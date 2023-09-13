@@ -2,9 +2,6 @@ import * as THREE from 'three';
 import * as editor from './js/editor_pane';
 import views from './views.json' assert {type: 'json'};
 
-console.log(views)
-
-
 // Initialize Three.js scene with an orthographic camera
 const scene = new THREE.Scene();
 const renderer = new THREE.WebGLRenderer();
@@ -26,9 +23,8 @@ const viewGrps = {};
 const activeView = Object.keys(views)[0];
 
 Object.keys(views).forEach((v, idx) => {
-    console.log(v);
     viewGrps[v] = {'grp':new THREE.Group(), 'cubes':[], 'cubePos':[], 'backBtns':[]}
-})
+});
 
 // Create an array to store cubes
 const cubeGrp = new THREE.Group();
@@ -94,12 +90,11 @@ function onMouseClick(event) {
 
     if (intersectsContainer.length > 0 && intersectsBackBtns.length == 0) {
     	doScale = true;
-        // Log the clicked cube's index and position
         const clickedCube = intersectsContainer[0].object;
         const cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
         activeIndex = cubeIndex;
-        console.log(`Clicked Cube Index: ${cubeIndex}`);
-        console.log(`Cube Position: x: ${clickedCube.position.x}, y: ${clickedCube.position.y}`);
+        //console.log(`Clicked Cube Index: ${cubeIndex}`);
+        //console.log(`Cube Position: x: ${clickedCube.position.x}, y: ${clickedCube.position.y}`);
         targetCameraPosition.copy(clickedCube.position);
     }else{
     	doScale = false;
@@ -116,7 +111,8 @@ function calculateAspectRatio() {
 
 // Function to determine the number of rows and columns based on window width
 function calculateGridSize() {
-    if (window.innerWidth < 700) {
+    console.log(window.innerWidth)
+    if (window.innerWidth < 600) {
         targetContainerScale = new THREE.Vector3(1.2, 1.2, 1.2);
         return { numRows: 6, numCols: 1 };
     } else if (window.innerWidth < 900) {
@@ -150,33 +146,34 @@ function createDynamicCube() {
     return cube;
 }
 
-// Function to create and position cubes in a grid
+// Function to create cubes for the grid
 function createCubeGrid() {
 
-    for (let row = 0; row < numRows; row++) {
+    Object.keys(views).forEach((v, idx) => {
+        var index = 0;
         for (let col = 0; col < numCols; col++) {
-            const cube = createDynamicCube();
-            const xOffset = (col - (numCols - 1) / 2) * (cubeSize + spacing);
-            const yOffset = (row - (numRows - 1) / 2) * (cubeSize + spacing);
+                for (let row = 0; row < numRows; row++) {
+                    if (index < views[v].length){
 
-            const geometry = new THREE.BoxGeometry(backBtnSize, backBtnSize, 1);
-		    const material = new THREE.MeshBasicMaterial({ color: Math.random() * 0xffffff , depthTest:true, transparent:true});
-		    const back = new THREE.Mesh(geometry, material);
+                        const cube = createDynamicCube();
+                        const geometry = new THREE.BoxGeometry(backBtnSize, backBtnSize, 1);
+                        const material = new THREE.MeshBasicMaterial({ color: Math.random() * 0xffffff , depthTest:true, transparent:true});
+                        const back = new THREE.Mesh(geometry, material);
 
+                        cube.add(back);
+                        back.position.set(-((cubeSize / 2) - (backBtnSize / 2)), (cubeSize / 2 ) - (backBtnSize / 2), 0);
+                        viewGrps[v].cubes.push(cube);
+                        viewGrps[v].cubePos.push(cube.position)
+                        viewGrps[v].backBtns.push(back);
+                        viewGrps[v].grp.add(cube);
+                        index++;
 
-            // Position the sprite at the top-left corner of the cube
-            //back.position.set(xOffset - (cubeSize / 2) + (cubeSize*0.1 / 2), yOffset + (cubeSize / 2 )- (cubeSize*0.1 / 2), 0);
-
-            cube.position.set(xOffset, yOffset, 0); // Z position remains at 0 in orthographic projection
-            //scene.add(cube);
-            cube.add(back);
-            back.position.set(-((cubeSize / 2) - (backBtnSize / 2)), (cubeSize / 2 ) - (backBtnSize / 2), 0);
-            viewGrps[activeView].cubes.push(cube);
-            viewGrps[activeView].cubePos.push(cube.position)
-            viewGrps[activeView].backBtns.push(back);
-            viewGrps[activeView].grp.add(cube);
+                    }
+                    
+            }
         }
-    }
+        
+    });
 }
 
 createCubeGrid(); // Create and add cubes to the scene
@@ -193,8 +190,6 @@ Object.keys(views).forEach((v, idx) => {
 
 
 function handleMouseWheel(event) {
-    //event.preventDefault();
-    console.log(event)
 
     // Check the direction of the mouse wheel (up or down)
     const delta = Math.sign(event.deltaY);
@@ -209,7 +204,7 @@ function handleMouseWheel(event) {
         activeIndex = items.length - 1;
     }
 
-    console.log(activeIndex)
+    //console.log(activeIndex)
 
     targetCameraPosition.copy(viewGrps[activeView].cubes[activeIndex].position);
     doScale = true;
@@ -223,7 +218,7 @@ document.addEventListener('wheel', handleMouseWheel);
 
 // Function to update the grid layout and cube positions on window resize
 function onWindowResize() {
-	console.log(window.innerWidth)
+	//console.log(window.innerWidth)
     const newAspectRatio = calculateAspectRatio();
     camera.left = (cubeSize * newAspectRatio) / -2;
     camera.right = (cubeSize * newAspectRatio) / 2;
@@ -234,20 +229,33 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     // Calculate the new grid layout
+    updateGrid()
+    
+}
+
+function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
     spacing = 0.1; // Adjust this for spacing between cubes
-    totalWidth = numCols * (cubeSize + spacing) - spacing;
-    totalHeight = numRows * (cubeSize + spacing) - spacing;
+
+    //console.log(numCols)
 
     // Reposition the cubes to fit the new grid layout
     let cubeIndex = 0;
     for (let row = 0; row < numRows; row++) {
-        for (let col = 0; col < numCols; col++) {
-            const cube = viewGrps[activeView].cubes[cubeIndex];
-            const xOffset = (col - (numCols - 1) / 2) * (cubeSize + spacing);
-            const yOffset = (row - (numRows - 1) / 2) * (cubeSize + spacing);
+        
+            for (let col = 0; col < numCols; col++) {
+                console.log(col - (numCols - 1) / 2)
+                console.log('-------------------')
+                console.log(row - (numRows - 1))
+                if(cubeIndex < views[activeView].length){
 
-            cube.position.set(xOffset, yOffset, 0);
+                    const cube = viewGrps[activeView].cubes[cubeIndex];
+                    const xOffset = (col - (numCols - 1) / 2) * (cubeSize + spacing);
+                    const yOffset = (row - (numRows - 1) / 2) * (cubeSize + spacing);
+
+                    cube.position.set(xOffset, -yOffset, 0);
+                }
+
             cubeIndex++;
         }
     }
