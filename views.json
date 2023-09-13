@@ -1,0 +1,14 @@
+{
+    "home": [
+        { "title": "container-1", "geo": "box", "span": [1,1], "elements":[] },
+        { "title": "container-2", "geo": "box", "span": [1,1], "elements":[] },
+        { "title": "container-3", "geo": "box", "span": [1,1], "elements":[] },
+        { "title": "container-4", "geo": "box", "span": [1,1], "elements":[] }
+    ],
+    "settings": [
+        { "title": "container-1", "geo": "box", "span": [1,1], "elements":[] },
+        { "title": "container-2", "geo": "box", "span": [1,1], "elements":[] },
+        { "title": "container-3", "geo": "box", "span": [1,1], "elements":[] },
+        { "title": "container-4", "geo": "box", "span": [1,1], "elements":[] }
+    ]
+}
