@@ -47,7 +47,7 @@ var CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
 let RESET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_START.x+GRID.offsetScale, CUBE_SCALE_START.y+GRID.offsetScale, CUBE_SCALE_START.z);
 let TARGET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_TARGET.x+GRID.offsetScale, CUBE_SCALE_TARGET.y+GRID.offsetScale, CUBE_SCALE_TARGET.z);
 
-var ACTIVE_IDX = -1;
+var ACTIVE_IDX = 0;
 var TGL_SCALE = false;
 
 
@@ -72,9 +72,11 @@ function scaleContainer() {
 
 	//switch to scale only the selected container
 	if(TGL_SCALE){
+        console.log(ACTIVE_IDX)
         gsap.to(viewGrps[activeView].cubes[ACTIVE_IDX].scale, {duration: NAV_SPEED.speed, x: TARGET_CUBE_SCALE.x, y: TARGET_CUBE_SCALE.y, z: TARGET_CUBE_SCALE.z, ease: NAV_EASE });
 
 	}else{
+
 		viewGrps[activeView].cubes.forEach((cube, idx) => {
             gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE });
 		})
@@ -114,10 +116,13 @@ function onMouseClick(event) {
     	TGL_SCALE = true;
         const clickedCube = intersectsContainer[0].object;
         const cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
-        ACTIVE_IDX = cubeIndex;
-        //console.log(`Clicked Cube Index: ${cubeIndex}`);
-        //console.log(`Cube Position: x: ${clickedCube.position.x}, y: ${clickedCube.position.y}`);
-        CAM_POS_TARGET.copy(clickedCube.position);
+        if(cubeIndex >= 0){
+            ACTIVE_IDX = cubeIndex;
+            CAM_POS_TARGET.copy(clickedCube.position);
+        }else{
+            TGL_SCALE = false;
+            CAM_POS_TARGET.copy(CAM_POS_START);
+        }
     }else{
     	TGL_SCALE = false;
     	CAM_POS_TARGET.copy(CAM_POS_START);
@@ -169,7 +174,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 function createCube(sizeX, sizeY){
-    const geometry = new THREE.PlaneGeometry(sizeX, sizeY, 1);
+    const geometry = new THREE.BoxGeometry(sizeX, sizeY, 1);
     const material = new THREE.MeshBasicMaterial({wireframe: true});
     const cube = new THREE.Mesh(geometry, material);
 
