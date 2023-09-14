@@ -9,21 +9,16 @@ const scene = new THREE.Scene();
 const renderer = new THREE.WebGLRenderer();
 const cubeSize = 100; // Use a relative size for the cube
 const backBtnSize = cubeSize*0.1
-//grid vars
-const GRID = editor_data.grid;
-var { numRows, numCols } = calculateGridSize();
-var SPACING = 0.1; // Adjust this for SPACING between cubes
-
-editor.bindGrid(GRID);
 
 //navigation vars
-//navigation vars
+const GRID = editor_data.navigation.grid;
+let { numRows, numCols } = calculateGridSize();
 const NAV_SPEED = editor_data.navigation.speed;
 const NAV_EASING = editor_data.navigation.easing;
 let NAV_EASE = 'none'
+let NAV = true;
 
-editor.bindNavVars(NAV_SPEED, NAV_EASING);
-
+editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid);
 
 const viewGrps = {};
 const activeView = Object.keys(views)[0];
@@ -49,51 +44,61 @@ const CUBE_SCALE_START = new THREE.Vector3(1, 1, 1);
 const CUBE_SCALE_NOW = new THREE.Vector3(1, 1, 1);
 var CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
 
+let RESET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_START.x+GRID.offsetScale, CUBE_SCALE_START.y+GRID.offsetScale, CUBE_SCALE_START.z);
+let TARGET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_TARGET.x+GRID.offsetScale, CUBE_SCALE_TARGET.y+GRID.offsetScale, CUBE_SCALE_TARGET.z);
+
 var ACTIVE_IDX = -1;
 var TGL_SCALE = false;
 
 
 // Function to smoothly interpolate camera position
-function lerpCameraPosition() {
+function panCamera() {
     const groupScale = viewGrps[activeView].grp.scale;
     const newX = CAM_POS_TARGET.x * groupScale.x;
     const newY = CAM_POS_TARGET.y * groupScale.y;
-    gsap.to(camera.position, {duration: NAV_SPEED.value, x: newX, y: newY, ease: "Power4.easeInOut" });
+    gsap.to(camera.position, {duration: NAV_SPEED.speed, x: newX, y: newY, ease: NAV_EASE , onComplete: onNavComplete});
 }
 
-function lerpContainer() {
+function scaleContainer() {
+    RESET_CUBE_SCALE.set(CUBE_SCALE_START.x+GRID.offsetScale, CUBE_SCALE_START.y+GRID.offsetScale, CUBE_SCALE_START.z);
+    TARGET_CUBE_SCALE.set(CUBE_SCALE_TARGET.x+GRID.offsetScale, CUBE_SCALE_TARGET.y+GRID.offsetScale, CUBE_SCALE_TARGET.z);
+    
 	//initial reset of all but selected containers
 	viewGrps[activeView].cubes.forEach((cube, idx) => {
 		if (idx != ACTIVE_IDX) {
-            gsap.to(cube.scale, {duration: NAV_SPEED.value, x: CUBE_SCALE_START.x, y: CUBE_SCALE_START.y, z: CUBE_SCALE_START.z, ease: NAV_EASE });
+            gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE });
 		}
 	})
 
 	//switch to scale only the selected container
 	if(TGL_SCALE){
-        gsap.to(viewGrps[activeView].cubes[ACTIVE_IDX].scale, {duration: NAV_SPEED.value, x: CUBE_SCALE_TARGET.x, y: CUBE_SCALE_TARGET.y, z: CUBE_SCALE_TARGET.z, ease: NAV_EASE });
+        gsap.to(viewGrps[activeView].cubes[ACTIVE_IDX].scale, {duration: NAV_SPEED.speed, x: TARGET_CUBE_SCALE.x, y: TARGET_CUBE_SCALE.y, z: TARGET_CUBE_SCALE.z, ease: NAV_EASE });
 
 	}else{
 		viewGrps[activeView].cubes.forEach((cube, idx) => {
-            gsap.to(cube.scale, {duration: NAV_SPEED.value, x: CUBE_SCALE_START.x, y: CUBE_SCALE_START.y, z: CUBE_SCALE_START.z, ease: NAV_EASE });
+            gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE });
 		})
 	}
 }
 
 function handleNav(){
+    if(!NAV)
+        return;
+
     if(NAV_EASING.ease!= 'none'){
         NAV_EASE = NAV_EASING.ease+'.'+NAV_EASING.easeType
-        console.log(NAV_EASING.ease+'.'+NAV_EASING.easeType)
     }
-    lerpCameraPosition();
-    lerpContainer();
+
+    panCamera();
+    scaleContainer();
+}
+
+function onNavComplete(){
+    console.log('nav complete')
 }
 
 // Function to handle mouse click events
 function onMouseClick(event) {
-    console.log(NAV_EASING)
-    console.log(NAV_SPEED.value)
-
     // Calculate mouse position in normalized device coordinates (NDC)
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -133,12 +138,18 @@ function calculateGridSize() {
     console.log(window.innerWidth)
     if (window.innerWidth < 600) {
         CUBE_SCALE_TARGET = new THREE.Vector3(1.2, 1.2, 1.2);
+        GRID.rows = 6
+        GRID.columns = 1
         return { numRows: 6, numCols: 1 };
     } else if (window.innerWidth < 900) {
         CUBE_SCALE_TARGET = new THREE.Vector3(1.5, 1.5, 1.5);
+        GRID.rows = 3
+        GRID.columns = 2
         return { numRows: 3, numCols: 2 };
     } else {
         CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
+        GRID.rows = 2
+        GRID.columns = 3
         return { numRows: 2, numCols: 3 };
     }
 }
@@ -158,8 +169,8 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 function createCube(sizeX, sizeY){
-    const geometry = new THREE.BoxGeometry(sizeX, sizeY, 1);
-    const material = new THREE.MeshBasicMaterial({ color: Math.random() * 0xffffff , depthTest:true, transparent:true});
+    const geometry = new THREE.PlaneGeometry(sizeX, sizeY, 1);
+    const material = new THREE.MeshBasicMaterial({wireframe: true});
     const cube = new THREE.Mesh(geometry, material);
 
     return cube
@@ -173,7 +184,7 @@ function createGridCube() {
 function createMinimizeCube(parent, pSizeX, pSizeY) {
     const cube = createCube(backBtnSize, backBtnSize);
     parent.add(cube);
-    cube.position.set(-((pSizeX / 2) - (backBtnSize / 2)), (pSizeY / 2 ) - (backBtnSize / 2), 0);
+    cube.position.set(-((pSizeX / 2) - (backBtnSize / 2)), (pSizeY / 2 ) - (backBtnSize / 2), parent.position.z+0.1);
     return createCube(backBtnSize, backBtnSize);
 }
 
@@ -254,22 +265,18 @@ function onWindowResize() {
 
 function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
-    SPACING = 0.1; // Adjust this for SPACING between cubes
-
-    //console.log(numCols)
-
+        console.log('Update Grid')
+        console.log(GRID.spacing)
     // Reposition the cubes to fit the new grid layout
     let cubeIndex = 0;
     for (let row = 0; row < numRows; row++) {
         
         for (let col = 0; col < numCols; col++) {
-            console.log(col - (numCols - 1) / 2)
-            console.log('-------------------')
-            console.log(row - (numRows - 1))
             const cube = viewGrps[activeView].cubes[cubeIndex];
-            const xOffset = (col - (numCols - 1) / 2) * (cubeSize + SPACING);
-            const yOffset = (row - (numRows - 1) / 2) * (cubeSize + SPACING);
+            const xOffset = (col - (numCols - 1) / 2) * (cubeSize + GRID.spacing);
+            const yOffset = (row - (numRows - 1) / 2) * (cubeSize + GRID.spacing);
 
+            cube.scale.set(cube.scale.x+GRID.offsetScale, cube.scale.y+GRID.offsetScale, cube.scale.z)
             cube.position.set(xOffset, -yOffset, 0);
 
             cubeIndex++;
@@ -287,3 +294,10 @@ function animate() {
 }
 
 animate();
+
+document.onkeydown = function(e) {
+    //Toggle nav for editing grid
+    if(e.key.toLowerCase() == 'x'){
+        NAV = !NAV;
+    }
+}

@@ -3,31 +3,55 @@ const pane = new Pane();
 
 const MAX_COLS = 4
 const MAX_ROWS = 20
+const MAX_SPACING = 20
 
-export function bindGrid(grid){
+console.log(pane)
 
-	pane.addBinding(grid, 'rows', {
+const navCtrls = pane.addFolder({
+  title: 'Navigation',
+  expanded: true,   // optional
+})
+
+
+export function bindNavVars(grid_vars, speed_vars, ease_vars, callback){
+
+	let needUpdate = ['spacing', 'offsetScale'];
+
+	navCtrls.addBinding(grid_vars, 'rows', {
 	  step:1,
 	  min: 0,
   	  max: MAX_ROWS,
 	});
 
-	pane.addBinding(grid, 'columns', {
+	navCtrls.addBinding(grid_vars, 'columns', {
 	  step:1,
 	  min: 0,
   	  max: MAX_COLS,
 	});
-};
 
-export function bindNavVars(speed_vars, ease_vars){
+	navCtrls.addBinding(grid_vars, 'spacing', {
+		  step:0.001,
+		  min: 0,
+	  	  max: MAX_SPACING,
+		}).on('change', (ev) => {
+		  callback();
+		});
 
-	pane.addBinding(speed_vars, 'value', {
+	navCtrls.addBinding(grid_vars, 'offsetScale', {
+		  step:0.001,
+		  min: -0.3,
+	  	  max: 0.3,
+		}).on('change', (ev) => {
+		  callback();
+		});
+
+	navCtrls.addBinding(speed_vars, 'speed', {
 	  step: 0.01,
 	  min: 0.001,
   	  max: 2,
 	});
 
-	pane.addBinding(ease_vars, 'ease', {
+	navCtrls.addBinding(ease_vars, 'ease', {
 	  options: {
 	  	none: 'none',
 	    expo: 'expo',
@@ -44,7 +68,7 @@ export function bindNavVars(speed_vars, ease_vars){
 	  },
 	});
 
-	pane.addBinding(ease_vars, 'easeType', {
+	navCtrls.addBinding(ease_vars, 'easeType', {
 	  options: {
 	  	in: 'in',
 	    inOut: 'inOut',

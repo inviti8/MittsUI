@@ -1,10 +1,12 @@
 {
-	"grid":{
-		"rows":2,
-		"columns":3
-	},
 	"navigation":{
-		"speed":{"value":0.5},
+		"grid":{
+			"rows":2,
+			"columns":3,
+			"spacing":0,
+			"offsetScale": 0
+		},
+		"speed":{"speed":0.5},
 		"easing":{
 			"ease":"none",
 			"easeType":"in"
