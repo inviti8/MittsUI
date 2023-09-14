@@ -1,0 +1,13 @@
+{
+	"grid":{
+		"rows":2,
+		"columns":3
+	},
+	"navigation":{
+		"speed":{"value":0.5},
+		"easing":{
+			"ease":"none",
+			"easeType":"in"
+		}
+	}
+}

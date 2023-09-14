@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { gsap } from "gsap";
+import editor_data from './editor_data.json' assert {type: 'json'};
 import * as editor from './js/editor_pane';
 import views from './views.json' assert {type: 'json'};
 
@@ -8,16 +10,20 @@ const renderer = new THREE.WebGLRenderer();
 const cubeSize = 100; // Use a relative size for the cube
 const backBtnSize = cubeSize*0.1
 //grid vars
-const GRID = {
-  rows: 2,
-  columns: 3,
-};
+const GRID = editor_data.grid;
 var { numRows, numCols } = calculateGridSize();
-var spacing = 0.1; // Adjust this for spacing between cubes
-var totalWidth = numCols * (cubeSize + spacing) - spacing;
-var totalHeight = numRows * (cubeSize + spacing) - spacing;
+var SPACING = 0.1; // Adjust this for SPACING between cubes
 
 editor.bindGrid(GRID);
+
+//navigation vars
+//navigation vars
+const NAV_SPEED = editor_data.navigation.speed;
+const NAV_EASING = editor_data.navigation.easing;
+let NAV_EASE = 'none'
+
+editor.bindNavVars(NAV_SPEED, NAV_EASING);
+
 
 const viewGrps = {};
 const activeView = Object.keys(views)[0];
@@ -35,48 +41,59 @@ const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
 
 // Variables to store the current and target camera positions
-const startCameraPosition = new THREE.Vector3();
-const currentCameraPosition = new THREE.Vector3();
-const targetCameraPosition = new THREE.Vector3();
+const CAM_POS_START = new THREE.Vector3();
+const CAM_POS_NOW = new THREE.Vector3();
+const CAM_POS_TARGET = new THREE.Vector3();
 
-const startContainerScale = new THREE.Vector3(1, 1, 1);
-const currentContainerScale = new THREE.Vector3(1, 1, 1);
-var targetContainerScale = new THREE.Vector3(1.8, 1.8, 1.8);
+const CUBE_SCALE_START = new THREE.Vector3(1, 1, 1);
+const CUBE_SCALE_NOW = new THREE.Vector3(1, 1, 1);
+var CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
 
-var activeIndex = -1;
-const containerOffset = new THREE.Vector3(0, 0, -1);
-var doScale = false;
+var ACTIVE_IDX = -1;
+var TGL_SCALE = false;
 
 
 // Function to smoothly interpolate camera position
-function lerpCameraPosition(alpha) {
-    currentCameraPosition.lerp(targetCameraPosition, alpha);
+function lerpCameraPosition() {
     const groupScale = viewGrps[activeView].grp.scale;
-    camera.position.copy(currentCameraPosition).multiply(groupScale);
-    camera.position.z = 100;
+    const newX = CAM_POS_TARGET.x * groupScale.x;
+    const newY = CAM_POS_TARGET.y * groupScale.y;
+    gsap.to(camera.position, {duration: NAV_SPEED.value, x: newX, y: newY, ease: "Power4.easeInOut" });
 }
 
-function lerpContainer(alpha) {
+function lerpContainer() {
 	//initial reset of all but selected containers
 	viewGrps[activeView].cubes.forEach((cube, idx) => {
-		if (idx != activeIndex) {
-			cube.scale.lerp(startContainerScale, alpha);
+		if (idx != ACTIVE_IDX) {
+            gsap.to(cube.scale, {duration: NAV_SPEED.value, x: CUBE_SCALE_START.x, y: CUBE_SCALE_START.y, z: CUBE_SCALE_START.z, ease: NAV_EASE });
 		}
 	})
 
 	//switch to scale only the selected container
-	if(doScale){
-		viewGrps[activeView].cubes[activeIndex].scale.lerp(targetContainerScale, alpha);
+	if(TGL_SCALE){
+        gsap.to(viewGrps[activeView].cubes[ACTIVE_IDX].scale, {duration: NAV_SPEED.value, x: CUBE_SCALE_TARGET.x, y: CUBE_SCALE_TARGET.y, z: CUBE_SCALE_TARGET.z, ease: NAV_EASE });
 
 	}else{
 		viewGrps[activeView].cubes.forEach((cube, idx) => {
-			cube.scale.lerp(startContainerScale, alpha);
+            gsap.to(cube.scale, {duration: NAV_SPEED.value, x: CUBE_SCALE_START.x, y: CUBE_SCALE_START.y, z: CUBE_SCALE_START.z, ease: NAV_EASE });
 		})
 	}
 }
 
+function handleNav(){
+    if(NAV_EASING.ease!= 'none'){
+        NAV_EASE = NAV_EASING.ease+'.'+NAV_EASING.easeType
+        console.log(NAV_EASING.ease+'.'+NAV_EASING.easeType)
+    }
+    lerpCameraPosition();
+    lerpContainer();
+}
+
 // Function to handle mouse click events
 function onMouseClick(event) {
+    console.log(NAV_EASING)
+    console.log(NAV_SPEED.value)
+
     // Calculate mouse position in normalized device coordinates (NDC)
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -89,17 +106,19 @@ function onMouseClick(event) {
     const intersectsBackBtns = raycaster.intersectObjects(viewGrps[activeView].backBtns);
 
     if (intersectsContainer.length > 0 && intersectsBackBtns.length == 0) {
-    	doScale = true;
+    	TGL_SCALE = true;
         const clickedCube = intersectsContainer[0].object;
         const cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
-        activeIndex = cubeIndex;
+        ACTIVE_IDX = cubeIndex;
         //console.log(`Clicked Cube Index: ${cubeIndex}`);
         //console.log(`Cube Position: x: ${clickedCube.position.x}, y: ${clickedCube.position.y}`);
-        targetCameraPosition.copy(clickedCube.position);
+        CAM_POS_TARGET.copy(clickedCube.position);
     }else{
-    	doScale = false;
-    	targetCameraPosition.copy(startCameraPosition);
+    	TGL_SCALE = false;
+    	CAM_POS_TARGET.copy(CAM_POS_START);
     }
+
+    handleNav();
 }
 
 window.addEventListener('click', onMouseClick, false);
@@ -113,13 +132,13 @@ function calculateAspectRatio() {
 function calculateGridSize() {
     console.log(window.innerWidth)
     if (window.innerWidth < 600) {
-        targetContainerScale = new THREE.Vector3(1.2, 1.2, 1.2);
+        CUBE_SCALE_TARGET = new THREE.Vector3(1.2, 1.2, 1.2);
         return { numRows: 6, numCols: 1 };
     } else if (window.innerWidth < 900) {
-        targetContainerScale = new THREE.Vector3(1.5, 1.5, 1.5);
+        CUBE_SCALE_TARGET = new THREE.Vector3(1.5, 1.5, 1.5);
         return { numRows: 3, numCols: 2 };
     } else {
-        targetContainerScale = new THREE.Vector3(1.8, 1.8, 1.8);
+        CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
         return { numRows: 2, numCols: 3 };
     }
 }
@@ -198,22 +217,19 @@ function handleMouseWheel(event) {
     const delta = Math.sign(event.deltaY);
 
     // Increment or decrement the current index based on the wheel direction
-    activeIndex += delta;
+    ACTIVE_IDX += delta;
 
     // Ensure the index stays within the bounds of the array
-    if (activeIndex < 0) {
-        activeIndex = 0;
-    } else if (activeIndex >= viewGrps[activeView].cubes.length) {
-        activeIndex = items.length - 1;
+    if (ACTIVE_IDX < 0) {
+        ACTIVE_IDX = 0;
+    } else if (ACTIVE_IDX >= viewGrps[activeView].cubes.length) {
+        ACTIVE_IDX = items.length - 1;
     }
 
-    //console.log(activeIndex)
+    CAM_POS_TARGET.copy(viewGrps[activeView].cubes[ACTIVE_IDX].position);
+    TGL_SCALE = true;
 
-    targetCameraPosition.copy(viewGrps[activeView].cubes[activeIndex].position);
-    doScale = true;
-
-    // Update the content or perform any action with the current item
-    //updateContent();
+    handleNav();
 }
 
 document.addEventListener('wheel', handleMouseWheel);
@@ -238,7 +254,7 @@ function onWindowResize() {
 
 function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
-    spacing = 0.1; // Adjust this for spacing between cubes
+    SPACING = 0.1; // Adjust this for SPACING between cubes
 
     //console.log(numCols)
 
@@ -251,8 +267,8 @@ function updateGrid(){
             console.log('-------------------')
             console.log(row - (numRows - 1))
             const cube = viewGrps[activeView].cubes[cubeIndex];
-            const xOffset = (col - (numCols - 1) / 2) * (cubeSize + spacing);
-            const yOffset = (row - (numRows - 1) / 2) * (cubeSize + spacing);
+            const xOffset = (col - (numCols - 1) / 2) * (cubeSize + SPACING);
+            const yOffset = (row - (numRows - 1) / 2) * (cubeSize + SPACING);
 
             cube.position.set(xOffset, -yOffset, 0);
 
@@ -263,16 +279,10 @@ function updateGrid(){
 
 window.addEventListener('resize', onWindowResize);
 
-// Function to smoothly update camera position
-function updateView() {
-    lerpCameraPosition(0.1); // Adjust the interpolation speed (0.1 is a good starting point)
-    lerpContainer(0.1);
-}
 
 // Add this to your existing animate function
 function animate() {
     requestAnimationFrame(animate);
-    updateView(); // Call the camera position update function
     renderer.render(scene, camera);
 }
 
