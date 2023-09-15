@@ -111,7 +111,6 @@ export function bindPanelCtrls(props, onIndexChange, handleContainer){
 		step:1,
 		min: 0,
   		max: 20,
-		format: (v) => (v == 0 ? 1 : -1),
 	}).on('change', (ev) => {
 		console.log(ev.value)
 		onIndexChange(ev.value);
@@ -120,11 +119,19 @@ export function bindPanelCtrls(props, onIndexChange, handleContainer){
 	panelCtrls.addBinding(span, 'span', {
 		x: {step: 1, min: 1, max: 3},
   		y: {step: 1, min: 1, max: 2},
+  		format: (v) => Math.floor(v),
+	}).on('change', (ev) => {
+		console.log('span change')
+		handleContainer('edit', props);
 	});
 
 	panelCtrls.addBinding(spanDirection, 'spanDirection', {
 		x: {step: 1, min: -1, max: 1},
   		y: {step: 1, min: -1, max: 1},
+  		format: (v) => (v == 0 ? 1 : -1),
+	}).on('change', (ev) => {
+
+		handleContainer('edit', props);
 	});
 
 	props.actions.forEach((action, idx) => {
@@ -134,7 +141,7 @@ export function bindPanelCtrls(props, onIndexChange, handleContainer){
 		}).on('click', () => {
   			console.log(props.span);
   			handleContainer(action, props)
-		});;
+		});
     	
 	});
 

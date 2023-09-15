@@ -26,7 +26,7 @@ const NAV_SPEED = editor_data.navigation.speed;
 const NAV_EASING = editor_data.navigation.easing;
 let NAV_EASE = 'none'
 let NAV = false;
-let LAST_INDEX = -1;
+let LAST_INDEX = 0;
 
 editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid);
 
@@ -146,7 +146,7 @@ function calculateAspectRatio() {
 
 // Function to determine the number of rows and columns based on window width
 function calculateGridSize() {
-    console.log(window.innerWidth)
+    //console.log(window.innerWidth)
     if (window.innerWidth < 600) {
         CUBE_SCALE_TARGET.set(1.2, 1.2, 1.2);
         return { numRows: 6, numCols: 1 };
@@ -209,8 +209,6 @@ function panelContainerMesh( action, props ){
     const spanDir = props.spanDirection;
     const parent = viewGrps[activeView].cubes[LAST_INDEX];
     const parentSize = getSize(parent)
-    console.log(parent.scale)
-    console.log(parentSize)
 
     switch (action) {
         case 'add':
@@ -218,8 +216,6 @@ function panelContainerMesh( action, props ){
             if(viewGrps[activeView].panels[LAST_INDEX] == null){
                 const panel = createCube(cubeSize*spans.x, cubeSize*spans.y);
                 const panelSize = getSize(panel)
-                console.log(panel.scale)
-                console.log(panelSize)
                 panel.material.wireframe = false;
                 parent.add(panel);
                 panel.position.set(((cubeSize/2)-(panelSize.width/2))*spanDir.x, ((cubeSize/2)-(panelSize.height/2))*spanDir.y, 10);
@@ -242,10 +238,21 @@ function panelContainerMesh( action, props ){
             break;
         case 'edit':
 
-            if(viewGrps[activeView].panels[LAST_INDEX] != null){
-                panel = viewGrps[activeView].panels[LAST_INDEX];
-                panel.width = cubeSize*spans.x;
-                panel.height = cubeSize*spans.y; 
+            if(viewGrps[activeView].panels[LAST_INDEX] != undefined){
+
+                const panel = viewGrps[activeView].panels[LAST_INDEX];
+                const panelSize = getSize(panel)
+                
+                panel.scale.set(1*spans.x, 1*spans.y, 1)
+
+                const parentHalfWidthX = parent.scale.x * parent.geometry.parameters.width * 0.5;
+                const childHalfWidthX = panel.scale.x * panel.geometry.parameters.width * 0.5;
+                const parentHalfWidthY = parent.scale.y * parent.geometry.parameters.height * 0.5;
+                const childHalfWidthY = panel.scale.y * panel.geometry.parameters.height * 0.5;
+                const newX = parentHalfWidthX - childHalfWidthX;
+                const newY = parentHalfWidthY - childHalfWidthY;
+
+                panel.position.set(Math.floor(newX)*spanDir.x, Math.floor(newY)*spanDir.y, 1);
 
             }
             break;
@@ -272,7 +279,7 @@ function createGrid() {
 
     Object.keys(views).forEach((v, idx) => {
         var index = 0;
-        console.log(v)
+        //console.log(v)
         for (let col = 0; col < numCols; col++) {
             for (let row = 0; row < numRows; row++) {
                 const cube = createGridMesh();
