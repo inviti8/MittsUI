@@ -91,7 +91,7 @@ export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid){
 	});
 };
 
-export function bindPanelCtrls(props, onIndexChange){
+export function bindPanelCtrls(props, onIndexChange, handleContainer){
 
 	const index = {
 		index: props.index,
@@ -101,29 +101,39 @@ export function bindPanelCtrls(props, onIndexChange){
 		span: props.span,
 	}
 
-	console.log(props.span)
+	const spanDirection = {
+		spanDirection: props.spanDirection,
+	}
+
+	console.log(props)
 
 	panelCtrls.addBinding(index, 'index', {
 		step:1,
 		min: 0,
   		max: 20,
-		format: (v) => v.toFixed(1),
+		format: (v) => (v == 0 ? 1 : -1),
 	}).on('change', (ev) => {
 		console.log(ev.value)
 		onIndexChange(ev.value);
 	});
 
 	panelCtrls.addBinding(span, 'span', {
-		x: {step: 1, min: 0, max: 2},
-  		y: {step: 1, min: 0, max: 3},
+		x: {step: 1, min: 1, max: 3},
+  		y: {step: 1, min: 1, max: 2},
+	});
+
+	panelCtrls.addBinding(spanDirection, 'spanDirection', {
+		x: {step: 1, min: -1, max: 1},
+  		y: {step: 1, min: -1, max: 1},
 	});
 
 	props.actions.forEach((action, idx) => {
 
 		panelCtrls.addButton({
   			title: action
-		}).on('click', (e) => {
-  			console.log(e);
+		}).on('click', () => {
+  			console.log(props.span);
+  			handleContainer(action, props)
 		});;
     	
 	});

@@ -25,7 +25,7 @@ let { numRows, numCols } = calculateGridSize();
 const NAV_SPEED = editor_data.navigation.speed;
 const NAV_EASING = editor_data.navigation.easing;
 let NAV_EASE = 'none'
-let NAV = true;
+let NAV = false;
 let LAST_INDEX = -1;
 
 editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid);
@@ -33,13 +33,13 @@ editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid);
 //panel vars
 const PANEL_PROPS = editor_data.panels.properties;
 
-editor.bindPanelCtrls(PANEL_PROPS, hiliteGridBox);
+editor.bindPanelCtrls(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
 
 const viewGrps = {};
 const activeView = Object.keys(views)[0];
 
 Object.keys(views).forEach((v, idx) => {
-    viewGrps[v] = {'grp':new THREE.Group(), 'cubes':[], 'cubePos':[], 'backBtns':[]}
+    viewGrps[v] = {'grp':new THREE.Group(), 'cubes':[], 'cubePos':[], 'backBtns':[], 'panels':{}}
 });
 
 // Create an array to store cubes
@@ -173,6 +173,15 @@ const camera = new THREE.OrthographicCamera(
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+function getSize(elem){
+    var bbox = new THREE.Box3();
+    bbox.setFromObject( elem );
+    var width = bbox.max.x - bbox.min.x;
+    var height = bbox.max.y - bbox.min.y;
+
+    return {'width': width, 'height': height}
+}
+
 function createCube(sizeX, sizeY){
     const geometry = new THREE.PlaneGeometry(sizeX, sizeY, 1);
     const material = new THREE.MeshBasicMaterial({wireframe: true});
@@ -191,6 +200,59 @@ function createMinimizeMesh(parent, pSizeX, pSizeY) {
     parent.add(cube);
     cube.position.set(-((pSizeX / 2) - (backBtnSize / 2)), (pSizeY / 2 ) - (backBtnSize / 2), parent.position.z+0.1);
     return createCube(backBtnSize, backBtnSize);
+}
+
+function panelContainerMesh( action, props ){
+    if(viewGrps[activeView].cubes[LAST_INDEX] == undefined)
+        return;
+    const spans = props.span;
+    const spanDir = props.spanDirection;
+    const parent = viewGrps[activeView].cubes[LAST_INDEX];
+    const parentSize = getSize(parent)
+    console.log(parent.scale)
+    console.log(parentSize)
+
+    switch (action) {
+        case 'add':
+
+            if(viewGrps[activeView].panels[LAST_INDEX] == null){
+                const panel = createCube(cubeSize*spans.x, cubeSize*spans.y);
+                const panelSize = getSize(panel)
+                console.log(panel.scale)
+                console.log(panelSize)
+                panel.material.wireframe = false;
+                parent.add(panel);
+                panel.position.set(((cubeSize/2)-(panelSize.width/2))*spanDir.x, ((cubeSize/2)-(panelSize.height/2))*spanDir.y, 10);
+                viewGrps[activeView].panels[LAST_INDEX] = panel;
+            }else{
+                alert("Slot is taken, remove to add a new panel container.")
+            }
+
+            break;
+        case 'remove':
+
+            if(viewGrps[activeView].panels[LAST_INDEX] != null){
+                let panel = viewGrps[activeView].panels[LAST_INDEX];
+                delete viewGrps[activeView].panels[LAST_INDEX];
+                parent.remove(panel);
+            }else{
+                alert("Nothing to remove.")
+            }
+
+            break;
+        case 'edit':
+
+            if(viewGrps[activeView].panels[LAST_INDEX] != null){
+                panel = viewGrps[activeView].panels[LAST_INDEX];
+                panel.width = cubeSize*spans.x;
+                panel.height = cubeSize*spans.y; 
+
+            }
+            break;
+
+        default:
+            console.log("Not used");
+    }
 }
 
 function hiliteGridBox(index){

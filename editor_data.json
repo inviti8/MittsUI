@@ -16,6 +16,7 @@
 		"properties":{
 			"index":0,
 			"span": {"x": 1, "y": 1},
+			"spanDirection": {"x": -1, "y": 1},
 			"creation":{
 			"element":"button",
 			"alignment":"center"
