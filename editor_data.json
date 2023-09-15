@@ -11,5 +11,19 @@
 			"ease":"none",
 			"easeType":"in"
 		}
+	},
+	"panels":{
+		"properties":{
+			"index":0,
+			"span": {"x": 1, "y": 1},
+			"creation":{
+			"element":"button",
+			"alignment":"center"
+			},
+			"actions":[
+				"add",
+				"remove"
+			]
+		}
 	}
 }

@@ -10,6 +10,15 @@ const renderer = new THREE.WebGLRenderer();
 const cubeSize = 100; // Use a relative size for the cube
 const backBtnSize = cubeSize*0.1
 
+// Variables to store the current and target camera positions
+const CAM_POS_START = new THREE.Vector3();
+const CAM_POS_NOW = new THREE.Vector3();
+var CAM_POS_TARGET = new THREE.Vector3();
+
+const CUBE_SCALE_START = new THREE.Vector3(1, 1, 1);
+const CUBE_SCALE_NOW = new THREE.Vector3(1, 1, 1);
+let CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
+
 //navigation vars
 const GRID = editor_data.navigation.grid;
 let { numRows, numCols } = calculateGridSize();
@@ -17,8 +26,14 @@ const NAV_SPEED = editor_data.navigation.speed;
 const NAV_EASING = editor_data.navigation.easing;
 let NAV_EASE = 'none'
 let NAV = true;
+let LAST_INDEX = -1;
 
 editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid);
+
+//panel vars
+const PANEL_PROPS = editor_data.panels.properties;
+
+editor.bindPanelCtrls(PANEL_PROPS, hiliteGridBox);
 
 const viewGrps = {};
 const activeView = Object.keys(views)[0];
@@ -34,15 +49,6 @@ scene.add(viewGrps[activeView].grp);
 // Initialize the mouse vector
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
-
-// Variables to store the current and target camera positions
-const CAM_POS_START = new THREE.Vector3();
-const CAM_POS_NOW = new THREE.Vector3();
-const CAM_POS_TARGET = new THREE.Vector3();
-
-const CUBE_SCALE_START = new THREE.Vector3(1, 1, 1);
-const CUBE_SCALE_NOW = new THREE.Vector3(1, 1, 1);
-var CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
 
 let RESET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_START.x+GRID.offsetScale, CUBE_SCALE_START.y+GRID.offsetScale, CUBE_SCALE_START.z);
 let TARGET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_TARGET.x+GRID.offsetScale, CUBE_SCALE_TARGET.y+GRID.offsetScale, CUBE_SCALE_TARGET.z);
@@ -87,7 +93,7 @@ function handleNav(){
     if(!NAV)
         return;
 
-    if(NAV_EASING.ease!= 'none'){
+    if(NAV_EASING.ease != 'none'){
         NAV_EASE = NAV_EASING.ease+'.'+NAV_EASING.easeType
     }
 
@@ -142,19 +148,13 @@ function calculateAspectRatio() {
 function calculateGridSize() {
     console.log(window.innerWidth)
     if (window.innerWidth < 600) {
-        CUBE_SCALE_TARGET = new THREE.Vector3(1.2, 1.2, 1.2);
-        GRID.rows = 6
-        GRID.columns = 1
+        CUBE_SCALE_TARGET.set(1.2, 1.2, 1.2);
         return { numRows: 6, numCols: 1 };
     } else if (window.innerWidth < 900) {
-        CUBE_SCALE_TARGET = new THREE.Vector3(1.5, 1.5, 1.5);
-        GRID.rows = 3
-        GRID.columns = 2
+        CUBE_SCALE_TARGET.set(1.5, 1.5, 1.5);
         return { numRows: 3, numCols: 2 };
     } else {
-        CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
-        GRID.rows = 2
-        GRID.columns = 3
+        CUBE_SCALE_TARGET.set(1.8, 1.8, 1.8);
         return { numRows: 2, numCols: 3 };
     }
 }
@@ -167,14 +167,14 @@ const camera = new THREE.OrthographicCamera(
     cubeSize / 2,
     cubeSize / -2,
     0.1,
-    10000
+    1000
 );
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 function createCube(sizeX, sizeY){
-    const geometry = new THREE.BoxGeometry(sizeX, sizeY, 1);
+    const geometry = new THREE.PlaneGeometry(sizeX, sizeY, 1);
     const material = new THREE.MeshBasicMaterial({wireframe: true});
     const cube = new THREE.Mesh(geometry, material);
 
@@ -182,15 +182,27 @@ function createCube(sizeX, sizeY){
 }
 
 // Function to create a cube with dynamic size
-function createGridCube() {
+function createGridMesh() {
     return createCube(cubeSize, cubeSize);
 }
 
-function createMinimizeCube(parent, pSizeX, pSizeY) {
+function createMinimizeMesh(parent, pSizeX, pSizeY) {
     const cube = createCube(backBtnSize, backBtnSize);
     parent.add(cube);
     cube.position.set(-((pSizeX / 2) - (backBtnSize / 2)), (pSizeY / 2 ) - (backBtnSize / 2), parent.position.z+0.1);
     return createCube(backBtnSize, backBtnSize);
+}
+
+function hiliteGridBox(index){
+    if(index > viewGrps[activeView].cubes.length-1)
+        return;
+
+    viewGrps[activeView].cubes.forEach((cube, idx) => {
+        cube.material.color.set('white');
+    });
+
+    viewGrps[activeView].cubes[index].material.color.set('green');
+    LAST_INDEX = index;
 }
 
 // Function to create cubes for the grid
@@ -201,8 +213,8 @@ function createGrid() {
         console.log(v)
         for (let col = 0; col < numCols; col++) {
             for (let row = 0; row < numRows; row++) {
-                const cube = createGridCube();
-                const back = createMinimizeCube(cube, cubeSize, cubeSize)
+                const cube = createGridMesh();
+                const back = createMinimizeMesh(cube, cubeSize, cubeSize)
 
                 viewGrps[v].cubes.push(cube);
                 viewGrps[v].cubePos.push(cube.position)
@@ -264,14 +276,12 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     // Calculate the new grid layout
-    updateGrid()
+    updateGrid();
     
 }
 
 function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
-        console.log('Update Grid')
-        console.log(GRID.spacing)
     // Reposition the cubes to fit the new grid layout
     let cubeIndex = 0;
     for (let row = 0; row < numRows; row++) {

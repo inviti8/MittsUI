@@ -10,10 +10,20 @@ console.log(pane)
 const navCtrls = pane.addFolder({
   title: 'Navigation',
   expanded: true,   // optional
-})
+});
+
+const panelCtrls = pane.addFolder({
+  title: 'Panels',
+  expanded: true,   // optional
+});
+
+const elemCtrls = pane.addFolder({
+  title: 'Elements',
+  expanded: false,   // optional
+});
 
 
-export function bindNavVars(grid_vars, speed_vars, ease_vars, callback){
+export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid){
 
 	let needUpdate = ['spacing', 'offsetScale'];
 
@@ -21,29 +31,33 @@ export function bindNavVars(grid_vars, speed_vars, ease_vars, callback){
 	  step:1,
 	  min: 0,
   	  max: MAX_ROWS,
+	}).on('change', (ev) => {
+		 updateGrid();
 	});
 
 	navCtrls.addBinding(grid_vars, 'columns', {
 	  step:1,
 	  min: 0,
   	  max: MAX_COLS,
+	}).on('change', (ev) => {
+		 updateGrid();
 	});
 
 	navCtrls.addBinding(grid_vars, 'spacing', {
 		  step:0.001,
 		  min: 0,
 	  	  max: MAX_SPACING,
-		}).on('change', (ev) => {
-		  callback();
-		});
+	}).on('change', (ev) => {
+		 updateGrid();
+	});
 
 	navCtrls.addBinding(grid_vars, 'offsetScale', {
 		  step:0.001,
 		  min: -0.3,
 	  	  max: 0.3,
-		}).on('change', (ev) => {
-		  callback();
-		});
+	}).on('change', (ev) => {
+		 updateGrid();
+	});
 
 	navCtrls.addBinding(speed_vars, 'speed', {
 	  step: 0.01,
@@ -77,9 +91,76 @@ export function bindNavVars(grid_vars, speed_vars, ease_vars, callback){
 	});
 };
 
-export function bindNavEase(vars){
+export function bindPanelCtrls(props, onIndexChange){
 
-	
+	const index = {
+		index: props.index,
+	}
+
+	const span = {
+		span: props.span,
+	}
+
+	console.log(props.span)
+
+	panelCtrls.addBinding(index, 'index', {
+		step:1,
+		min: 0,
+  		max: 20,
+		format: (v) => v.toFixed(1),
+	}).on('change', (ev) => {
+		console.log(ev.value)
+		onIndexChange(ev.value);
+	});
+
+	panelCtrls.addBinding(span, 'span', {
+		x: {step: 1, min: 0, max: 2},
+  		y: {step: 1, min: 0, max: 3},
+	});
+
+	props.actions.forEach((action, idx) => {
+
+		panelCtrls.addButton({
+  			title: action
+		}).on('click', (e) => {
+  			console.log(e);
+		});;
+    	
+	});
+
+
+};
+
+export function bindElemCtrls(props, onIndexChange){
+
+	elemCtrls.addBinding(props.creation, 'element', {
+	    options: {
+	  	button: 'button',
+	    input: 'input',
+	    toggle: 'toggle'
+	  },
+	});
+
+	elemCtrls.addBinding(props.creation, 'alignment', {
+	    options: {
+	  	center: 'center',
+	    left: 'left',
+	    right: 'right',
+	    top:'top',
+	    bottom:'bottom'
+	  },
+	});
+
+	// props.actions.forEach((action, idx) => {
+
+	// 	panelCtrls.addButton({
+  	// 		title: action
+	// 	}).on('click', (e) => {
+  	// 		console.log(e);
+	// 	});;
+    	
+	// });
+
 
 };
 
