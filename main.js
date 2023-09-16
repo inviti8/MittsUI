@@ -26,7 +26,7 @@ const NAV_SPEED = editor_data.navigation.speed;
 const NAV_EASING = editor_data.navigation.easing;
 let NAV_EASE = 'none'
 let NAV = false;
-let LAST_INDEX = 0;
+
 
 editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid);
 
@@ -53,8 +53,11 @@ const raycaster = new THREE.Raycaster();
 let RESET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_START.x+GRID.offsetScale, CUBE_SCALE_START.y+GRID.offsetScale, CUBE_SCALE_START.z);
 let TARGET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_TARGET.x+GRID.offsetScale, CUBE_SCALE_TARGET.y+GRID.offsetScale, CUBE_SCALE_TARGET.z);
 
-var ACTIVE_IDX = 0;
-var TGL_SCALE = false;
+let ACTIVE_IDX = 0;
+let LAST_INDEX = 0;
+let TGL_SCALE = false;
+let ACTIVE_PANEL_POS
+let ACTIVE_PANEL_SCALE
 
 
 // Function to smoothly interpolate camera position
@@ -62,6 +65,7 @@ function panCamera() {
     const groupScale = viewGrps[activeView].grp.scale;
     const newX = CAM_POS_TARGET.x * groupScale.x;
     const newY = CAM_POS_TARGET.y * groupScale.y;
+    const activeMesh = viewGrps[activeView].cubes[ACTIVE_IDX];
     gsap.to(camera.position, {duration: NAV_SPEED.speed, x: newX, y: newY, ease: NAV_EASE , onComplete: onNavComplete});
 }
 
@@ -72,21 +76,55 @@ function scaleContainer() {
 	//initial reset of all but selected containers
 	viewGrps[activeView].cubes.forEach((cube, idx) => {
 		if (idx != ACTIVE_IDX) {
-            gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE });
+            gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['INACTIVE'] });
 		}
 	})
 
 	//switch to scale only the selected container
 	if(TGL_SCALE){
-        console.log(ACTIVE_IDX)
-        gsap.to(viewGrps[activeView].cubes[ACTIVE_IDX].scale, {duration: NAV_SPEED.speed, x: TARGET_CUBE_SCALE.x, y: TARGET_CUBE_SCALE.y, z: TARGET_CUBE_SCALE.z, ease: NAV_EASE });
+        gsap.to(viewGrps[activeView].cubes[ACTIVE_IDX].scale, {duration: NAV_SPEED.speed, x: TARGET_CUBE_SCALE.x, y: TARGET_CUBE_SCALE.y, z: TARGET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['ACTIVE'] });
 
 	}else{
 
 		viewGrps[activeView].cubes.forEach((cube, idx) => {
-            gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE });
+            gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['INACTIVE'] });
 		})
 	}
+}
+
+function panelAnimation(state){
+    let parent = viewGrps[activeView].cubes[ACTIVE_IDX];
+
+    //console.log(state)
+
+    if(parent.children.length > 1){
+
+        // Assuming parent and child are both THREE.Mesh objects
+        const child = parent.getObjectByName('Panel')
+
+        //console.log(child.userData.cachedScale)
+
+        if (parent.scale.x < child.scale.x || parent.scale.y < child.scale.y){
+            //console.log('IN')
+            // Calculate the scaling factors
+            const scaleFactorX = child.scale.x * (TARGET_CUBE_SCALE.x-parent.scale.x);
+            const scaleFactorY = child.scale.y * (TARGET_CUBE_SCALE.y-parent.scale.y);
+            const scaleFactorZ = parent.scale.z / child.scale.z;
+
+            // Find the minimum scaling factor to maintain the aspect ratio
+            const scaleFactor = Math.min(scaleFactorX, scaleFactorY, scaleFactorZ);
+
+            //gsap.to(child.position, { duration: NAV_SPEED.speed, x: 0, y: 0, ease: NAV_EASE });
+            //gsap.to(child.scale, { duration: NAV_SPEED.speed, x: scaleFactorX, y: scaleFactorY, ease: NAV_EASE });
+
+        }else{
+            //console.log('OUT')
+
+            //gsap.to(child.position, { duration: NAV_SPEED.speed, x: child.userData.cachedPos.x, y: child.userData.cachedPos.y, ease: NAV_EASE });
+            //gsap.to(child.scale, { duration: NAV_SPEED.speed, x: 3, y: 1, ease: NAV_EASE });
+        }
+    }
+
 }
 
 function handleNav(){
@@ -116,15 +154,27 @@ function onMouseClick(event) {
 
     // Calculate objects intersecting with the ray
     const intersectsContainer = raycaster.intersectObjects(viewGrps[activeView].cubes);
+    const intersectsPanel = raycaster.intersectObjects(Object.values(viewGrps[activeView].panels));
     const intersectsBackBtns = raycaster.intersectObjects(viewGrps[activeView].backBtns);
 
-    if (intersectsContainer.length > 0 && intersectsBackBtns.length == 0) {
+    if (intersectsContainer.length > 0 && intersectsBackBtns.length == 0 ) {
     	TGL_SCALE = true;
-        const clickedCube = intersectsContainer[0].object;
-        const cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
+        let clickedCube = intersectsContainer[0].object;
+        let cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
+
+        if(intersectsPanel.length > 0){
+            const panel = intersectsPanel[0].object;
+            clickedCube = panel.parent;
+            cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
+        }
+
         if(cubeIndex >= 0){
             ACTIVE_IDX = cubeIndex;
             CAM_POS_TARGET.copy(clickedCube.position);
+            if (clickedCube.children.length > 0){
+                ACTIVE_PANEL_POS = clickedCube.children[0].position;
+                ACTIVE_PANEL_SCALE = clickedCube.children[0].scale;
+            }
         }else{
             TGL_SCALE = false;
             CAM_POS_TARGET.copy(CAM_POS_START);
@@ -207,18 +257,29 @@ function panelContainerMesh( action, props ){
         return;
     const spans = props.span;
     const spanDir = props.spanDirection;
+    const maxSpans = props.maxSpans;
     const parent = viewGrps[activeView].cubes[LAST_INDEX];
     const parentSize = getSize(parent)
+    //console.log(props)
 
     switch (action) {
         case 'add':
 
             if(viewGrps[activeView].panels[LAST_INDEX] == null){
-                const panel = createCube(cubeSize*spans.x, cubeSize*spans.y);
-                const panelSize = getSize(panel)
+                const panel = createCube(cubeSize, cubeSize);
+                panel.scale.set(panel.scale.x*spans.x, panel.scale.y*spans.y, 1);
                 panel.material.wireframe = false;
                 parent.add(panel);
-                panel.position.set(((cubeSize/2)-(panelSize.width/2))*spanDir.x, ((cubeSize/2)-(panelSize.height/2))*spanDir.y, 10);
+                const offsetPos = edgeAlign(parent, panel)
+                panel.position.set(offsetPos.x*spanDir.x, offsetPos.y*spanDir.y, 10);
+                panel.userData = {
+                    'cachedPos':panel.position, 
+                    'cachedScale':panel.scale,
+                    'spans':spans,
+                    'spanDir': spanDir,
+                    'maxSpans': maxSpans
+                };
+                panel.name = 'Panel';
                 viewGrps[activeView].panels[LAST_INDEX] = panel;
             }else{
                 alert("Slot is taken, remove to add a new panel container.")
@@ -237,22 +298,34 @@ function panelContainerMesh( action, props ){
 
             break;
         case 'edit':
-
+            console.log('edit')
             if(viewGrps[activeView].panels[LAST_INDEX] != undefined){
 
+                console.log(viewGrps[activeView].panels)
+
                 const panel = viewGrps[activeView].panels[LAST_INDEX];
-                const panelSize = getSize(panel)
+                let newX = 1*spans.x;
+                let newY = 1*spans.y;
+
+                if(newX>maxSpans.x){
+                    newX= maxSpans.x;
+                }
+                if(newY>maxSpans.y){
+                    newY= maxSpans.y;
+                }
                 
-                panel.scale.set(1*spans.x, 1*spans.y, 1)
+                panel.scale.set(newX, newY, 1);
 
-                const parentHalfWidthX = parent.scale.x * parent.geometry.parameters.width * 0.5;
-                const childHalfWidthX = panel.scale.x * panel.geometry.parameters.width * 0.5;
-                const parentHalfWidthY = parent.scale.y * parent.geometry.parameters.height * 0.5;
-                const childHalfWidthY = panel.scale.y * panel.geometry.parameters.height * 0.5;
-                const newX = parentHalfWidthX - childHalfWidthX;
-                const newY = parentHalfWidthY - childHalfWidthY;
+                const offsetPos = edgeAlign(parent, panel)
 
-                panel.position.set(Math.floor(newX)*spanDir.x, Math.floor(newY)*spanDir.y, 1);
+                panel.position.set(offsetPos.x*spanDir.x, offsetPos.y*spanDir.y, 10);
+                panel.userData.cachedPos=panel.position;
+                panel.userData.cachedScale=panel.scale;
+                panel.userData.spans=spans;
+                panel.userData.spanDir=spanDir;
+                panel.userData.maxSpans=maxSpans;
+
+                console.log(panel.scale)
 
             }
             break;
@@ -260,6 +333,17 @@ function panelContainerMesh( action, props ){
         default:
             console.log("Not used");
     }
+}
+
+function edgeAlign(parent, child){
+    const parentHalfWidthX = parent.scale.x * parent.geometry.parameters.width * 0.5;
+    const childHalfWidthX = child.scale.x * child.geometry.parameters.width * 0.5;
+    const parentHalfWidthY = parent.scale.y * parent.geometry.parameters.height * 0.5;
+    const childHalfWidthY = child.scale.y * child.geometry.parameters.height * 0.5;
+    const x = parentHalfWidthX - childHalfWidthX;
+    const y = parentHalfWidthY - childHalfWidthY;
+
+    return {'x': x, 'y': y}
 }
 
 function hiliteGridBox(index){

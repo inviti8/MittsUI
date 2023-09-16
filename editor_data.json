@@ -17,6 +17,7 @@
 			"index":0,
 			"span": {"x": 1, "y": 1},
 			"spanDirection": {"x": -1, "y": 1},
+			"maxSpans": {"x": 3, "y": 2},
 			"creation":{
 			"element":"button",
 			"alignment":"center"

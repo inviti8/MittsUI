@@ -5,7 +5,6 @@ const MAX_COLS = 4
 const MAX_ROWS = 20
 const MAX_SPACING = 20
 
-console.log(pane)
 
 const navCtrls = pane.addFolder({
   title: 'Navigation',
@@ -105,8 +104,6 @@ export function bindPanelCtrls(props, onIndexChange, handleContainer){
 		spanDirection: props.spanDirection,
 	}
 
-	console.log(props)
-
 	panelCtrls.addBinding(index, 'index', {
 		step:1,
 		min: 0,
@@ -139,7 +136,6 @@ export function bindPanelCtrls(props, onIndexChange, handleContainer){
 		panelCtrls.addButton({
   			title: action
 		}).on('click', () => {
-  			console.log(props.span);
   			handleContainer(action, props)
 		});
     	
