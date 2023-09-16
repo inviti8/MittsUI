@@ -27,6 +27,12 @@ const NAV_EASING = editor_data.navigation.easing;
 let NAV_EASE = 'none'
 let NAV = false;
 
+//tween vars
+let NAV_TWEEN_SCALE = undefined;
+let NAV_TWEEN_POS = undefined;
+let PANEL_TWEEN_SCALE = undefined;
+let PANEL_TWEEN_POS = undefined;
+
 
 editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid);
 
@@ -70,25 +76,42 @@ function panCamera() {
 }
 
 function scaleContainer() {
+
+    if( gsap.isTweening( NAV_TWEEN_SCALE ))
+        return;
+
     RESET_CUBE_SCALE.set(CUBE_SCALE_START.x+GRID.offsetScale, CUBE_SCALE_START.y+GRID.offsetScale, CUBE_SCALE_START.z);
     TARGET_CUBE_SCALE.set(CUBE_SCALE_TARGET.x+GRID.offsetScale, CUBE_SCALE_TARGET.y+GRID.offsetScale, CUBE_SCALE_TARGET.z);
     
 	//initial reset of all but selected containers
 	viewGrps[activeView].cubes.forEach((cube, idx) => {
 		if (idx != ACTIVE_IDX) {
-            gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['INACTIVE'] });
+            NAV_TWEEN_SCALE = gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['INACTIVE'] });
+            if(cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_SCALE )){
+                const child = cube.getObjectByName('Panel');
+                console.log(gsap.isTweening(NAV_TWEEN_SCALE))
+                const offsetPos = edgeAlign(cube, child);
+                const spanDir = child.userData.spanDir;
+                //panel.position.set(offsetPos.x*spanDir.x, offsetPos.y*spanDir.y, 10);
+                PANEL_TWEEN_SCALE = gsap.to(child.position, { duration: NAV_SPEED.speed, x: offsetPos.x*spanDir.x, y: offsetPos.y*spanDir.y, ease: NAV_EASE });
+                //PANEL_TWEEN_SCALE = gsap.to(child.position, { duration: NAV_SPEED.speed, x: child.userData.cachedPos.x, y: child.userData.cachedPos.y, ease: NAV_EASE });
+            }
 		}
 	})
 
 	//switch to scale only the selected container
 	if(TGL_SCALE){
-        gsap.to(viewGrps[activeView].cubes[ACTIVE_IDX].scale, {duration: NAV_SPEED.speed, x: TARGET_CUBE_SCALE.x, y: TARGET_CUBE_SCALE.y, z: TARGET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['ACTIVE'] });
+        const cube = viewGrps[activeView].cubes[ACTIVE_IDX];
+        gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: TARGET_CUBE_SCALE.x, y: TARGET_CUBE_SCALE.y, z: TARGET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['ACTIVE'] });
+        if(cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_SCALE )){
+            const child = cube.getObjectByName('Panel');
+            PANEL_TWEEN_SCALE = gsap.to(child.position, { duration: NAV_SPEED.speed, x: 0, y: 0, ease: NAV_EASE });
+        }
 
 	}else{
-
 		viewGrps[activeView].cubes.forEach((cube, idx) => {
-            gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['INACTIVE'] });
-		})
+            NAV_TWEEN_SCALE = gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['INACTIVE'] });
+		});
 	}
 }
 
@@ -301,8 +324,6 @@ function panelContainerMesh( action, props ){
             console.log('edit')
             if(viewGrps[activeView].panels[LAST_INDEX] != undefined){
 
-                console.log(viewGrps[activeView].panels)
-
                 const panel = viewGrps[activeView].panels[LAST_INDEX];
                 let newX = 1*spans.x;
                 let newY = 1*spans.y;
@@ -339,6 +360,17 @@ function edgeAlign(parent, child){
     const parentHalfWidthX = parent.scale.x * parent.geometry.parameters.width * 0.5;
     const childHalfWidthX = child.scale.x * child.geometry.parameters.width * 0.5;
     const parentHalfWidthY = parent.scale.y * parent.geometry.parameters.height * 0.5;
+    const childHalfWidthY = child.scale.y * child.geometry.parameters.height * 0.5;
+    const x = parentHalfWidthX - childHalfWidthX;
+    const y = parentHalfWidthY - childHalfWidthY;
+
+    return {'x': x, 'y': y}
+}
+
+function centerAlign(parent, child){
+    const parentHalfWidthX = parent.scale.x * parent.geometry.parameters.width;
+    const childHalfWidthX = child.scale.x * child.geometry.parameters.width * 0.5;
+    const parentHalfWidthY = parent.scale.y * parent.geometry.parameters.height;
     const childHalfWidthY = child.scale.y * child.geometry.parameters.height * 0.5;
     const x = parentHalfWidthX - childHalfWidthX;
     const y = parentHalfWidthY - childHalfWidthY;
