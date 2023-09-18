@@ -22,6 +22,7 @@ let CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
 //navigation vars
 const GRID = editor_data.navigation.grid;
 let { numRows, numCols } = calculateGridSize();
+let { idealWidth, idealHeight } = calculatePanelSize();
 const NAV_SPEED = editor_data.navigation.speed;
 const NAV_EASING = editor_data.navigation.easing;
 let NAV_EASE = 'none'
@@ -103,22 +104,44 @@ function scaleContainer() {
 }
 
 function panelAnimation(state, cube){
+
+    let cubeIndex = viewGrps[activeView].cubes.indexOf(cube);
     const child = cube.getObjectByName('Panel');
+    let { idealWidth, idealHeight } = calculatePanelSize();
+    let ratio = undefined;
 
     if (child == undefined)
         return;
 
-    if(state == 'ACTIVE'){
-        if(cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS )){
+
+    let scaleX = child.scale.x;
+    let scaleY = child.scale.y;
+
+    if(scaleX > scaleY){
+        ratio = scaleX / scaleY;
+        scaleX = idealWidth*window.innerWidth / cubeSize;
+
+    }else if(scaleY > scaleX){
+        ratio = scaleY / scaleX;
+        scaleX = idealWidth*window.innerHeight / cubeSize;
+    }
+
+    if(state == 'ACTIVE' && !child.userData.expanded){
+        if( cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS )){
+            
+            child.userData.expanded = true;
             PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed, x: 0, y: 0, ease: NAV_EASE });
             gsap.to(child.scale, { duration: NAV_SPEED.speed, x: child.scale.x*0.7, y: child.scale.y*0.7, ease: NAV_EASE });
         }
     }
-    else if(state == 'INACTIVE'){
+    else if(state == 'INACTIVE' && child.userData.expanded){
+
         if(cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS )){
+            console.log(state)
             const offsetPos = edgeAlign(cube, child);
             const spanDir = child.userData.spanDir;
             
+            child.userData.expanded = false;
             PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed, x: child.userData.cachedPos.x, y: child.userData.cachedPos.y, ease: NAV_EASE });
             gsap.to(child.scale, { duration: NAV_SPEED.speed, x: child.userData.cachedScale.x, y: child.userData.cachedScale.y, ease: NAV_EASE });
         }
@@ -156,13 +179,11 @@ function onMouseClick(event) {
     const intersectsBackBtns = raycaster.intersectObjects(viewGrps[activeView].backBtns);
 
     if ( (intersectsContainer.length > 0 && intersectsBackBtns.length == 0) || (intersectsPanel.length > 0) ) {
-        console.log('HERE1')
     	TGL_SCALE = true;
         let clickedCube = intersectsContainer[0].object;
         let cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
 
         if(intersectsPanel.length > 0){
-            console.log('Intersect a panel')
             const panel = intersectsPanel[0].object;
             console.log(panel)
             clickedCube = panel.parent;
@@ -170,15 +191,12 @@ function onMouseClick(event) {
         }
 
         if(cubeIndex >= 0){
-            console.log('Active Index:')
             ACTIVE_IDX = cubeIndex;
             console.log(ACTIVE_IDX)
             CAM_POS_TARGET.copy(clickedCube.position);
             if (clickedCube.children.length > 0){
                 ACTIVE_PANEL_POS = clickedCube.children[0].position;
                 ACTIVE_PANEL_SCALE = clickedCube.children[0].scale;
-                console.log(ACTIVE_PANEL_POS)
-                console.log(ACTIVE_PANEL_SCALE)
             }
         }else{
             TGL_SCALE = false;
@@ -211,6 +229,16 @@ function calculateGridSize() {
     } else {
         CUBE_SCALE_TARGET.set(1.8, 1.8, 1.8);
         return { numRows: 2, numCols: 3 };
+    }
+}
+
+function calculatePanelSize() {
+    if (window.innerWidth < 600) {
+        return { idealWidth: 0.25*window.innerWidth, idealHeight: 0.25*window.innerHeight };
+    } else if (window.innerWidth < 900) {
+        return { idealWidth: 0.4*window.innerWidth, idealHeight: 0.4*window.innerHeight };
+    } else {
+        return { idealWidth: 0.6*window.innerWidth, idealHeight: 0.6*window.innerHeight };
     }
 }
 
@@ -451,6 +479,7 @@ function onWindowResize() {
 
 function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
+    let { idealWidth, idealHeight } = calculatePanelSize();
     // Reposition the cubes to fit the new grid layout
     let cubeIndex = 0;
     for (let row = 0; row < numRows; row++) {
