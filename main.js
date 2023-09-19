@@ -63,12 +63,16 @@ let TARGET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_TARGET.x+GRID.offsetScale,
 let ACTIVE_IDX = 0;
 let LAST_INDEX = 0;
 let TGL_SCALE = false;
-let ACTIVE_PANEL_POS
-let ACTIVE_PANEL_SCALE
+let ACTIVE_PANEL_POS;
+let ACTIVE_PANEL_SCALE;
+let MOVE = new THREE.Vector3();//var for moving elements
 
 
 // Function to smoothly interpolate camera position
 function panCamera() {
+    const cube = viewGrps[activeView].cubes[ACTIVE_IDX];
+    if(!panelCanScale(cube))
+        return;
     const groupScale = viewGrps[activeView].grp.scale;
     const newX = CAM_POS_TARGET.x * groupScale.x;
     const newY = CAM_POS_TARGET.y * groupScale.y;
@@ -94,6 +98,9 @@ function scaleContainer() {
 	//switch to scale only the selected container
 	if(TGL_SCALE){
         const cube = viewGrps[activeView].cubes[ACTIVE_IDX];
+        if(!panelCanScale(cube))
+            return;
+
         gsap.to(cube.scale, {duration: NAV_SPEED.speed, x: TARGET_CUBE_SCALE.x, y: TARGET_CUBE_SCALE.y, z: TARGET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['ACTIVE', cube] });
 
 	}else{
@@ -103,47 +110,78 @@ function scaleContainer() {
 	}
 }
 
-function panelAnimation(state, cube){
+function panelCanScale(cube){
+    let result = true;
+    const child = cube.getObjectByName('Panel');
+    if (child != undefined && child.scale.x >= 2 && child.scale.y >= 2)
+        result = false;
+
+    return result;
+}
+
+function getScaleRatio(elem){
+    let result = undefined;
+
+    let scaleX = elem.scale.x;
+    let scaleY = elem.scale.y;
+
+
+    if(scaleX > scaleY){
+        result = scaleY / scaleX;
+    }else if(scaleY > scaleX){
+        result = scaleX / scaleY;
+    }
+
+    return result
+}
+
+function panelAnimation(state, cube, speedMult=1){
 
     let cubeIndex = viewGrps[activeView].cubes.indexOf(cube);
     const child = cube.getObjectByName('Panel');
+    const minSize = cubeSize*cube.userData.spans;
     let { idealWidth, idealHeight } = calculatePanelSize();
-    let ratio = undefined;
 
     if (child == undefined)
         return;
 
-
     let scaleX = child.scale.x;
     let scaleY = child.scale.y;
+    let ratio = getScaleRatio(child);
 
     if(scaleX > scaleY){
-        ratio = scaleX / scaleY;
-        scaleX = idealWidth*window.innerWidth / cubeSize;
-
+        scaleX = scaleX*(ratio+idealWidth);
+        scaleY = scaleY*(ratio+idealWidth);
     }else if(scaleY > scaleX){
-        ratio = scaleY / scaleX;
-        scaleX = idealWidth*window.innerHeight / cubeSize;
+        scaleX = scaleX*(ratio+idealHeight);
+        scaleY = scaleY*(ratio+idealHeight);
     }
 
     if(state == 'ACTIVE' && !child.userData.expanded){
-        if( cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS )){
+        if( cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS )&& !gsap.isTweening( PANEL_TWEEN_SCALE )){
             
             child.userData.expanded = true;
-            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed, x: 0, y: 0, ease: NAV_EASE });
-            gsap.to(child.scale, { duration: NAV_SPEED.speed, x: child.scale.x*0.7, y: child.scale.y*0.7, ease: NAV_EASE });
+            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: 0, y: 0, ease: NAV_EASE });
+            PANEL_TWEEN_SCALE = gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: scaleX, y: scaleY, ease: NAV_EASE });
         }
     }
+    // if(state == 'RESIZE'){
+    //     if( cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS )){
+    //         let size = getSize(child);
+    //         if(size <=cubeSize)
+    //             return;
+
+    //         PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: 0, y: 0, ease: NAV_EASE });
+    //         gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: scaleX, y: scaleY, ease: NAV_EASE });
+    //     }
+    // }
     else if(state == 'INACTIVE' && child.userData.expanded){
 
-        if(cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS )){
-            console.log(state)
-            const offsetPos = edgeAlign(cube, child);
-            const spanDir = child.userData.spanDir;
-            
+        if(cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS ) && !gsap.isTweening( PANEL_TWEEN_SCALE )){
+
             child.userData.expanded = false;
-            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed, x: child.userData.cachedPos.x, y: child.userData.cachedPos.y, ease: NAV_EASE });
-            gsap.to(child.scale, { duration: NAV_SPEED.speed, x: child.userData.cachedScale.x, y: child.userData.cachedScale.y, ease: NAV_EASE });
+            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: child.userData.cachedPos.x, y: child.userData.cachedPos.y, ease: NAV_EASE });
+            PANEL_TWEEN_SCALE = gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: child.userData.cachedScale.x, y: child.userData.cachedScale.y, ease: NAV_EASE });
         }
     }
 }
@@ -234,11 +272,11 @@ function calculateGridSize() {
 
 function calculatePanelSize() {
     if (window.innerWidth < 600) {
-        return { idealWidth: 0.25*window.innerWidth, idealHeight: 0.25*window.innerHeight };
+        return { idealWidth: 0, idealHeight: 0 };
     } else if (window.innerWidth < 900) {
-        return { idealWidth: 0.4*window.innerWidth, idealHeight: 0.4*window.innerHeight };
+        return { idealWidth: 0.15, idealHeight: 0.025 };
     } else {
-        return { idealWidth: 0.6*window.innerWidth, idealHeight: 0.6*window.innerHeight };
+        return { idealWidth: 0.3, idealHeight: 0.13 };
     }
 }
 
@@ -280,9 +318,11 @@ function createGridMesh() {
 
 function createMinimizeMesh(parent, pSizeX, pSizeY) {
     const cube = createCube(backBtnSize, backBtnSize);
+    cube.name = 'BackBtn';
     parent.add(cube);
     cube.position.set(-((pSizeX / 2) - (backBtnSize / 2)), (pSizeY / 2 ) - (backBtnSize / 2), parent.position.z+0.1);
-    return createCube(backBtnSize, backBtnSize);
+    cube.userData = { 'size': {'x': backBtnSize, 'y':backBtnSize}, 'cachedPos': cube.position, 'cachedScale': cube.scale};
+    return cube;
 }
 
 function panelContainerMesh( action, props ){
@@ -309,6 +349,7 @@ function panelContainerMesh( action, props ){
                 var scale = new THREE.Vector3(panel.scale.x, panel.scale.y, panel.scale.y);
                 panel.position.copy(pos);
                 panel.userData = {
+                    'size': {'x': cubeSize,'y': cubeSize},
                     'expanded': false,
                     'cachedPos':pos, 
                     'cachedScale':scale,
@@ -317,7 +358,10 @@ function panelContainerMesh( action, props ){
                     'maxSpans': maxSpans
                 };
                 panel.name = 'Panel';
+                let btn = createMinimizeMesh(panel, cubeSize*spans.x, cubeSize*spans.y);
                 viewGrps[activeView].panels[LAST_INDEX] = panel;
+                viewGrps[activeView].backBtns.push(btn);
+                updateCornerButton(panel, btn, spans);
             }else{
                 alert("Slot is taken, remove to add a new panel container.")
             }
@@ -350,10 +394,13 @@ function panelContainerMesh( action, props ){
                 }
                 
                 panel.scale.set(newX, newY, 1);
-
                 const offsetPos = edgeAlign(parent, panel)
 
                 panel.position.set(offsetPos.x*spanDir.x, offsetPos.y*spanDir.y, 10);
+                const btn = panel.getObjectByName('BackBtn');
+                if(btn != undefined){
+                    updateCornerButton(panel, btn, spans);
+                }
                 panel.userData.cachedPos.set(panel.position.x, panel.position.y, panel.position.y);
                 panel.userData.cachedScale.set(panel.scale.x, panel.scale.y, panel.scale.y);
                 panel.userData.spans=spans;
@@ -366,6 +413,24 @@ function panelContainerMesh( action, props ){
         default:
             console.log("Not used");
     }
+}
+
+function updateCornerButton(parent, btn, spans, dirX=-1, dirY=1){
+    let multX = 1/spans.x;
+    let multY = 1/spans.y;
+    let offsetX = (parent.userData.size.x/2)-((btn.userData.size.x*btn.scale.x)/2);
+    let offsetY = (parent.userData.size.y/2)-((btn.userData.size.y*btn.scale.y)/2);
+  
+    if(parent.scale.x>parent.scale.y){
+        btn.scale.set(multX*spans.x, multY*spans.x, 1);
+    }else if(parent.scale.y>parent.scale.x){
+        btn.scale.set(multX*spans.y, multY*spans.y, 1);;
+    }else{
+        btn.scale.set(multX*spans.x, multY*spans.y, 1);
+    }
+
+    btn.position.set(offsetX*dirX, offsetY*dirY, btn.userData.cachedPos.z)
+
 }
 
 function edgeAlign(parent, child){
@@ -474,12 +539,47 @@ function onWindowResize() {
 
     // Calculate the new grid layout
     updateGrid();
-    
+}
+
+function updatePanels(){
+    let { idealWidth, idealHeight } = calculatePanelSize();
+    let cubeIndex = 0;
+
+    for (let row = 0; row < numRows; row++) {
+
+        for (let col = 0; col < numCols; col++) {
+            const cube = viewGrps[activeView].cubes[cubeIndex];
+            const child = cube.getObjectByName('Panel');
+            let ratio = undefined;
+
+            if (child != undefined){
+                let scaleX = child.scale.x;
+                let scaleY = child.scale.y;
+
+                if(scaleX > scaleY){
+                    ratio = scaleY / scaleX;
+                    scaleX = scaleX*(ratio+idealWidth);
+                    scaleY = scaleY*(ratio+idealWidth);
+
+
+                }else if(scaleY > scaleX){
+                    ratio = scaleX / scaleY;
+                    scaleX = scaleX*(ratio+idealHeight);
+                    scaleY = scaleY*(ratio+idealHeight);
+                }
+
+                panelAnimation('RESIZE', cube, 1.5);
+            }
+
+        }
+
+    }
 }
 
 function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
     let { idealWidth, idealHeight } = calculatePanelSize();
+
     // Reposition the cubes to fit the new grid layout
     let cubeIndex = 0;
     for (let row = 0; row < numRows; row++) {
