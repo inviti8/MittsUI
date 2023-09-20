@@ -20,6 +20,7 @@ const CUBE_SCALE_NOW = new THREE.Vector3(1, 1, 1);
 let CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
 
 //navigation vars
+const NAV_VARS = editor_data.navigation
 const GRID = editor_data.navigation.grid;
 let { numRows, numCols } = calculateGridSize();
 let { idealWidth, idealHeight } = calculatePanelSize();
@@ -35,7 +36,7 @@ let PANEL_TWEEN_SCALE = undefined;
 let PANEL_TWEEN_POS = undefined;
 
 
-editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid);
+editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
 
 //panel vars
 const PANEL_PROPS = editor_data.panels.properties;
@@ -46,7 +47,7 @@ const viewGrps = {};
 const activeView = Object.keys(views)[0];
 
 Object.keys(views).forEach((v, idx) => {
-    viewGrps[v] = {'grp':new THREE.Group(), 'cubes':[], 'cubePos':[], 'backBtns':[], 'panels':{}}
+    viewGrps[v] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}}
 });
 
 // Create an array to store cubes
@@ -137,7 +138,6 @@ function getScaleRatio(elem){
 
 function panelAnimation(state, cube, speedMult=1){
 
-    let cubeIndex = viewGrps[activeView].cubes.indexOf(cube);
     const child = cube.getObjectByName('Panel');
     const minSize = cubeSize*cube.userData.spans;
     let { idealWidth, idealHeight } = calculatePanelSize();
@@ -161,7 +161,7 @@ function panelAnimation(state, cube, speedMult=1){
         if( cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS )&& !gsap.isTweening( PANEL_TWEEN_SCALE )){
             
             child.userData.expanded = true;
-            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: 0, y: 0, ease: NAV_EASE });
+            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: 0, y: 0, z: child.userData.cachedPos.z+10, ease: NAV_EASE });
             PANEL_TWEEN_SCALE = gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: scaleX, y: scaleY, ease: NAV_EASE });
         }
     }
@@ -180,14 +180,17 @@ function panelAnimation(state, cube, speedMult=1){
         if(cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS ) && !gsap.isTweening( PANEL_TWEEN_SCALE )){
 
             child.userData.expanded = false;
-            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: child.userData.cachedPos.x, y: child.userData.cachedPos.y, ease: NAV_EASE });
+            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: child.userData.cachedPos.x, y: child.userData.cachedPos.y, z: child.userData.cachedPos.z, ease: NAV_EASE });
             PANEL_TWEEN_SCALE = gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: child.userData.cachedScale.x, y: child.userData.cachedScale.y, ease: NAV_EASE });
         }
     }
 }
 
 function handleNav(){
-    if(!NAV)
+    const cube = viewGrps[activeView].cubes[ACTIVE_IDX];
+    const child = cube.getObjectByName('Panel');
+
+    if(!NAV || child == undefined)
         return;
 
     if(NAV_EASING.ease != 'none'){
@@ -223,14 +226,12 @@ function onMouseClick(event) {
 
         if(intersectsPanel.length > 0){
             const panel = intersectsPanel[0].object;
-            console.log(panel)
             clickedCube = panel.parent;
             cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
         }
 
         if(cubeIndex >= 0){
             ACTIVE_IDX = cubeIndex;
-            console.log(ACTIVE_IDX)
             CAM_POS_TARGET.copy(clickedCube.position);
             if (clickedCube.children.length > 0){
                 ACTIVE_PANEL_POS = clickedCube.children[0].position;
@@ -244,6 +245,12 @@ function onMouseClick(event) {
     	TGL_SCALE = false;
     	CAM_POS_TARGET.copy(CAM_POS_START);
     }
+
+    //console.log(editor_data.navigation.grid.DEBUG)
+
+    if (event.ctrlKey) {
+        hiliteGridBox(ACTIVE_IDX);
+    };
 
     handleNav();
 }
@@ -418,19 +425,11 @@ function panelContainerMesh( action, props ){
 function updateCornerButton(parent, btn, spans, dirX=-1, dirY=1){
     let multX = 1/spans.x;
     let multY = 1/spans.y;
-    let offsetX = (parent.userData.size.x/2)-((btn.userData.size.x*btn.scale.x)/2);
-    let offsetY = (parent.userData.size.y/2)-((btn.userData.size.y*btn.scale.y)/2);
+    let offsetX = (parent.userData.size.x/2)-((btn.userData.size.x*btn.userData.cachedScale.x)/2);
+    let offsetY = (parent.userData.size.y/2)-((btn.userData.size.y*btn.userData.cachedScale.y)/2);
   
-    if(parent.scale.x>parent.scale.y){
-        btn.scale.set(multX*spans.x, multY*spans.x, 1);
-    }else if(parent.scale.y>parent.scale.x){
-        btn.scale.set(multX*spans.y, multY*spans.y, 1);;
-    }else{
-        btn.scale.set(multX*spans.x, multY*spans.y, 1);
-    }
-
+    btn.scale.set(multX, multY, 1);
     btn.position.set(offsetX*dirX, offsetY*dirY, btn.userData.cachedPos.z)
-
 }
 
 function edgeAlign(parent, child){
@@ -481,7 +480,11 @@ function createGrid() {
                 viewGrps[v].cubes.push(cube);
                 viewGrps[v].cubePos.push(cube.position)
                 viewGrps[v].backBtns.push(back);
-                viewGrps[v].grp.add(cube);   
+                viewGrps[v].grp.add(cube);
+                //create grid for each column configuration
+                viewGrps[v].grids.forEach( (arr) => {
+                    arr.push(cube);
+                });  
             }
         }
         
@@ -541,60 +544,71 @@ function onWindowResize() {
     updateGrid();
 }
 
-function updatePanels(){
+function updatePanel(cube, numCols){
+    console.log('update')
     let { idealWidth, idealHeight } = calculatePanelSize();
-    let cubeIndex = 0;
+    const child = cube.getObjectByName('Panel');
+    let ratio = undefined;
 
-    for (let row = 0; row < numRows; row++) {
+    console.log(numCols)
 
-        for (let col = 0; col < numCols; col++) {
-            const cube = viewGrps[activeView].cubes[cubeIndex];
-            const child = cube.getObjectByName('Panel');
-            let ratio = undefined;
+    if (child != undefined){
+        if (window.innerWidth < 900) {
+            let scaleX = child.userData.cachedScale.x;
+            let scaleY = child.userData.cachedScale.y;
+            let ratio = getScaleRatio(child);
 
-            if (child != undefined){
-                let scaleX = child.scale.x;
-                let scaleY = child.scale.y;
-
-                if(scaleX > scaleY){
-                    ratio = scaleY / scaleX;
-                    scaleX = scaleX*(ratio+idealWidth);
-                    scaleY = scaleY*(ratio+idealWidth);
-
-
-                }else if(scaleY > scaleX){
-                    ratio = scaleX / scaleY;
-                    scaleX = scaleX*(ratio+idealHeight);
-                    scaleY = scaleY*(ratio+idealHeight);
-                }
-
-                panelAnimation('RESIZE', cube, 1.5);
+            if(scaleX > scaleY){
+                scaleX = scaleX*(ratio);
+                scaleY = scaleY*(ratio);
+            }else if(scaleY > scaleX){
+                scaleX = scaleX*(ratio);
+                scaleY = scaleY*(ratio);
             }
 
-        }
+            // console.log(ratio);
+            // console.log(scaleX);
+            // console.log(scaleY);
 
+            child.scale.set(scaleX*numCols, scaleY*numCols, child.userData.cachedScale.z);
+
+
+            //console.log(scaleX)
+            //console.log(scaleY)
+
+            //panelAnimation('RESIZE', cube, 1.5);
+        }
+        else
+        {
+            child.scale.set(child.userData.cachedScale.x, child.userData.cachedScale.y, child.userData.cachedScale.z);
+            child.position.set(child.userData.cachedPos.x, child.userData.cachedPos.y, child.userData.cachedPos.z);
+        }    
     }
 }
 
 function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
-    let { idealWidth, idealHeight } = calculatePanelSize();
 
     // Reposition the cubes to fit the new grid layout
     let cubeIndex = 0;
     for (let row = 0; row < numRows; row++) {
         
         for (let col = 0; col < numCols; col++) {
-            const cube = viewGrps[activeView].cubes[cubeIndex];
+            const cube = viewGrps[activeView].grids[numCols][cubeIndex];
             const xOffset = (col - (numCols - 1) / 2) * (cubeSize + GRID.spacing);
             const yOffset = (row - (numRows - 1) / 2) * (cubeSize + GRID.spacing);
 
             cube.scale.set(cube.scale.x+GRID.offsetScale, cube.scale.y+GRID.offsetScale, cube.scale.z)
             cube.position.set(xOffset, -yOffset, 0);
+            //updatePanel(cube, numCols)
 
             cubeIndex++;
         }
     }
+}
+
+function setDebug(val){
+    NAV = val;
 }
 
 window.addEventListener('resize', onWindowResize);
@@ -612,5 +626,6 @@ document.onkeydown = function(e) {
     //Toggle nav for editing grid
     if(e.key.toLowerCase() == 'x'){
         NAV = !NAV;
+        editor_data.navigation.grid=NAV;
     }
 }

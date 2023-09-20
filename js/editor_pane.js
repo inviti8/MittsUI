@@ -22,7 +22,7 @@ const elemCtrls = pane.addFolder({
 });
 
 
-export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid){
+export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid, setDebug){
 
 	let needUpdate = ['spacing', 'offsetScale'];
 
@@ -87,6 +87,10 @@ export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid){
 	    inOut: 'inOut',
 	    out: 'out'
 	  },
+	});
+
+	navCtrls.addBinding(grid_vars, 'DEBUG').on('change', (ev) => {
+		 setDebug(ev.value);
 	});
 };
 

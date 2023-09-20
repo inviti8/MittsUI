@@ -4,7 +4,8 @@
 			"rows":2,
 			"columns":3,
 			"spacing":0,
-			"offsetScale": 0
+			"offsetScale": 0,
+			"DEBUG":true
 		},
 		"speed":{"speed":0.5},
 		"easing":{
