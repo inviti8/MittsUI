@@ -22,6 +22,10 @@ const elemCtrls = pane.addFolder({
 });
 
 
+export function refresh(){
+	pane.refresh();
+}
+
 export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid, setDebug){
 
 	let needUpdate = ['spacing', 'offsetScale'];
@@ -90,15 +94,16 @@ export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid, setDeb
 	});
 
 	navCtrls.addBinding(grid_vars, 'DEBUG').on('change', (ev) => {
+		grid_vars.DEBUG = ev.value;
 		 setDebug(ev.value);
 	});
 };
 
 export function bindPanelCtrls(props, onIndexChange, handleContainer){
 
-	const index = {
-		index: props.index,
-	}
+	// const index = {
+	// 	index: props.index,
+	// }
 
 	const span = {
 		span: props.span,
@@ -108,14 +113,14 @@ export function bindPanelCtrls(props, onIndexChange, handleContainer){
 		spanDirection: props.spanDirection,
 	}
 
-	panelCtrls.addBinding(index, 'index', {
-		step:1,
-		min: 0,
-  		max: 20,
-	}).on('change', (ev) => {
-		console.log(ev.value)
-		onIndexChange(ev.value);
-	});
+	// panelCtrls.addBinding(index, 'index', {
+	// 	step:1,
+	// 	min: 0,
+  	// 	max: 20,
+	// }).on('change', (ev) => {
+	// 	console.log(ev.value)
+	// 	onIndexChange(ev.value);
+	// });
 
 	panelCtrls.addBinding(span, 'span', {
 		x: {step: 1, min: 1, max: 3},

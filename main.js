@@ -22,6 +22,7 @@ let CUBE_SCALE_TARGET = new THREE.Vector3(1.8, 1.8, 1.8);
 //navigation vars
 const NAV_VARS = editor_data.navigation
 const GRID = editor_data.navigation.grid;
+const MAX_COLS = 3;
 let { numRows, numCols } = calculateGridSize();
 let { idealWidth, idealHeight } = calculatePanelSize();
 const NAV_SPEED = editor_data.navigation.speed;
@@ -310,6 +311,19 @@ function getSize(elem){
     return {'width': width, 'height': height}
 }
 
+function setUserData(elem, sizeX, sizeY, expanded, cachedPos, cachedScale, spans, spanDir, maxSpans, attachedTo=[]){
+    elem.userData = {
+                    'size': {'x': sizeX,'y': sizeY},
+                    'expanded': expanded,
+                    'cachedPos': cachedPos, 
+                    'cachedScale': cachedScale,
+                    'spans': spans,
+                    'spanDir': spanDir,
+                    'maxSpans': maxSpans,
+                    'attachedTo': attachedTo
+                };
+}
+
 function createCube(sizeX, sizeY){
     const geometry = new THREE.PlaneGeometry(sizeX, sizeY, 1);
     const material = new THREE.MeshBasicMaterial({wireframe: true});
@@ -327,9 +341,17 @@ function createMinimizeMesh(parent, pSizeX, pSizeY) {
     const cube = createCube(backBtnSize, backBtnSize);
     cube.name = 'BackBtn';
     parent.add(cube);
-    cube.position.set(-((pSizeX / 2) - (backBtnSize / 2)), (pSizeY / 2 ) - (backBtnSize / 2), parent.position.z+0.1);
-    cube.userData = { 'size': {'x': backBtnSize, 'y':backBtnSize}, 'cachedPos': cube.position, 'cachedScale': cube.scale};
+    var pos = new THREE.Vector3(-((pSizeX / 2) - (backBtnSize / 2)), (pSizeY / 2 ) - (backBtnSize / 2), parent.position.z+0.1);
+    var scale = new THREE.Vector3(cube.scale.x, cube.scale.y, cube.scale.y);
+    cube.position.copy(pos);
+    setUserData(cube, backBtnSize, backBtnSize, false, pos, scale, {"x": 1, "y": 1}, {"x": -1, "y": 1}, 1);
+
     return cube;
+}
+
+function updateGridAttachments(elem){
+    let index = viewGrps[activeView].cubes.indexOf(elem);
+    const spans = elem.userData.spans;
 }
 
 function panelContainerMesh( action, props ){
@@ -341,6 +363,11 @@ function panelContainerMesh( action, props ){
     const maxSpans = props.maxSpans;
     const parent = viewGrps[activeView].cubes[LAST_INDEX];
     const parentSize = getSize(parent);
+    let limitX = LAST_INDEX;
+
+    if(LAST_INDEX>=MAX_COLS){
+        limitX=Math.abs(MAX_COLS-LAST_INDEX);
+    }
 
     switch (action) {
         case 'add':
@@ -355,15 +382,7 @@ function panelContainerMesh( action, props ){
                 var pos = new THREE.Vector3(offsetPos.x*spanDir.x, offsetPos.y*spanDir.y, 10);
                 var scale = new THREE.Vector3(panel.scale.x, panel.scale.y, panel.scale.y);
                 panel.position.copy(pos);
-                panel.userData = {
-                    'size': {'x': cubeSize,'y': cubeSize},
-                    'expanded': false,
-                    'cachedPos':pos, 
-                    'cachedScale':scale,
-                    'spans':spans,
-                    'spanDir': spanDir,
-                    'maxSpans': maxSpans
-                };
+                setUserData(panel, cubeSize, cubeSize, false, pos, scale, spans, spanDir, maxSpans);
                 panel.name = 'Panel';
                 let btn = createMinimizeMesh(panel, cubeSize*spans.x, cubeSize*spans.y);
                 viewGrps[activeView].panels[LAST_INDEX] = panel;
@@ -425,11 +444,11 @@ function panelContainerMesh( action, props ){
 function updateCornerButton(parent, btn, spans, dirX=-1, dirY=1){
     let multX = 1/spans.x;
     let multY = 1/spans.y;
-    let offsetX = (parent.userData.size.x/2)-((btn.userData.size.x*btn.userData.cachedScale.x)/2);
-    let offsetY = (parent.userData.size.y/2)-((btn.userData.size.y*btn.userData.cachedScale.y)/2);
+    let offsetX = (parent.userData.size.x/2)-((btn.userData.size.x/2*btn.userData.cachedScale.x*multX));
+    let offsetY = (parent.userData.size.y/2)-((btn.userData.size.y/2*btn.userData.cachedScale.y*multY));
   
+    btn.position.set(offsetX*dirX, offsetY*dirY, btn.userData.cachedPos.z);
     btn.scale.set(multX, multY, 1);
-    btn.position.set(offsetX*dirX, offsetY*dirY, btn.userData.cachedPos.z)
 }
 
 function edgeAlign(parent, child){
