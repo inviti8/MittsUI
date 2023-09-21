@@ -368,6 +368,11 @@ function panelContainerMesh( action, props ){
     if(LAST_INDEX>=MAX_COLS){
         limitX=Math.abs(MAX_COLS-LAST_INDEX);
     }
+    //cap spans
+    spans.x = spans.x-limitX;
+    if(spans.x<1){
+        spans.x=1;
+    }
 
     switch (action) {
         case 'add':
