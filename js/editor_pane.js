@@ -131,14 +131,6 @@ export function bindPanelCtrls(props, onIndexChange, handleContainer){
 		handleContainer('edit', props);
 	});
 
-	panelCtrls.addBinding(spanDirection, 'spanDirection', {
-		x: {step: 1, min: -1, max: 1},
-  		y: {step: 1, min: -1, max: 1},
-  		format: (v) => (v == 0 ? 1 : -1),
-	}).on('change', (ev) => {
-
-		handleContainer('edit', props);
-	});
 
 	props.actions.forEach((action, idx) => {
 

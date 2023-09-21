@@ -311,14 +311,13 @@ function getSize(elem){
     return {'width': width, 'height': height}
 }
 
-function setUserData(elem, sizeX, sizeY, expanded, cachedPos, cachedScale, spans, spanDir, maxSpans, attachedTo=[]){
+function setUserData(elem, sizeX, sizeY, expanded, cachedPos, cachedScale, spans, maxSpans, attachedTo=[]){
     elem.userData = {
                     'size': {'x': sizeX,'y': sizeY},
                     'expanded': expanded,
                     'cachedPos': cachedPos, 
                     'cachedScale': cachedScale,
                     'spans': spans,
-                    'spanDir': spanDir,
                     'maxSpans': maxSpans,
                     'attachedTo': attachedTo
                 };
@@ -359,7 +358,6 @@ function panelContainerMesh( action, props ){
         return;
 
     const spans = props.span;
-    const spanDir = props.spanDirection;
     const maxSpans = props.maxSpans;
     const parent = viewGrps[activeView].cubes[LAST_INDEX];
     const parentSize = getSize(parent);
@@ -384,10 +382,10 @@ function panelContainerMesh( action, props ){
                 panel.material.wireframe = false;
                 parent.add(panel);
                 const offsetPos = edgeAlign(parent, panel);
-                var pos = new THREE.Vector3(offsetPos.x*spanDir.x, offsetPos.y*spanDir.y, 10);
+                var pos = new THREE.Vector3(offsetPos.x*-1, offsetPos.y*1, 10);
                 var scale = new THREE.Vector3(panel.scale.x, panel.scale.y, panel.scale.y);
                 panel.position.copy(pos);
-                setUserData(panel, cubeSize, cubeSize, false, pos, scale, spans, spanDir, maxSpans);
+                setUserData(panel, cubeSize, cubeSize, false, pos, scale, spans, maxSpans);
                 panel.name = 'Panel';
                 let btn = createMinimizeMesh(panel, cubeSize*spans.x, cubeSize*spans.y);
                 viewGrps[activeView].panels[LAST_INDEX] = panel;
@@ -427,7 +425,7 @@ function panelContainerMesh( action, props ){
                 panel.scale.set(newX, newY, 1);
                 const offsetPos = edgeAlign(parent, panel)
 
-                panel.position.set(offsetPos.x*spanDir.x, offsetPos.y*spanDir.y, 10);
+                panel.position.set(offsetPos.x*-1, offsetPos.y*1, 10);
                 const btn = panel.getObjectByName('BackBtn');
                 if(btn != undefined){
                     updateCornerButton(panel, btn, spans);
@@ -435,7 +433,6 @@ function panelContainerMesh( action, props ){
                 panel.userData.cachedPos.set(panel.position.x, panel.position.y, panel.position.y);
                 panel.userData.cachedScale.set(panel.scale.x, panel.scale.y, panel.scale.y);
                 panel.userData.spans=spans;
-                panel.userData.spanDir=spanDir;
                 panel.userData.maxSpans=maxSpans;
 
             }
