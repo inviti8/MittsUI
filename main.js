@@ -229,6 +229,10 @@ function onMouseClick(event) {
             const panel = intersectsPanel[0].object;
             clickedCube = panel.parent;
             cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
+            if (event.ctrlKey && event.shiftKey) {
+                //hiliteGridBox(ACTIVE_IDX);
+                panelContainerMesh('remove', PANEL_PROPS);
+            }
         }
 
         if(cubeIndex >= 0){
@@ -247,11 +251,11 @@ function onMouseClick(event) {
     	CAM_POS_TARGET.copy(CAM_POS_START);
     }
 
-    //console.log(editor_data.navigation.grid.DEBUG)
+    hiliteGridBox(ACTIVE_IDX);
 
-    if (event.ctrlKey) {
-        hiliteGridBox(ACTIVE_IDX);
-    };
+    if (event.ctrlKey && !event.shiftKey) {
+        panelContainerMesh('add', PANEL_PROPS);
+    }
 
     handleNav();
 }
@@ -343,7 +347,7 @@ function createMinimizeMesh(parent, pSizeX, pSizeY) {
     var pos = new THREE.Vector3(-((pSizeX / 2) - (backBtnSize / 2)), (pSizeY / 2 ) - (backBtnSize / 2), parent.position.z+0.1);
     var scale = new THREE.Vector3(cube.scale.x, cube.scale.y, cube.scale.y);
     cube.position.copy(pos);
-    setUserData(cube, backBtnSize, backBtnSize, false, pos, scale, {"x": 1, "y": 1}, {"x": -1, "y": 1}, 1);
+    setUserData(cube, backBtnSize, backBtnSize, false, pos, scale, {"x": 1, "y": 1}, 1);
 
     return cube;
 }
@@ -544,6 +548,7 @@ function handleMouseWheel(event) {
     TGL_SCALE = true;
 
     handleNav();
+
 }
 
 document.addEventListener('wheel', handleMouseWheel);
@@ -647,6 +652,5 @@ document.onkeydown = function(e) {
     //Toggle nav for editing grid
     if(e.key.toLowerCase() == 'x'){
         NAV = !NAV;
-        editor_data.navigation.grid=NAV;
     }
 }
