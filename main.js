@@ -229,8 +229,7 @@ function onMouseClick(event) {
             const panel = intersectsPanel[0].object;
             clickedCube = panel.parent;
             cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
-            if (event.ctrlKey && event.shiftKey) {
-                //hiliteGridBox(ACTIVE_IDX);
+            if (event.ctrlKey && event.altKey) {
                 panelContainerMesh('remove', PANEL_PROPS);
             }
         }
@@ -251,9 +250,11 @@ function onMouseClick(event) {
     	CAM_POS_TARGET.copy(CAM_POS_START);
     }
 
-    hiliteGridBox(ACTIVE_IDX);
+    if (event.ctrlKey && event.shiftKey) {
+       hiliteGridBox(ACTIVE_IDX); 
+    }
 
-    if (event.ctrlKey && !event.shiftKey) {
+    if (event.ctrlKey && !event.altKey&& !event.shiftKey) {
         panelContainerMesh('add', PANEL_PROPS);
     }
 
@@ -541,7 +542,7 @@ function handleMouseWheel(event) {
     if (ACTIVE_IDX < 0) {
         ACTIVE_IDX = 0;
     } else if (ACTIVE_IDX >= viewGrps[activeView].cubes.length) {
-        ACTIVE_IDX = items.length - 1;
+        ACTIVE_IDX = viewGrps[activeView].cubes.length - 1;
     }
 
     CAM_POS_TARGET.copy(viewGrps[activeView].cubes[ACTIVE_IDX].position);
