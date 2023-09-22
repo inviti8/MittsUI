@@ -68,6 +68,18 @@ let TGL_SCALE = false;
 let ACTIVE_PANEL_POS;
 let ACTIVE_PANEL_SCALE;
 let MOVE = new THREE.Vector3();//var for moving elements
+const TOP_PAD = 10;//spacing buffer for top of browser window
+
+// Function to smoothly interpolate camera position
+function resetCamera() {
+    MOVE.set(0, viewGrps[activeView].cubes[0].position.y-(cubeSize/2-TOP_PAD), camera.position.z);
+    CAM_POS_TARGET.copy(MOVE);
+    const groupScale = viewGrps[activeView].grp.scale;
+    const newX = CAM_POS_TARGET.x * groupScale.x;
+    const newY = CAM_POS_TARGET.y * groupScale.y;
+
+    gsap.to(camera.position, {duration: NAV_SPEED.speed*0.5, x: newX, y: newY, ease: NAV_EASE , onComplete: onNavComplete});
+}
 
 
 // Function to smoothly interpolate camera position
@@ -78,7 +90,7 @@ function panCamera() {
     const groupScale = viewGrps[activeView].grp.scale;
     const newX = CAM_POS_TARGET.x * groupScale.x;
     const newY = CAM_POS_TARGET.y * groupScale.y;
-    const activeMesh = viewGrps[activeView].cubes[ACTIVE_IDX];
+
     gsap.to(camera.position, {duration: NAV_SPEED.speed, x: newX, y: newY, ease: NAV_EASE , onComplete: onNavComplete});
 }
 
@@ -273,13 +285,13 @@ function calculateGridSize() {
     //console.log(window.innerWidth)
     if (window.innerWidth < 600) {
         CUBE_SCALE_TARGET.set(1.2, 1.2, 1.2);
-        return { numRows: 6, numCols: 1 };
+        return { numRows: 9, numCols: 1 };
     } else if (window.innerWidth < 900) {
         CUBE_SCALE_TARGET.set(1.5, 1.5, 1.5);
-        return { numRows: 3, numCols: 2 };
+        return { numRows: 6, numCols: 2 };
     } else {
         CUBE_SCALE_TARGET.set(1.8, 1.8, 1.8);
-        return { numRows: 2, numCols: 3 };
+        return { numRows: 3, numCols: 3 };
     }
 }
 
@@ -316,7 +328,7 @@ function getSize(elem){
     return {'width': width, 'height': height}
 }
 
-function setUserData(elem, sizeX, sizeY, expanded, cachedPos, cachedScale, spans, maxSpans, attachedTo=[]){
+function setUserData(elem, sizeX, sizeY, expanded, cachedPos, cachedScale, spans, maxSpans, column, row, attachedTo=[]){
     elem.userData = {
                     'size': {'x': sizeX,'y': sizeY},
                     'expanded': expanded,
@@ -324,6 +336,8 @@ function setUserData(elem, sizeX, sizeY, expanded, cachedPos, cachedScale, spans
                     'cachedScale': cachedScale,
                     'spans': spans,
                     'maxSpans': maxSpans,
+                    'column': column,
+                    'row': row,
                     'attachedTo': attachedTo
                 };
 }
@@ -519,6 +533,73 @@ function createGrid() {
 
 createGrid(); // Create and add cubes to the scene
 onWindowResize();
+hiliteGridBox(ACTIVE_IDX); 
+
+function updateGrid(){
+    const { numRows, numCols } = calculateGridSize();
+    console.log(viewGrps[activeView].panels.length)
+    if( Object.keys(viewGrps[activeView].panels).length>0){
+        viewGrps[activeView].grids[0] = [];//col 1
+        viewGrps[activeView].grids[1] = [];//col 2
+        //Setup grids for other screen sizes
+        for (const [idx, panel] of Object.entries(viewGrps[activeView].panels)) {
+            let activeIdx = viewGrps[activeView].cubes.indexOf(panel.parent);
+            let spansX = panel.userData.spans.x;
+            let spansY = panel.userData.spans.y;
+            if(spansX>2){
+                spansX=2;
+            }
+            const spans = [spansX. spansY];
+            
+            let active = viewGrps[activeView].cubes.indexOf(panel.parent);
+            viewGrps[activeView].grids[0].push(panel.parent);
+            viewGrps[activeView].grids[1].push(panel.parent);
+            viewGrps[activeView].grids[1].push(viewGrps[activeView].cubes[active+1]);
+            // for (let i = 0; i < spansX; i++) {
+            //     let active = viewGrps[activeView].cubes.indexOf(panel.parent);
+            //     viewGrps[activeView].grids[1].push(viewGrps[activeView].cubes[active-i]);
+            // }
+            //viewGrps[activeView].grids[1].push(viewGrps[activeView].cubes[active]);
+            // let next = 0;
+
+            // for (let i = 0; i < spans; i++) {
+            //     let span = spans[i];
+            //     for (let j = 0; j < span; j++) {
+            //         next = activeIdx+j;
+            //         let nextCube = viewGrps[activeView].cubes[next];
+            //         let active = viewGrps[activeView].grids.indexOf(nextCube);
+            //         if(active<1){
+            //             viewGrps[activeView].grids[1].push(nextCube);
+            //         }
+            //     }
+            // }
+
+        }
+    }
+    
+    // console.log('numCols')
+    // console.log(numCols-1)
+
+    // Reposition the cubes to fit the new grid layout
+    let cubeIndex = 0;
+    for (let row = 0; row < numRows; row++) {
+        
+        for (let col = 0; col < numCols; col++) {
+            const cube = viewGrps[activeView].grids[numCols-1][cubeIndex];
+            const xOffset = (col - (numCols - 1) / 2) * (cubeSize + GRID.spacing);
+            const yOffset = (row - (numRows - 1) / 2) * (cubeSize + GRID.spacing);
+            if(cube != undefined){
+                cube.scale.set(cube.scale.x+GRID.offsetScale, cube.scale.y+GRID.offsetScale, cube.scale.z)
+                cube.position.set(xOffset, -yOffset, 0);
+                //updatePanel(cube, numCols)
+            }
+
+            cubeIndex++;
+        }
+    }
+
+    resetCamera();
+}
 
 // Set up camera and render loop
 camera.position.z = 100;
@@ -527,7 +608,8 @@ camera.updateProjectionMatrix(); // Update the camera's projection matrix
 //set initial scaling on group after populated
 Object.keys(views).forEach((v, idx) => {
     viewGrps[v].grp.scale.set(0.5, 0.5, 0.5);
-})
+});
+resetCamera();
 
 
 function handleMouseWheel(event) {
@@ -613,26 +695,6 @@ function updatePanel(cube, numCols){
     }
 }
 
-function updateGrid(){
-    const { numRows, numCols } = calculateGridSize();
-
-    // Reposition the cubes to fit the new grid layout
-    let cubeIndex = 0;
-    for (let row = 0; row < numRows; row++) {
-        
-        for (let col = 0; col < numCols; col++) {
-            const cube = viewGrps[activeView].grids[numCols][cubeIndex];
-            const xOffset = (col - (numCols - 1) / 2) * (cubeSize + GRID.spacing);
-            const yOffset = (row - (numRows - 1) / 2) * (cubeSize + GRID.spacing);
-
-            cube.scale.set(cube.scale.x+GRID.offsetScale, cube.scale.y+GRID.offsetScale, cube.scale.z)
-            cube.position.set(xOffset, -yOffset, 0);
-            //updatePanel(cube, numCols)
-
-            cubeIndex++;
-        }
-    }
-}
 
 function setDebug(val){
     NAV = val;
