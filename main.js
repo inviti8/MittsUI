@@ -68,11 +68,11 @@ let TGL_SCALE = false;
 let ACTIVE_PANEL_POS;
 let ACTIVE_PANEL_SCALE;
 let MOVE = new THREE.Vector3();//var for moving elements
-const TOP_PAD = 10;//spacing buffer for top of browser window
+const TOP_PAD = 2;//spacing buffer for top of browser window
 
 // Function to smoothly interpolate camera position
-function resetCamera() {
-    MOVE.set(0, viewGrps[activeView].cubes[0].position.y-(cubeSize/2-TOP_PAD), camera.position.z);
+function resetCamera(idx=0) {
+    MOVE.set(0, viewGrps[activeView].cubes[idx].position.y-(cubeSize/2-TOP_PAD), camera.position.z);
     CAM_POS_TARGET.copy(MOVE);
     const groupScale = viewGrps[activeView].grp.scale;
     const newX = CAM_POS_TARGET.x * groupScale.x;
@@ -80,6 +80,19 @@ function resetCamera() {
 
     gsap.to(camera.position, {duration: NAV_SPEED.speed*0.5, x: newX, y: newY, ease: NAV_EASE , onComplete: onNavComplete});
 }
+
+function resetContainerScale(){
+    const cube = viewGrps[activeView].cubes[ACTIVE_IDX];
+    if(!panelCanScale(cube))
+        return;
+    viewGrps[activeView].cubes.forEach((cube, idx) => {
+        if (idx != ACTIVE_IDX) {
+            NAV_TWEEN_SCALE = gsap.to(cube.scale, {duration: NAV_SPEED.speed*0.5, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['INACTIVE', cube] });
+        }
+    });
+    NAV_TWEEN_SCALE = gsap.to(cube.scale, {duration: NAV_SPEED.speed*0.5, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['INACTIVE', cube] });
+}
+
 
 
 // Function to smoothly interpolate camera position
@@ -256,10 +269,12 @@ function onMouseClick(event) {
         }else{
             TGL_SCALE = false;
             CAM_POS_TARGET.copy(CAM_POS_START);
+            resetCamera(ACTIVE_IDX);
         }
     }else{
     	TGL_SCALE = false;
     	CAM_POS_TARGET.copy(CAM_POS_START);
+        resetCamera();
     }
 
     if (event.ctrlKey && event.shiftKey) {
@@ -555,6 +570,9 @@ function updateGrid(){
             viewGrps[activeView].grids[0].push(panel.parent);
             viewGrps[activeView].grids[1].push(panel.parent);
             viewGrps[activeView].grids[1].push(viewGrps[activeView].cubes[active+1]);
+            if(spansY>1){
+               viewGrps[activeView].grids[1].push(viewGrps[activeView].cubes[active+1*spansY]); 
+            }
             // for (let i = 0; i < spansX; i++) {
             //     let active = viewGrps[activeView].cubes.indexOf(panel.parent);
             //     viewGrps[activeView].grids[1].push(viewGrps[activeView].cubes[active-i]);
@@ -597,7 +615,7 @@ function updateGrid(){
             cubeIndex++;
         }
     }
-
+    resetContainerScale()
     resetCamera();
 }
 
