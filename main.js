@@ -78,7 +78,7 @@ function resetCamera(idx=0) {
     const newX = CAM_POS_TARGET.x * groupScale.x;
     const newY = CAM_POS_TARGET.y * groupScale.y;
 
-    gsap.to(camera.position, {duration: NAV_SPEED.speed*0.5, x: newX, y: newY, ease: NAV_EASE , onComplete: onNavComplete});
+    gsap.to(camera.position, {duration: NAV_SPEED.speed*0.5, x: newX, y: newY, onComplete: onNavComplete});
 }
 
 function resetContainerScale(){
@@ -205,9 +205,11 @@ function panelAnimation(state, cube, speedMult=1){
         resetScaleY = child.userData.scaleOffset.y;
         resetPosX=child.userData.posOffset.x;
         resetPosY=child.userData.posOffset.y;
-
+        console.log(child.userData.spans)
+        console.log(child)
         if(child.userData.spans.x > 2){
-            scaleMult = 1.4;
+            console.log('This is here!!!')
+            scaleMult = 1.6;
         }
 
         if(child.userData.spans.x > 1 && child.userData.spans.y > 1){
@@ -372,7 +374,7 @@ function setUserData(elem, sizeX, sizeY, expanded, cachedPos, cachedScale, spans
                     'expanded': expanded,
                     'cachedPos': cachedPos, 
                     'cachedScale': cachedScale,
-                    'spans': spans,
+                    'spans': new THREE.Vector2(spans.x, spans.y),
                     'maxSpans': maxSpans,
                     'column': column,
                     'row': row,
@@ -493,9 +495,11 @@ function panelContainerMesh( action, props ){
                 }
                 panel.userData.cachedPos.set(panel.position.x, panel.position.y, panel.position.y);
                 panel.userData.cachedScale.set(panel.scale.x, panel.scale.y, panel.scale.y);
-                panel.userData.spans=spans;
+                panel.userData.spans.set(spans.x, spans.y);
                 panel.userData.maxSpans=maxSpans;
                 panel.userData.ratio=getScaleRatio(panel);
+                console.log('Spans is being set to:')
+                console.log(spans)
 
             }
             break;
@@ -581,7 +585,7 @@ hiliteGridBox(ACTIVE_IDX);
 
 function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
-    let rowOffset = 2;
+    let rowOffset = 1;
     let colOffset = 2;
     if( Object.keys(viewGrps[activeView].panels).length>0){
         viewGrps[activeView].grids[0] = [];//col 1
