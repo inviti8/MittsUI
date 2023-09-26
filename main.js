@@ -93,8 +93,6 @@ function resetContainerScale(){
     NAV_TWEEN_SCALE = gsap.to(cube.scale, {duration: NAV_SPEED.speed*0.5, x: RESET_CUBE_SCALE.x, y: RESET_CUBE_SCALE.y, z: RESET_CUBE_SCALE.z, ease: NAV_EASE, onStart: panelAnimation, onStartParams:['INACTIVE', cube] });
 }
 
-
-
 // Function to smoothly interpolate camera position
 function panCamera() {
     const cube = viewGrps[activeView].cubes[ACTIVE_IDX];
@@ -146,17 +144,24 @@ function panelCanScale(cube){
     return result;
 }
 
-function getScaleRatio(elem){
+function getScaleRatio(elem, cached=false){
     let result = undefined;
 
     let scaleX = elem.scale.x;
     let scaleY = elem.scale.y;
+
+    if(cached && elem.userData.cachedScale != undefined){
+        scaleX = elem.userData.cachedScale.x;
+        scaleY = elem.userData.cachedScale.y;
+    }  
 
 
     if(scaleX > scaleY){
         result = scaleY / scaleX;
     }else if(scaleY > scaleX){
         result = scaleX / scaleY;
+    }else{
+        result = 1;
     }
 
     return result
@@ -166,6 +171,7 @@ function panelAnimation(state, cube, speedMult=1){
 
     const child = cube.getObjectByName('Panel');
     const minSize = cubeSize*cube.userData.spans;
+    const { numRows, numCols } = calculateGridSize();
     let { idealWidth, idealHeight } = calculatePanelSize();
 
     if (child == undefined)
@@ -173,19 +179,40 @@ function panelAnimation(state, cube, speedMult=1){
 
     let scaleX = child.scale.x;
     let scaleY = child.scale.y;
-    let ratio = getScaleRatio(child);
+    let resetScaleX = child.userData.cachedScale.x;
+    let resetScaleY = child.userData.cachedScale.y;
+    let resetPosX = child.userData.cachedPos.x;
+    let resetPosY = child.userData.cachedPos.y;
+    let ratio = child.userData.ratio;
     let scaleMult = 1;
 
     if(scaleX > scaleY){
-        scaleX = scaleX*(ratio+idealWidth);
-        scaleY = scaleY*(ratio+idealWidth);
+        scaleX = scaleX*(ratio)*idealWidth;
+        scaleY = scaleY*(ratio)*idealWidth;
     }else if(scaleY > scaleX){
-        scaleX = scaleX*(ratio+idealHeight);
-        scaleY = scaleY*(ratio+idealHeight);
+        scaleX = scaleX*(ratio)*idealHeight;
+        scaleY = scaleY*(ratio)*idealHeight;
     }
 
     if(scaleX>=2 && scaleY>=2){
         scaleMult = 0.5;
+    }
+
+    if (window.innerWidth < 900) {
+        // resetScaleX*=ratio;
+        // resetScaleY*=ratio;
+        resetScaleX = child.userData.scaleOffset.x;
+        resetScaleY = child.userData.scaleOffset.y;
+        resetPosX=child.userData.posOffset.x;
+        resetPosY=child.userData.posOffset.y;
+
+        if(child.userData.spans.x > 2){
+            scaleMult = 1.4;
+        }
+
+        if(child.userData.spans.x > 1 && child.userData.spans.y > 1){
+            scaleMult = 0.5;
+        }
     }
 
     if(state == 'ACTIVE' && !child.userData.expanded){
@@ -193,26 +220,16 @@ function panelAnimation(state, cube, speedMult=1){
             
             child.userData.expanded = true;
             PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: 0, y: 0, z: child.userData.cachedPos.z+50, ease: NAV_EASE });
-            PANEL_TWEEN_SCALE = gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: scaleX*scaleMult, y: scaleY*scaleMult, ease: NAV_EASE });
+            PANEL_TWEEN_SCALE = gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: scaleX*scaleMult, y: scaleY*scaleMult, z: child.userData.cachedScale.z, ease: NAV_EASE });
         }
     }
-    // if(state == 'RESIZE'){
-    //     if( cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS )){
-    //         let size = getSize(child);
-    //         if(size <=cubeSize)
-    //             return;
-
-    //         PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: 0, y: 0, ease: NAV_EASE });
-    //         gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: scaleX, y: scaleY, ease: NAV_EASE });
-    //     }
-    // }
     else if(state == 'INACTIVE' && child.userData.expanded){
 
         if(cube.children.length > 1 && !gsap.isTweening( PANEL_TWEEN_POS ) && !gsap.isTweening( PANEL_TWEEN_SCALE )){
 
             child.userData.expanded = false;
-            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: child.userData.cachedPos.x, y: child.userData.cachedPos.y, z: child.userData.cachedPos.z, ease: NAV_EASE });
-            PANEL_TWEEN_SCALE = gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: child.userData.cachedScale.x, y: child.userData.cachedScale.y, ease: NAV_EASE });
+            PANEL_TWEEN_POS = gsap.to(child.position, { duration: NAV_SPEED.speed*speedMult, x: resetPosX, y: resetPosY, z: child.userData.cachedPos.z, ease: NAV_EASE });
+            PANEL_TWEEN_SCALE = gsap.to(child.scale, { duration: NAV_SPEED.speed*speedMult, x: resetScaleX, y: resetScaleY, z: child.userData.cachedScale.z, ease: NAV_EASE });
         }
     }
 }
@@ -251,13 +268,11 @@ function onMouseClick(event) {
     const intersectsBackBtns = raycaster.intersectObjects(viewGrps[activeView].backBtns);
 
     if ( (intersectsContainer.length > 0 && intersectsBackBtns.length == 0) || (intersectsPanel.length > 0) ) {
-        console.log('@1')
     	TGL_SCALE = true;
         let clickedCube = intersectsContainer[0].object;
         let cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
 
         if(intersectsPanel.length > 0){
-            console.log('@2')
             const panel = intersectsPanel[0].object;
             clickedCube = panel.parent;
             cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
@@ -267,38 +282,30 @@ function onMouseClick(event) {
         }
 
         if(cubeIndex >= 0){
-            console.log('@3')
             ACTIVE_IDX = cubeIndex;
             CAM_POS_TARGET.copy(clickedCube.position);
             if (clickedCube.children.length > 0){
-                console.log('@4')
                 ACTIVE_PANEL_POS = clickedCube.children[0].position;
                 ACTIVE_PANEL_SCALE = clickedCube.children[0].scale;
             }
         }else{
-            console.log('@5')
             TGL_SCALE = false;
             CAM_POS_TARGET.copy(CAM_POS_START);
             resetCamera();
         }
     }else{
-        console.log('@6')
     	TGL_SCALE = false;
     	CAM_POS_TARGET.copy(CAM_POS_START);
         resetCamera();
     }
 
     if (event.ctrlKey && event.shiftKey) {
-        console.log('@7')
        hiliteGridBox(ACTIVE_IDX);
-       console.log(ACTIVE_IDX);
     }
 
     if (event.ctrlKey && !event.altKey&& !event.shiftKey) {
-        console.log('@8')
         panelContainerMesh('add', PANEL_PROPS);
     }
-    console.log('@9')
     handleNav();
 }
 
@@ -325,12 +332,13 @@ function calculateGridSize() {
 }
 
 function calculatePanelSize() {
+    const { numRows, numCols } = calculateGridSize();
     if (window.innerWidth < 600) {
-        return { idealWidth: 0, idealHeight: 0.3 };
+        return { idealWidth: 1.8, idealHeight: 2.3 };
     } else if (window.innerWidth < 900) {
-        return { idealWidth: 0.15, idealHeight: 0.17 };
+        return { idealWidth: 0.55, idealHeight: 0.6 };
     } else {
-        return { idealWidth: 0.3, idealHeight:0.05 };
+        return { idealWidth: 1.5, idealHeight:1.05 };
     }
 }
 
@@ -368,6 +376,9 @@ function setUserData(elem, sizeX, sizeY, expanded, cachedPos, cachedScale, spans
                     'maxSpans': maxSpans,
                     'column': column,
                     'row': row,
+                    'ratio': getScaleRatio(elem),
+                    'posOffset': new THREE.Vector3(0, 0, 0),
+                    'scaleOffset': new THREE.Vector3(1, 1, 1),
                     'attachedTo': attachedTo
                 };
 }
@@ -484,6 +495,7 @@ function panelContainerMesh( action, props ){
                 panel.userData.cachedScale.set(panel.scale.x, panel.scale.y, panel.scale.y);
                 panel.userData.spans=spans;
                 panel.userData.maxSpans=maxSpans;
+                panel.userData.ratio=getScaleRatio(panel);
 
             }
             break;
@@ -552,6 +564,7 @@ function createGrid() {
                 viewGrps[v].cubePos.push(cube.position)
                 viewGrps[v].backBtns.push(back);
                 viewGrps[v].grp.add(cube);
+                setUserData(cube, cubeSize, cubeSize, false, cube.position, cube.scale, {"x": 1, "y": 1}, 1, col, row);
                 //create grid for each column configuration
                 viewGrps[v].grids.forEach( (arr) => {
                     arr.push(cube);
@@ -581,19 +594,13 @@ function updateGrid(){
 
             viewGrps[activeView].grids[0].push(panel.parent);
 
-            if(spansX == 1 && spansY == 1){
-                viewGrps[activeView].grids[1].push(panel.parent);
-            }else{
-                var max = active+(spansX*spansY);
-                if(spansX<spansY){
-                    var max = active+(spansX*spansY+rowOffset);
-                }
-                for (let i = active; i < max; i++) {
-                    var elem = viewGrps[activeView].cubes[i];
-                    viewGrps[activeView].grids[1].push(elem);
-                }
+            var max = active+(spansX*spansY+rowOffset);
 
+            for (let i = active; i < max; i++) {
+                var elem = viewGrps[activeView].cubes[i];
+                viewGrps[activeView].grids[1].push(elem);
             }
+
         }
 
         rowOffset += 1;
@@ -611,11 +618,10 @@ function updateGrid(){
             if(cube != undefined){
                 cube.scale.set(cube.scale.x+GRID.offsetScale, cube.scale.y+GRID.offsetScale, cube.scale.z)
                 cube.position.set(xOffset, -yOffset, 0);
-                //updatePanel(cube, numCols)
+                updatePanel(cube, numCols)
                 cubeIndex++;
             }
 
-            
         }
     }
     resetContainerScale()
@@ -675,43 +681,50 @@ function onWindowResize() {
 }
 
 function updatePanel(cube, numCols){
-    //console.log('update')
+
     let { idealWidth, idealHeight } = calculatePanelSize();
     const child = cube.getObjectByName('Panel');
     let ratio = undefined;
-
-    //console.log(numCols)
 
     if (child != undefined){
         if (window.innerWidth < 900) {
             let scaleX = child.userData.cachedScale.x;
             let scaleY = child.userData.cachedScale.y;
-            let ratio = getScaleRatio(child);
+            let ratio = getScaleRatio(child)*numCols;
+
+            if(child.userData.spans.x > 1 && child.userData.spans.y > 1){
+                scaleX*=0.5;
+                scaleY*=0.5;
+            }
 
             if(scaleX > scaleY){
                 scaleX = scaleX*(ratio);
                 scaleY = scaleY*(ratio);
+
             }else if(scaleY > scaleX){
                 scaleX = scaleX*(ratio);
                 scaleY = scaleY*(ratio);
             }
 
-            // console.log(ratio);
-            // console.log(scaleX);
-            // console.log(scaleY);
+            child.userData.ratio = ratio;
+            child.scale.set(scaleX, scaleY, child.userData.cachedScale.z);
+            const offsetPos = edgeAlign(cube, child);
+            MOVE.set(offsetPos.x*-1, offsetPos.y*1, 10);
+            if (window.innerWidth < 600) {
+                MOVE.set(0, 0, 10);
+            }
 
-            child.scale.set(scaleX*numCols, scaleY*numCols, child.userData.cachedScale.z);
-
-
-            //console.log(scaleX)
-            //console.log(scaleY)
-
-            //panelAnimation('RESIZE', cube, 1.5);
+            child.position.copy(MOVE);
+            child.userData.scaleOffset.copy(child.scale);
+            child.userData.posOffset.copy(MOVE);
         }
         else
         {
             child.scale.set(child.userData.cachedScale.x, child.userData.cachedScale.y, child.userData.cachedScale.z);
             child.position.set(child.userData.cachedPos.x, child.userData.cachedPos.y, child.userData.cachedPos.z);
+            child.userData.ratio = getScaleRatio(child, true);
+            child.userData.scaleOffset.copy(child.scale);
+            child.userData.posOffset.set(0, 0, 0);
         }    
     }
 }
