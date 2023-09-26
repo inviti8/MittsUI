@@ -105,22 +105,19 @@ export function bindPanelCtrls(props, onIndexChange, handleContainer){
 	// 	index: props.index,
 	// }
 
+	const name = {
+		name:props.name,
+	}
+
 	const span = {
 		span: props.span,
 	}
 
-	const spanDirection = {
-		spanDirection: props.spanDirection,
-	}
-
-	// panelCtrls.addBinding(index, 'index', {
-	// 	step:1,
-	// 	min: 0,
-  	// 	max: 20,
-	// }).on('change', (ev) => {
-	// 	console.log(ev.value)
-	// 	onIndexChange(ev.value);
-	// });
+	panelCtrls.addBinding(name, 'name')
+	.on('change', (ev) => {
+		console.log(ev.value)
+		onIndexChange(ev.value);
+	});
 
 	panelCtrls.addBinding(span, 'span', {
 		x: {step: 1, min: 1, max: 3},

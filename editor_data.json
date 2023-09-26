@@ -15,6 +15,23 @@
 	},
 	"panels":{
 		"properties":{
+			"name":"Panel",
+			"index":0,
+			"span": {"x": 1, "y": 1},
+			"maxSpans": {"x": 3, "y": 2},
+			"creation":{
+			"element":"button",
+			"alignment":"center"
+			},
+			"actions":[
+				"add",
+				"remove"
+			]
+		}
+	},
+	"inputs":{
+		"properties":{
+			"name":"Input",
 			"index":0,
 			"span": {"x": 1, "y": 1},
 			"maxSpans": {"x": 3, "y": 2},
