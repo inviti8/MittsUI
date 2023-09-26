@@ -1,150 +1,190 @@
 import {Pane} from 'tweakpane';
 const pane = new Pane();
 
+const pages = [{title: 'home'}, {title: 'settings'}]
+let tabs = undefined;
+
 const MAX_COLS = 4
 const MAX_ROWS = 20
 const MAX_SPACING = 20
 
+const navCtrls = [];
+// const navCtrl = pane.addFolder({
+//   title: 'Navigation Variables',
+//   expanded: true,   // optional
+// });
 
-const navCtrls = pane.addFolder({
-  title: 'Navigation',
-  expanded: true,   // optional
-});
+const panelCtrls = [];
+// const panelCtrl = pane.addFolder({
+//   title: 'Panel Creation',
+//   expanded: true,   // optional
+// });
 
-const panelCtrls = pane.addFolder({
-  title: 'Panels',
-  expanded: true,   // optional
-});
+const elemCtrls = [];
+// const elemCtrl = pane.addFolder({
+//   title: 'Elements',
+//   expanded: false,   // optional
+// });
 
-const elemCtrls = pane.addFolder({
-  title: 'Elements',
-  expanded: false,   // optional
-});
+export function getPages(){
+	return pages;
+};
 
+export function addPages(onTabChange){
+
+	tabs = pane.addTab({
+	  pages: pages,
+	}).on('select', (ev) => {
+		console.log('tab changed')
+		console.log(ev)
+		onTabChange(ev.index);
+	});
+
+	tabs.pages.forEach((page, idx) => {
+
+		const nCtrl = page.addFolder({
+		  title: 'Navigation Variables',
+		  expanded: true,   // optional
+		});
+		navCtrls.push(nCtrl);
+
+		const pCtrl = page.addFolder({
+		  title: 'Panel Creation',
+		  expanded: true,   // optional
+		});
+		panelCtrls.push(pCtrl);
+
+	});
+
+};
+
+export function addPage(index, folder){
+	tabs.pages[index].addFolder(folder);
+};
 
 export function refresh(){
 	pane.refresh();
-}
+};
 
 export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid, setDebug){
 
-	let needUpdate = ['spacing', 'offsetScale'];
+	navCtrls.forEach((ctrl, idx) => {
+			ctrl.addBinding(grid_vars, 'rows', {
+			  step:1,
+			  min: 0,
+		  	  max: MAX_ROWS,
+			}).on('change', (ev) => {
+				 updateGrid();
+			});
 
-	navCtrls.addBinding(grid_vars, 'rows', {
-	  step:1,
-	  min: 0,
-  	  max: MAX_ROWS,
-	}).on('change', (ev) => {
-		 updateGrid();
-	});
+			ctrl.addBinding(grid_vars, 'columns', {
+			  step:1,
+			  min: 0,
+		  	  max: MAX_COLS,
+			}).on('change', (ev) => {
+				 updateGrid();
+			});
 
-	navCtrls.addBinding(grid_vars, 'columns', {
-	  step:1,
-	  min: 0,
-  	  max: MAX_COLS,
-	}).on('change', (ev) => {
-		 updateGrid();
-	});
+			ctrl.addBinding(grid_vars, 'spacing', {
+				  step:0.001,
+				  min: 0,
+			  	  max: MAX_SPACING,
+			}).on('change', (ev) => {
+				 updateGrid();
+			});
 
-	navCtrls.addBinding(grid_vars, 'spacing', {
-		  step:0.001,
-		  min: 0,
-	  	  max: MAX_SPACING,
-	}).on('change', (ev) => {
-		 updateGrid();
-	});
+			ctrl.addBinding(grid_vars, 'offsetScale', {
+				  step:0.001,
+				  min: -0.3,
+			  	  max: 0.3,
+			}).on('change', (ev) => {
+				 updateGrid();
+			});
 
-	navCtrls.addBinding(grid_vars, 'offsetScale', {
-		  step:0.001,
-		  min: -0.3,
-	  	  max: 0.3,
-	}).on('change', (ev) => {
-		 updateGrid();
-	});
+			ctrl.addBinding(speed_vars, 'speed', {
+			  step: 0.01,
+			  min: 0.001,
+		  	  max: 2,
+			});
 
-	navCtrls.addBinding(speed_vars, 'speed', {
-	  step: 0.01,
-	  min: 0.001,
-  	  max: 2,
-	});
+			ctrl.addBinding(ease_vars, 'ease', {
+			  options: {
+			  	none: 'none',
+			    expo: 'expo',
+			    sine: 'sine',
+			    bounce: 'bounce',
+			    elastic:'elastic',
+			    back: 'back',
+			    power1: 'power1',
+			    power2: 'power2',
+			    power3: 'power3',
+			    power4: 'power4',
+			    slow: 'slow',
+			    rough: 'rough'
+			  },
+			});
 
-	navCtrls.addBinding(ease_vars, 'ease', {
-	  options: {
-	  	none: 'none',
-	    expo: 'expo',
-	    sine: 'sine',
-	    bounce: 'bounce',
-	    elastic:'elastic',
-	    back: 'back',
-	    power1: 'power1',
-	    power2: 'power2',
-	    power3: 'power3',
-	    power4: 'power4',
-	    slow: 'slow',
-	    rough: 'rough'
-	  },
-	});
+			ctrl.addBinding(ease_vars, 'easeType', {
+			  options: {
+			  	in: 'in',
+			    inOut: 'inOut',
+			    out: 'out'
+			  },
+			});
 
-	navCtrls.addBinding(ease_vars, 'easeType', {
-	  options: {
-	  	in: 'in',
-	    inOut: 'inOut',
-	    out: 'out'
-	  },
-	});
-
-	navCtrls.addBinding(grid_vars, 'DEBUG').on('change', (ev) => {
-		grid_vars.DEBUG = ev.value;
-		 setDebug(ev.value);
+			ctrl.addBinding(grid_vars, 'DEBUG').on('change', (ev) => {
+				grid_vars.DEBUG = ev.value;
+				 setDebug(ev.value);
+			});
 	});
 };
 
-export function bindPanelCtrls(props, onIndexChange, handleContainer){
+export function bindPanelCtrl(props, onIndexChange, handleContainer){
 
-	// const index = {
-	// 	index: props.index,
-	// }
+	panelCtrls.forEach((ctrl, idx) => {
+		// const index = {
+		// 	index: props.index,
+		// }
 
-	const name = {
-		name:props.name,
-	}
+		const name = {
+			name:props.name,
+		}
 
-	const span = {
-		span: props.span,
-	}
+		const span = {
+			span: props.span,
+		}
 
-	panelCtrls.addBinding(name, 'name')
-	.on('change', (ev) => {
-		console.log(ev.value)
-		onIndexChange(ev.value);
-	});
+		ctrl.addBinding(name, 'name')
+		// .on('change', (ev) => {
+		// 	console.log(ev.value)
+		// 	onIndexChange(ev.value);
+		// });
 
-	panelCtrls.addBinding(span, 'span', {
-		x: {step: 1, min: 1, max: 3},
-  		y: {step: 1, min: 1, max: 2},
-  		format: (v) => Math.floor(v),
-	}).on('change', (ev) => {
-		console.log('span change')
-		handleContainer('edit', props);
-	});
-
-
-	props.actions.forEach((action, idx) => {
-
-		panelCtrls.addButton({
-  			title: action
-		}).on('click', () => {
-  			handleContainer(action, props)
+		ctrl.addBinding(span, 'span', {
+			x: {step: 1, min: 1, max: 3},
+	  		y: {step: 1, min: 1, max: 2},
+	  		format: (v) => Math.floor(v),
+		}).on('change', (ev) => {
+			console.log('span change')
+			handleContainer('edit', props);
 		});
-    	
+
+
+		props.actions.forEach((action, idx) => {
+
+			ctrl.addButton({
+	  			title: action
+			}).on('click', () => {
+	  			handleContainer(action, props)
+			});
+	    	
+		});
 	});
-
-
 };
 
-export function bindElemCtrls(props, onIndexChange){
+export function bindElemCtrl(props, onIndexChange){
 
-	elemCtrls.addBinding(props.creation, 'element', {
+	elemCtrl.addBinding(props.creation, 'element', {
 	    options: {
 	  	button: 'button',
 	    input: 'input',
@@ -152,7 +192,7 @@ export function bindElemCtrls(props, onIndexChange){
 	  },
 	});
 
-	elemCtrls.addBinding(props.creation, 'alignment', {
+	elemCtrl.addBinding(props.creation, 'alignment', {
 	    options: {
 	  	center: 'center',
 	    left: 'left',
@@ -164,7 +204,7 @@ export function bindElemCtrls(props, onIndexChange){
 
 	// props.actions.forEach((action, idx) => {
 
-	// 	panelCtrls.addButton({
+	// 	panelCtrl.addButton({
   	// 		title: action
 	// 	}).on('click', (e) => {
   	// 		console.log(e);

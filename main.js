@@ -3,7 +3,6 @@ import { gsap } from "gsap";
 import * as extensions from './js/three_extensions';
 import editor_data from './editor_data.json' assert {type: 'json'};
 import * as editor from './js/editor_pane';
-import views from './views.json' assert {type: 'json'};
 
 // Initialize Three.js scene with an orthographic camera
 const scene = new THREE.Scene();
@@ -37,24 +36,25 @@ let NAV_TWEEN_POS = undefined;
 let PANEL_TWEEN_SCALE = undefined;
 let PANEL_TWEEN_POS = undefined;
 
+editor.addPages(onTabChange);
+let PAGES = editor.getPages();
 
 editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
 
 //panel vars
 const PANEL_PROPS = editor_data.panels.properties;
 
-editor.bindPanelCtrls(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
+editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
 
-const viewGrps = {};
-const activeView = Object.keys(views)[0];
+let viewGrps = {};
+let activeView = 'home';
 
-Object.keys(views).forEach((v, idx) => {
-    viewGrps[v] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}}
+PAGES.forEach((page, idx) => {
+    viewGrps[page.title] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}}
 });
-
 // Create an array to store cubes
-const cubeGrp = new THREE.Group();
 scene.add(viewGrps[activeView].grp);
+console.log(viewGrps)
 
 // Initialize the mouse vector
 const mouse = new THREE.Vector2();
@@ -416,7 +416,7 @@ function updateGridAttachments(elem){
 function panelContainerMesh( action, props ){
     if(viewGrps[activeView].cubes[LAST_INDEX] == undefined)
         return;
-
+    const name = props.name;
     const spans = props.span;
     const maxSpans = props.maxSpans;
     const parent = viewGrps[activeView].cubes[LAST_INDEX];
@@ -446,7 +446,7 @@ function panelContainerMesh( action, props ){
                 var scale = new THREE.Vector3(panel.scale.x, panel.scale.y, panel.scale.y);
                 panel.position.copy(pos);
                 setUserData(panel, 'PANEL', cubeSize, cubeSize, false, pos, scale, spans, maxSpans);
-                panel.name = 'Panel';
+                panel.name = name;
                 let btn = createMinimizeMesh(panel, cubeSize*spans.x, cubeSize*spans.y);
                 viewGrps[activeView].panels[LAST_INDEX] = panel;
                 viewGrps[activeView].backBtns.push(btn);
@@ -496,8 +496,6 @@ function panelContainerMesh( action, props ){
                 panel.userData.spans.set(spans.x, spans.y);
                 panel.userData.maxSpans=maxSpans;
                 panel.userData.ratio=getScaleRatio(panel);
-                console.log('Spans is being set to:')
-                console.log(spans)
 
             }
             break;
@@ -539,6 +537,14 @@ function centerAlign(parent, child){
     return {'x': x, 'y': y}
 }
 
+function updatePanelName(name){
+    if(index > viewGrps[activeView].cubes.length-1)
+        return;
+    const cube = viewGrps[activeView].cubes[ACTIVE_IDX];
+    const child = cube.getObjectByUserDataProperty('type', 'PANEL');
+    child.name = name;
+}
+
 function hiliteGridBox(index){
     if(index > viewGrps[activeView].cubes.length-1)
         return;
@@ -548,14 +554,20 @@ function hiliteGridBox(index){
     });
 
     viewGrps[activeView].cubes[index].material.color.set('green');
-    console.log(viewGrps[activeView].cubes[index])
     LAST_INDEX = index;
 }
 
-// Function to create cubes for the grid
-function createGrid() {
+function onTabChange(index){
+    scene.remove(viewGrps[activeView].grp);
+    activeView = PAGES[index].title;
+    scene.add(viewGrps[activeView].grp);
+    updateGrid();
+}
 
-    Object.keys(views).forEach((v, idx) => {
+// Function to create cubes for the grid
+function createGrids() {
+
+    PAGES.forEach((page, idx) => {
         var index = 0;
         //console.log(v)
         for (let col = 0; col < numCols; col++) {
@@ -563,13 +575,13 @@ function createGrid() {
                 const cube = createGridMesh();
                 const back = createMinimizeMesh(cube, cubeSize, cubeSize)
 
-                viewGrps[v].cubes.push(cube);
-                viewGrps[v].cubePos.push(cube.position)
-                viewGrps[v].backBtns.push(back);
-                viewGrps[v].grp.add(cube);
+                viewGrps[page.title].cubes.push(cube);
+                viewGrps[page.title].cubePos.push(cube.position)
+                viewGrps[page.title].backBtns.push(back);
+                viewGrps[page.title].grp.add(cube);
                 setUserData(cube, 'GRID', cubeSize, cubeSize, false, cube.position, cube.scale, {"x": 1, "y": 1}, 1, col, row);
                 //create grid for each column configuration
-                viewGrps[v].grids.forEach( (arr) => {
+                viewGrps[page.title].grids.forEach( (arr) => {
                     arr.push(cube);
                 });  
             }
@@ -578,7 +590,7 @@ function createGrid() {
     });
 }
 
-createGrid(); // Create and add cubes to the scene
+createGrids(); // Create and add cubes to the scene
 onWindowResize();
 hiliteGridBox(ACTIVE_IDX); 
 
@@ -631,8 +643,8 @@ camera.position.z = 100;
 camera.aspect = aspectRatio; // Update the camera's aspect ratio
 camera.updateProjectionMatrix(); // Update the camera's projection matrix
 //set initial scaling on group after populated
-Object.keys(views).forEach((v, idx) => {
-    viewGrps[v].grp.scale.set(0.5, 0.5, 0.5);
+PAGES.forEach((page, idx) => {
+    viewGrps[page.title].grp.scale.set(0.5, 0.5, 0.5);
 });
 resetCamera();
 
