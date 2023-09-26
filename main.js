@@ -581,7 +581,7 @@ hiliteGridBox(ACTIVE_IDX);
 
 function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
-    let rowOffset = 1;
+    let rowOffset = 2;
     let colOffset = 2;
     if( Object.keys(viewGrps[activeView].panels).length>0){
         viewGrps[activeView].grids[0] = [];//col 1
