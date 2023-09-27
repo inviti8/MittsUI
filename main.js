@@ -36,25 +36,25 @@ let NAV_TWEEN_POS = undefined;
 let PANEL_TWEEN_SCALE = undefined;
 let PANEL_TWEEN_POS = undefined;
 
-editor.addPages(onTabChange);
+editor.setCallbacks(onTabChange, onTabCreation);
 let PAGES = editor.getPages();
 
-editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
+//editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
 
 //panel vars
 const PANEL_PROPS = editor_data.panels.properties;
 
-editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
+//editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
 
 let viewGrps = {};
 let activeView = 'home';
 
-PAGES.forEach((page, idx) => {
-    viewGrps[page.title] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}}
-});
-// Create an array to store cubes
-scene.add(viewGrps[activeView].grp);
-console.log(viewGrps)
+// PAGES.forEach((page, idx) => {
+//     viewGrps[page.title] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}}
+// });
+// // Create an array to store cubes
+// scene.add(viewGrps[activeView].grp);
+// console.log(viewGrps)
 
 // Initialize the mouse vector
 const mouse = new THREE.Vector2();
@@ -558,10 +558,32 @@ function hiliteGridBox(index){
 }
 
 function onTabChange(index){
+    resetContainerScale();
+    resetCamera();
     scene.remove(viewGrps[activeView].grp);
     activeView = PAGES[index].title;
     scene.add(viewGrps[activeView].grp);
     updateGrid();
+}
+
+function onTabCreation(){
+    PAGES = editor.getPages();
+    editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
+    editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
+    if(viewGrps[activeView] != undefined && viewGrps[activeView].grp != undefined){
+        scene.remove(viewGrps[activeView].grp);
+    }
+    activeView = PAGES[0].title;
+    PAGES.forEach((page, idx) => {
+        viewGrps[page.title] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}};
+        viewGrps[page.title].grp.scale.set(0.5, 0.5, 0.5);
+    });
+
+    scene.add(viewGrps[activeView].grp);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    createGrids();
+    onWindowResize();
+    resetCamera();
 }
 
 // Function to create cubes for the grid
@@ -572,27 +594,29 @@ function createGrids() {
         //console.log(v)
         for (let col = 0; col < numCols; col++) {
             for (let row = 0; row < numRows; row++) {
-                const cube = createGridMesh();
-                const back = createMinimizeMesh(cube, cubeSize, cubeSize)
+                if(Object.keys(viewGrps[page.title].panels).length == 0){
+                    const cube = createGridMesh();
+                    const back = createMinimizeMesh(cube, cubeSize, cubeSize)
 
-                viewGrps[page.title].cubes.push(cube);
-                viewGrps[page.title].cubePos.push(cube.position)
-                viewGrps[page.title].backBtns.push(back);
-                viewGrps[page.title].grp.add(cube);
-                setUserData(cube, 'GRID', cubeSize, cubeSize, false, cube.position, cube.scale, {"x": 1, "y": 1}, 1, col, row);
-                //create grid for each column configuration
-                viewGrps[page.title].grids.forEach( (arr) => {
-                    arr.push(cube);
-                });  
+                    viewGrps[page.title].cubes.push(cube);
+                    viewGrps[page.title].cubePos.push(cube.position)
+                    viewGrps[page.title].backBtns.push(back);
+                    viewGrps[page.title].grp.add(cube);
+                    setUserData(cube, 'GRID', cubeSize, cubeSize, false, cube.position, cube.scale, {"x": 1, "y": 1}, 1, col, row);
+                    //create grid for each column configuration
+                    viewGrps[page.title].grids.forEach( (arr) => {
+                        arr.push(cube);
+                    });  
+                }
             }
         }
         
     });
 }
 
-createGrids(); // Create and add cubes to the scene
-onWindowResize();
-hiliteGridBox(ACTIVE_IDX); 
+// createGrids(); // Create and add cubes to the scene
+// onWindowResize();
+// hiliteGridBox(ACTIVE_IDX); 
 
 function updateGrid(){
     const { numRows, numCols } = calculateGridSize();
@@ -634,7 +658,7 @@ function updateGrid(){
 
         }
     }
-    resetContainerScale()
+    resetContainerScale();
     resetCamera();
 }
 
@@ -643,10 +667,10 @@ camera.position.z = 100;
 camera.aspect = aspectRatio; // Update the camera's aspect ratio
 camera.updateProjectionMatrix(); // Update the camera's projection matrix
 //set initial scaling on group after populated
-PAGES.forEach((page, idx) => {
-    viewGrps[page.title].grp.scale.set(0.5, 0.5, 0.5);
-});
-resetCamera();
+// PAGES.forEach((page, idx) => {
+//     viewGrps[page.title].grp.scale.set(0.5, 0.5, 0.5);
+// });
+// resetCamera();
 
 
 function handleMouseWheel(event) {

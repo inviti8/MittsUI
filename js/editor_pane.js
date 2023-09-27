@@ -1,7 +1,7 @@
 import {Pane} from 'tweakpane';
 const pane = new Pane();
 
-const pages = [{title: 'home'}, {title: 'settings'}]
+let pages = []
 let tabs = undefined;
 
 const MAX_COLS = 4
@@ -9,57 +9,108 @@ const MAX_ROWS = 20
 const MAX_SPACING = 20
 
 const navCtrls = [];
-// const navCtrl = pane.addFolder({
-//   title: 'Navigation Variables',
-//   expanded: true,   // optional
-// });
-
 const panelCtrls = [];
-// const panelCtrl = pane.addFolder({
-//   title: 'Panel Creation',
-//   expanded: true,   // optional
-// });
-
 const elemCtrls = [];
-// const elemCtrl = pane.addFolder({
-//   title: 'Elements',
-//   expanded: false,   // optional
-// });
+let _onTabChange = undefined;
+let _onTabCreation = undefined;
+
+pane.addBlade({
+  view: 'separator',
+});
+pane.addBlade({
+  view: 'separator',
+});
+
+const tabName = {
+  pages: 'Home, Feed, Settings',
+};
+
+pane.addBinding(tabName, 'pages');
+
+const btnAdd = pane.addButton({
+	title: 'Create Pages'
+}).on('click', (ev) => {
+	console.log(ev);
+	console.log(tabName.pages)
+	if(_onTabChange == undefined || _onTabCreation == undefined)
+		return;
+	let arr = tabName.pages.split(',');
+	console.log(arr)
+	arr.forEach((page, idx) => {
+		let title = page.replace(' ', '');
+		let tab = {title: title};
+		pages.push(tab);
+	});
+	addPages();
+	_onTabCreation();
+});
+
+const btnRemove = pane.addButton({
+	title: 'Remove Page'
+}).on('click', (ev) => {
+	console.log(ev);
+});
+
+pane.addBlade({
+  view: 'separator',
+});
+
+export function setCallbacks(onTabChange, onTabCreation){
+	if(_onTabChange == undefined){
+		_onTabChange = onTabChange;
+	}
+	if(_onTabCreation == undefined){
+		_onTabCreation = onTabCreation;
+	}
+}
 
 export function getPages(){
 	return pages;
 };
 
-export function addPages(onTabChange){
+export function createPage(page){
 
-	tabs = pane.addTab({
-	  pages: pages,
-	}).on('select', (ev) => {
-		console.log('tab changed')
-		console.log(ev)
-		onTabChange(ev.index);
+	const nCtrl = page.addFolder({
+		 title: 'Navigation Variables',
+		 expanded: false,   // optional
 	});
+	navCtrls.push(nCtrl);
 
-	tabs.pages.forEach((page, idx) => {
-
-		const nCtrl = page.addFolder({
-		  title: 'Navigation Variables',
-		  expanded: true,   // optional
-		});
-		navCtrls.push(nCtrl);
-
-		const pCtrl = page.addFolder({
-		  title: 'Panel Creation',
-		  expanded: true,   // optional
-		});
-		panelCtrls.push(pCtrl);
-
+	const pCtrl = page.addFolder({
+		 title: 'Panel Creation',
+		 expanded: false,   // optional
 	});
+	panelCtrls.push(pCtrl);
 
 };
 
-export function addPage(index, folder){
-	tabs.pages[index].addFolder(folder);
+export function addTabs(){
+	tabs = pane.addTab({
+	  pages: pages,
+	}).on('select', (ev) => {
+		_onTabChange(ev.index);
+	});
+
+	return tabs
+};
+
+export function addPages(){
+	tabs = addTabs();
+
+	tabs.pages.forEach((page, idx) => {
+		createPage(page);
+	});
+};
+
+export function addPage(title, onTabChange){
+	let tab = {title: title};
+	pages.push(tab);
+	console.log(pages)
+	tabs = addTabs(onTabChange);
+	let index = pages.indexOf(tab);
+	let page = tabs.pages[index];
+	createPage(page);
+	return index;
 };
 
 export function refresh(){
@@ -69,6 +120,7 @@ export function refresh(){
 export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid, setDebug){
 
 	navCtrls.forEach((ctrl, idx) => {
+
 			ctrl.addBinding(grid_vars, 'rows', {
 			  step:1,
 			  min: 0,
