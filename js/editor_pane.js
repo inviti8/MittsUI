@@ -14,10 +14,15 @@ const elemCtrls = [];
 let _onTabChange = undefined;
 let _onTabCreation = undefined;
 
-pane.addBlade({
+const initCtrl = pane.addFolder({
+	title: 'Initialization',
+	expanded: true,   // optional
+});
+
+initCtrl.addBlade({
   view: 'separator',
 });
-pane.addBlade({
+initCtrl.addBlade({
   view: 'separator',
 });
 
@@ -25,33 +30,28 @@ const tabName = {
   pages: 'Home, Feed, Settings',
 };
 
-pane.addBinding(tabName, 'pages');
+initCtrl.addBinding(tabName, 'pages');
 
-const btnAdd = pane.addButton({
+const btnAdd = initCtrl.addButton({
 	title: 'Create Pages'
 }).on('click', (ev) => {
-	console.log(ev);
-	console.log(tabName.pages)
-	if(_onTabChange == undefined || _onTabCreation == undefined)
+	const create = confirm('Create Pages from:\n'+tabName.pages);
+	if(!create || _onTabChange == undefined || _onTabCreation == undefined)
 		return;
 	let arr = tabName.pages.split(',');
-	console.log(arr)
+
 	arr.forEach((page, idx) => {
 		let title = page.replace(' ', '');
 		let tab = {title: title};
 		pages.push(tab);
 	});
+
 	addPages();
 	_onTabCreation();
+	initCtrl.disabled = true;
 });
 
-const btnRemove = pane.addButton({
-	title: 'Remove Page'
-}).on('click', (ev) => {
-	console.log(ev);
-});
-
-pane.addBlade({
+initCtrl.addBlade({
   view: 'separator',
 });
 
@@ -102,16 +102,6 @@ export function addPages(){
 	});
 };
 
-export function addPage(title, onTabChange){
-	let tab = {title: title};
-	pages.push(tab);
-	console.log(pages)
-	tabs = addTabs(onTabChange);
-	let index = pages.indexOf(tab);
-	let page = tabs.pages[index];
-	createPage(page);
-	return index;
-};
 
 export function refresh(){
 	pane.refresh();

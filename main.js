@@ -4,6 +4,7 @@ import * as extensions from './js/three_extensions';
 import editor_data from './editor_data.json' assert {type: 'json'};
 import * as editor from './js/editor_pane';
 
+let INITIALIZED = false;
 // Initialize Three.js scene with an orthographic camera
 const scene = new THREE.Scene();
 const renderer = new THREE.WebGLRenderer();
@@ -38,23 +39,10 @@ let PANEL_TWEEN_POS = undefined;
 
 editor.setCallbacks(onTabChange, onTabCreation);
 let PAGES = editor.getPages();
-
-//editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
-
-//panel vars
 const PANEL_PROPS = editor_data.panels.properties;
-
-//editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
 
 let viewGrps = {};
 let activeView = 'home';
-
-// PAGES.forEach((page, idx) => {
-//     viewGrps[page.title] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}}
-// });
-// // Create an array to store cubes
-// scene.add(viewGrps[activeView].grp);
-// console.log(viewGrps)
 
 // Initialize the mouse vector
 const mouse = new THREE.Vector2();
@@ -70,6 +58,26 @@ let ACTIVE_PANEL_POS;
 let ACTIVE_PANEL_SCALE;
 let MOVE = new THREE.Vector3();//var for moving elements
 const TOP_PAD = 2;//spacing buffer for top of browser window
+
+// Create the camera with a consistent aspect ratio
+const aspectRatio = calculateAspectRatio();
+const camera = new THREE.OrthographicCamera(
+    (cubeSize * aspectRatio) / -2,
+    (cubeSize * aspectRatio) / 2,
+    cubeSize / 2,
+    cubeSize / -2,
+    0.1,
+    1000
+);
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.sortObjects = true;
+document.body.appendChild(renderer.domElement);
+
+// Set up camera and render loop
+camera.position.z = 100;
+camera.aspect = aspectRatio; // Update the camera's aspect ratio
+camera.updateProjectionMatrix(); // Update the camera's projection matrix
 
 // Function to smoothly interpolate camera position
 function resetCamera(idx=0) {
@@ -155,7 +163,6 @@ function getScaleRatio(elem, cached=false){
         scaleX = elem.userData.cachedScale.x;
         scaleY = elem.userData.cachedScale.y;
     }  
-
 
     if(scaleX > scaleY){
         result = scaleY / scaleX;
@@ -254,6 +261,8 @@ function onNavComplete(){
 
 // Function to handle mouse click events
 function onMouseClick(event) {
+    if(viewGrps[activeView] == undefined)
+        return;
     // Calculate mouse position in normalized device coordinates (NDC)
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -340,21 +349,6 @@ function calculatePanelSize() {
         return { idealWidth: 1.5, idealHeight:1.05 };
     }
 }
-
-// Create the camera with a consistent aspect ratio
-const aspectRatio = calculateAspectRatio();
-const camera = new THREE.OrthographicCamera(
-    (cubeSize * aspectRatio) / -2,
-    (cubeSize * aspectRatio) / 2,
-    cubeSize / 2,
-    cubeSize / -2,
-    0.1,
-    1000
-);
-
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.sortObjects = true;
-document.body.appendChild(renderer.domElement);
 
 function getSize(elem){
     var bbox = new THREE.Box3();
@@ -568,8 +562,12 @@ function onTabChange(index){
 
 function onTabCreation(){
     PAGES = editor.getPages();
-    editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
-    editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
+
+    if(!INITIALIZED){
+        editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
+        editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
+    }
+    
     if(viewGrps[activeView] != undefined && viewGrps[activeView].grp != undefined){
         scene.remove(viewGrps[activeView].grp);
     }
@@ -614,11 +612,9 @@ function createGrids() {
     });
 }
 
-// createGrids(); // Create and add cubes to the scene
-// onWindowResize();
-// hiliteGridBox(ACTIVE_IDX); 
-
 function updateGrid(){
+    if(viewGrps[activeView] == undefined)
+        return;
     const { numRows, numCols } = calculateGridSize();
     let rowOffset = 1;
     if( Object.keys(viewGrps[activeView].panels).length>0){
@@ -662,17 +658,6 @@ function updateGrid(){
     resetCamera();
 }
 
-// Set up camera and render loop
-camera.position.z = 100;
-camera.aspect = aspectRatio; // Update the camera's aspect ratio
-camera.updateProjectionMatrix(); // Update the camera's projection matrix
-//set initial scaling on group after populated
-// PAGES.forEach((page, idx) => {
-//     viewGrps[page.title].grp.scale.set(0.5, 0.5, 0.5);
-// });
-// resetCamera();
-
-
 function handleMouseWheel(event) {
 
     // Check the direction of the mouse wheel (up or down)
@@ -696,7 +681,6 @@ function handleMouseWheel(event) {
 }
 
 document.addEventListener('wheel', handleMouseWheel);
-
 
 // Function to update the grid layout and cube positions on window resize
 function onWindowResize() {
