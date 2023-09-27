@@ -40,6 +40,7 @@ let PANEL_TWEEN_POS = undefined;
 editor.setCallbacks(onTabChange, onTabCreation);
 let PAGES = editor.getPages();
 const PANEL_PROPS = editor_data.panels.properties;
+editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
 
 let viewGrps = {};
 let activeView = 'home';
@@ -285,7 +286,7 @@ function onMouseClick(event) {
             clickedCube = panel.parent;
             cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
             if (event.ctrlKey && event.altKey) {
-                panelContainerMesh('remove', PANEL_PROPS);
+                panelHandler('remove', PANEL_PROPS);
             }
         }
 
@@ -312,7 +313,7 @@ function onMouseClick(event) {
     }
 
     if (event.ctrlKey && !event.altKey&& !event.shiftKey) {
-        panelContainerMesh('add', PANEL_PROPS);
+        panelHandler('add', PANEL_PROPS);
     }
     handleNav();
 }
@@ -407,7 +408,7 @@ function updateGridAttachments(elem){
     const spans = elem.userData.spans;
 }
 
-function panelContainerMesh( action, props ){
+function panelHandler( action, props ){
     if(viewGrps[activeView].cubes[LAST_INDEX] == undefined)
         return;
     const name = props.name;
@@ -475,7 +476,7 @@ function panelContainerMesh( action, props ){
                 if(newY>maxSpans.y){
                     newY= maxSpans.y;
                 }
-                
+                panel.name = name;
                 panel.scale.set(newX, newY, 1);
                 const offsetPos = edgeAlign(parent, panel)
 
@@ -564,8 +565,8 @@ function onTabCreation(){
     PAGES = editor.getPages();
 
     if(!INITIALIZED){
-        editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
-        editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelContainerMesh);
+        //editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
+        editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelHandler);
     }
     
     if(viewGrps[activeView] != undefined && viewGrps[activeView].grp != undefined){
@@ -586,7 +587,6 @@ function onTabCreation(){
 
 // Function to create cubes for the grid
 function createGrids() {
-
     PAGES.forEach((page, idx) => {
         var index = 0;
         //console.log(v)
