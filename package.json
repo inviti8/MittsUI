@@ -2,6 +2,7 @@
   "dependencies": {
     "gsap": "^3.12.2",
     "three": "^0.156.1",
+    "three-orbitcontrols": "^2.110.3",
     "tweakpane": "^4.0.1"
   },
   "devDependencies": {
