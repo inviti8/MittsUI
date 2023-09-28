@@ -3,6 +3,7 @@ import { gsap } from "gsap";
 import * as extensions from './js/three_extensions';
 import editor_data from './editor_data.json' assert {type: 'json'};
 import * as editor from './js/editor_pane';
+import * as text from './js/three_text';
 
 let INITIALIZED = false;
 // Initialize Three.js scene with an orthographic camera
@@ -39,8 +40,15 @@ let PANEL_TWEEN_POS = undefined;
 
 editor.setCallbacks(onTabChange, onTabCreation);
 let PAGES = editor.getPages();
+const PANEL_CREATE_PROPS = editor_data.panels.creation;
 const PANEL_PROPS = editor_data.panels.properties;
+const PANEL_CONST = editor_data.panels.constants;
+const INPUT_CREATE_PROPS = editor_data.inputs.creation;
+const INPUT_PROPS = editor_data.inputs.properties;
+const INPUT_CONST = editor_data.inputs.constants;
+let STYLE_PROPS = editor_data.style;
 editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
+editor.bindStyleVars(STYLE_PROPS, updateStyle);
 
 let viewGrps = {};
 let activeView = 'home';
@@ -286,7 +294,7 @@ function onMouseClick(event) {
             clickedCube = panel.parent;
             cubeIndex = viewGrps[activeView].cubes.indexOf(clickedCube);
             if (event.ctrlKey && event.altKey) {
-                panelHandler('remove', PANEL_PROPS);
+                panelHandler('remove', PANEL_CREATE_PROPS);
             }
         }
 
@@ -313,7 +321,7 @@ function onMouseClick(event) {
     }
 
     if (event.ctrlKey && !event.altKey&& !event.shiftKey) {
-        panelHandler('add', PANEL_PROPS);
+        panelHandler('add', PANEL_CREATE_PROPS);
     }
     handleNav();
 }
@@ -403,9 +411,8 @@ function createMinimizeMesh(parent, pSizeX, pSizeY) {
     return cube;
 }
 
-function updateGridAttachments(elem){
-    let index = viewGrps[activeView].cubes.indexOf(elem);
-    const spans = elem.userData.spans;
+function updateStyle(props){
+    STYLE_PROPS = props;
 }
 
 function panelHandler( action, props ){
@@ -413,9 +420,8 @@ function panelHandler( action, props ){
         return;
     const name = props.name;
     const spans = props.span;
-    const maxSpans = props.maxSpans;
+    const maxSpans = PANEL_CONST.maxSpans;
     const parent = viewGrps[activeView].cubes[LAST_INDEX];
-    const parentSize = getSize(parent);
     let limitX = LAST_INDEX;
 
     if(LAST_INDEX>=MAX_COLS){
@@ -442,10 +448,16 @@ function panelHandler( action, props ){
                 panel.position.copy(pos);
                 setUserData(panel, 'PANEL', cubeSize, cubeSize, false, pos, scale, spans, maxSpans);
                 panel.name = name;
+                if(panel.name == 'Panel'){
+                    panel.name = name+'-'+panel.id;
+                }
                 let btn = createMinimizeMesh(panel, cubeSize*spans.x, cubeSize*spans.y);
                 viewGrps[activeView].panels[LAST_INDEX] = panel;
+                viewGrps[activeView].inputs[panel.id] = [];
                 viewGrps[activeView].backBtns.push(btn);
                 updateCornerButton(panel, btn, spans);
+                let index = Object.keys(viewGrps).indexOf(activeView);
+                editor.addPanelUI(panel, INPUT_CREATE_PROPS, index, inputHandler);
             }else{
                 alert("Slot is taken, remove to add a new panel container.")
             }
@@ -456,6 +468,8 @@ function panelHandler( action, props ){
             if(viewGrps[activeView].panels[LAST_INDEX] != null){
                 let panel = viewGrps[activeView].panels[LAST_INDEX];
                 delete viewGrps[activeView].panels[LAST_INDEX];
+                delete viewGrps[activeView].inputs[panel.id];
+                editor.removePanelUI(panel);
                 parent.remove(panel);
             }else{
                 alert("Nothing to remove.")
@@ -476,7 +490,11 @@ function panelHandler( action, props ){
                 if(newY>maxSpans.y){
                     newY= maxSpans.y;
                 }
+
                 panel.name = name;
+                if(panel.name == 'Panel'){
+                    panel.name = name+'-'+panel.id;
+                }
                 panel.scale.set(newX, newY, 1);
                 const offsetPos = edgeAlign(parent, panel)
 
@@ -491,6 +509,8 @@ function panelHandler( action, props ){
                 panel.userData.spans.set(spans.x, spans.y);
                 panel.userData.maxSpans=maxSpans;
                 panel.userData.ratio=getScaleRatio(panel);
+                let index = Object.keys(viewGrps).indexOf(activeView);
+                editor.addPanelUI(panel, INPUT_CREATE_PROPS, index, inputHandler);
 
             }
             break;
@@ -498,6 +518,29 @@ function panelHandler( action, props ){
         default:
             //console.log("Not used");
     }
+}
+
+function inputHandler( action, props ){
+    if(viewGrps[activeView] == undefined)
+        return;
+
+     switch (action) {
+        case 'add':
+
+            console.log('Should add element: '+props.element)
+
+        break;
+        case 'remove':
+
+        break;
+        case 'edit':
+
+        break;
+
+        default:
+            //console.log("Not used");
+        }
+
 }
 
 function updateCornerButton(parent, btn, spans, dirX=-1, dirY=1){
@@ -565,8 +608,7 @@ function onTabCreation(){
     PAGES = editor.getPages();
 
     if(!INITIALIZED){
-        //editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
-        editor.bindPanelCtrl(PANEL_PROPS, hiliteGridBox, panelHandler);
+        editor.bindPanelCtrl(PANEL_PROPS, PANEL_CREATE_PROPS, hiliteGridBox, panelHandler);
     }
     
     if(viewGrps[activeView] != undefined && viewGrps[activeView].grp != undefined){
@@ -574,7 +616,7 @@ function onTabCreation(){
     }
     activeView = PAGES[0].title;
     PAGES.forEach((page, idx) => {
-        viewGrps[page.title] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}};
+        viewGrps[page.title] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}, 'inputs':{}};
         viewGrps[page.title].grp.scale.set(0.5, 0.5, 0.5);
     });
 

@@ -10,7 +10,10 @@ const MAX_SPACING = 20
 
 const creationCtrls = [];
 const panelCtrls = [];
+let panels = {};
 const elemCtrls = [];
+let elements = {};
+//callbacks for tab actions
 let _onTabChange = undefined;
 let _onTabCreation = undefined;
 
@@ -84,10 +87,9 @@ export function createPage(page){
 
 	const pCtrl = page.addFolder({
 		 title: 'Panels',
-		 expanded: false,   // optional
+		 expanded: true,   // optional
 	});
 	panelCtrls.push(pCtrl);
-
 };
 
 export function addTabs(){
@@ -108,9 +110,37 @@ export function addPages(){
 	});
 };
 
-
 export function refresh(){
 	pane.refresh();
+};
+
+export function bindStyleVars(props, handler){
+
+	console.log(props)
+
+	const folder = pane.addFolder({
+		title: 'Style',
+		expanded: true,   // optional
+	});
+
+	let options = {};
+
+	props.fonts.forEach((path, idx) => {
+		let k = path.split('/')[1];
+		k = k.split('.')[0];
+		k = k.split('_')[0];
+		options[k] = path;
+	});
+
+	console.log(options)
+
+	folder.addBinding(props.selected_font, 'Generic_Techno_Regular', {
+	  options: options,
+	}).on('change', (ev) => {
+		props.selected_font = ev.value;
+		handler('edit', props);
+	});
+
 };
 
 export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid, setDebug){
@@ -189,7 +219,7 @@ export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid, setDeb
 
 };
 
-export function bindPanelCtrl(props, onIndexChange, handler){
+export function bindPanelCtrl(props, ctrls, onIndexChange, handler){
 
 	creationCtrls.forEach((ctrl, idx) => {
 		// const index = {
@@ -206,6 +236,9 @@ export function bindPanelCtrl(props, onIndexChange, handler){
 
 		ctrl.addBinding(name, 'name')
 		.on('change', (ev) => {
+			console.log('name change')
+			console.log(ev)
+			props.name = ev.value;
 			handler('edit', props);
 		});
 
@@ -214,11 +247,10 @@ export function bindPanelCtrl(props, onIndexChange, handler){
 	  		y: {step: 1, min: 1, max: 2},
 	  		format: (v) => Math.floor(v),
 		}).on('change', (ev) => {
-			console.log('span change')
 			handler('edit', props);
 		});
 
-		props.actions.forEach((action, idx) => {
+		ctrls.actions.forEach((action, idx) => {
 
 			ctrl.addButton({
 	  			title: action
@@ -229,9 +261,46 @@ export function bindPanelCtrl(props, onIndexChange, handler){
 		});
 	});
 
-	panelCtrls.forEach((ctrl, idx) => {
+};
 
+export function addPanelUI(obj, props, index, handler){
+	if(panels[obj.id] != null){
+		removePanelUI(obj);
+	}
+
+	let folder = panelCtrls[index].addFolder({
+		 title: obj.name,
+		 expanded: false,   // optional
 	});
+	panels[obj.id] = folder;
+	let options = {};
+
+	props.elements.forEach((elem, idx) => {
+		options[elem] = elem;
+	});
+
+	folder.addBinding(props.create, 'element', {
+	  options: options,
+	}).on('change', (ev) => {
+		props.element = ev.value;
+		handler('edit', props);
+	});
+	
+	props.actions.forEach((action, idx) => {
+
+		folder.addButton({
+	  		title: action
+		}).on('click', () => {
+	  		handler(action, props);
+		});
+	    	
+	});
+};
+
+export function removePanelUI(obj){
+	
+	panels[obj.id].dispose();
+	delete panels[obj.id];
 };
 
 export function bindElemCtrl(props, onIndexChange){

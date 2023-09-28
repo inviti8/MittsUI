@@ -13,32 +13,64 @@
 			"easeType":"in"
 		}
 	},
+	"style":{
+		"selected_font":{"Generic_Techno_Regular":"fonts/Generic_Techno_Regular.json"},
+		"fonts":[
+			"fonts/Generic_Techno_Regular.json",
+			"fonts/GeoFont_Regular.json",
+			"fonts/Expanse_Expanse.json"
+		]
+	},
 	"panels":{
+		"creation":{
+			"actions":[
+				"add",
+				"remove"
+			]
+		},
 		"properties":{
 			"name":"Panel",
 			"index":0,
-			"span": {"x": 1, "y": 1},
-			"maxSpans": {"x": 3, "y": 2},
-			"actions":[
-				"add",
-				"remove"
-			]
+			"span": {"x": 1, "y": 1}
+		},
+		"constants":{
+			"maxSpans": {"x": 3, "y": 2}
 		}
 	},
 	"inputs":{
-		"properties":{
-			"name":"Input",
-			"index":0,
-			"span": {"x": 1, "y": 1},
-			"maxSpans": {"x": 3, "y": 2},
-			"creation":{
-			"element":"button",
-			"alignment":"center"
-			},
+		"creation":{
+			"create":{"element":""},
+			"elements":[
+				"label",
+				"button",
+				"dropdown",
+				"text_input",
+				"text_multiline",
+				"switch"
+			],
 			"actions":[
 				"add",
 				"remove"
 			]
+		},
+		"properties":{
+			"name":"Panel",
+			"index":0,
+			"span": {"x": 1, "y": 1}
+		},
+		"constants":{
+			"maxSpans": {"x": 3, "y": 2}
+		},
+		"label":{
+			"font":"fonts/Generic_Techno_Regular.json",
+			"size": 80,
+			"height": 5,
+			"curveSegments": 12,
+			"bevelEnabled": true,
+			"bevelThickness": 10,
+			"bevelSize": 8,
+			"bevelOffset": 0,
+			"bevelSegments": 5
 		}
 	}
 }
