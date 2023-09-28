@@ -71,7 +71,7 @@
 	},
 	"inputs":{
 		"creation":{
-			"create":{"element":""},
+			"create":{"element":"label"},
 			"elements":[
 				"label",
 				"button",

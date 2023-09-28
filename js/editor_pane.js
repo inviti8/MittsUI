@@ -293,6 +293,14 @@ export function addPanelUI(obj, props, index, handler){
 		 title: obj.name,
 		 expanded: false,   // optional
 	});
+	let createFolder = folder.addFolder({
+		 title: 'Element Creation',
+		 expanded: false,   // optional
+	});
+	let elemFolder = folder.addFolder({
+		 title: 'Elements',
+		 expanded: true,   // optional
+	});
 	panels[obj.id] = folder;
 	let options = {};
 
@@ -300,16 +308,15 @@ export function addPanelUI(obj, props, index, handler){
 		options[elem] = elem;
 	});
 
-	folder.addBinding(props.create, 'element', {
+	createFolder.addBinding(props.create, 'element', {
 	  options: options,
 	}).on('change', (ev) => {
-		props.element = ev.value;
 		handler('edit', props);
 	});
 	
 	props.actions.forEach((action, idx) => {
 
-		folder.addButton({
+		createFolder.addButton({
 	  		title: action
 		}).on('click', () => {
 	  		handler(action, props);

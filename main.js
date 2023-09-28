@@ -526,8 +526,7 @@ function inputHandler( action, props ){
 
      switch (action) {
         case 'add':
-
-            console.log('Should add element: '+props.element)
+            console.log('Should add element: '+props.create.element)
 
         break;
         case 'remove':
