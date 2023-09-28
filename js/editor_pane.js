@@ -116,11 +116,14 @@ export function refresh(){
 
 export function bindStyleVars(props, handler){
 
-	console.log(props)
-
 	const folder = pane.addFolder({
 		title: 'Style',
-		expanded: true,   // optional
+		expanded: false,   // optional
+	});
+
+	let txtFolder = folder.addFolder({
+		title: 'Text',
+		expanded: false,   // optional
 	});
 
 	let options = {};
@@ -132,13 +135,31 @@ export function bindStyleVars(props, handler){
 		options[k] = path;
 	});
 
-	console.log(options)
-
-	folder.addBinding(props.selected_font, 'Generic_Techno_Regular', {
+	txtFolder.addBinding(props.selected_font, 'font', {
 	  options: options,
 	}).on('change', (ev) => {
 		props.selected_font = ev.value;
-		handler('edit', props);
+		handler( props );
+	});
+
+	Object.keys(props.text).forEach((txt, idx) => {
+		let f = txtFolder.addFolder({
+			title: txt,
+			expanded: false,   // optional
+		});
+
+		Object.keys(props.text[txt]).forEach((p, idx) => {
+			let k = `${p}`
+			let val = props.text[txt][p];
+			let prop = {};
+			prop[k]=val;
+
+			f.addBinding(prop, p).on('change', (ev) => {
+				props.text[txt][k] = ev.value;
+				handler( props );
+			});
+		});
+
 	});
 
 };

@@ -14,12 +14,44 @@
 		}
 	},
 	"style":{
-		"selected_font":{"Generic_Techno_Regular":"fonts/Generic_Techno_Regular.json"},
+		"selected_font":{"font":"fonts/Generic_Techno_Regular.json"},
 		"fonts":[
 			"fonts/Generic_Techno_Regular.json",
 			"fonts/GeoFont_Regular.json",
 			"fonts/Expanse_Expanse.json"
-		]
+		],
+		"text":{
+			"p":{
+				"size": 30,
+				"height": 5,
+				"curveSegments": 12,
+				"bevelEnabled": true,
+				"bevelThickness": 10,
+				"bevelSize": 8,
+				"bevelOffset": 0,
+				"bevelSegments": 5
+			},
+			"h1":{
+				"size": 60,
+				"height": 5,
+				"curveSegments": 12,
+				"bevelEnabled": true,
+				"bevelThickness": 10,
+				"bevelSize": 8,
+				"bevelOffset": 0,
+				"bevelSegments": 5
+			},
+			"h2":{
+				"size": 45,
+				"height": 5,
+				"curveSegments": 12,
+				"bevelEnabled": true,
+				"bevelThickness": 10,
+				"bevelSize": 8,
+				"bevelOffset": 0,
+				"bevelSegments": 5
+			}
+		}
 	},
 	"panels":{
 		"creation":{
@@ -60,17 +92,7 @@
 		},
 		"constants":{
 			"maxSpans": {"x": 3, "y": 2}
-		},
-		"label":{
-			"font":"fonts/Generic_Techno_Regular.json",
-			"size": 80,
-			"height": 5,
-			"curveSegments": 12,
-			"bevelEnabled": true,
-			"bevelThickness": 10,
-			"bevelSize": 8,
-			"bevelOffset": 0,
-			"bevelSegments": 5
 		}
+		
 	}
 }
