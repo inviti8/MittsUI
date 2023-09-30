@@ -41,7 +41,7 @@ function createTextGeometry(character, font, size, height, curveSegments, bevelE
 
 function baseClipMaterial(){
   const mat = new THREE.MeshBasicMaterial();
-  mat.color = 0xE91E63;
+  mat.color.set(Math.random() * 0xff00000 - 0xff00000);
   mat.stencilRef = 0;
   mat.stencilFunc = THREE.NotEqualStencilFunc;
   mat.stencilFail = THREE.ReplaceStencilOp;
@@ -62,28 +62,39 @@ export function clipMaterial(clippingPlanes){
   return mat
 }
 
-export function textBox(width, height){
+export function textBox(width, height, clipped=true){
 
-  const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 1), new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
-  const clipTop = new THREE.Plane( new THREE.Vector3( 0, -1, 0 ), height/2 );
-  const clipBottom = new THREE.Plane( new THREE.Vector3( 0, 1, 0 ), height/2 );
-  const clipRight = new THREE.Plane( new THREE.Vector3( -1, 0, 0 ), width/2 );
-  const clipLeft = new THREE.Plane( new THREE.Vector3( 1, 0, 0 ), width/2 );
+  const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 1), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
+  
+  let result = { 'box': box };
 
-  return { 'box': box, 'clipTop': clipTop, 'clipBottom': clipBottom, 'clipLeft': clipLeft, 'clipRight': clipRight }
+  if(clipped){
+    const clipTop = new THREE.Plane( new THREE.Vector3( 0, -1, 0 ), height/2 );
+    const clipBottom = new THREE.Plane( new THREE.Vector3( 0, 1, 0 ), height/2 );
+    const clipRight = new THREE.Plane( new THREE.Vector3( -1, 0, 0 ), width/2 );
+    const clipLeft = new THREE.Plane( new THREE.Vector3( 1, 0, 0 ), width/2 );
+
+    result = { 'box': box, 'clipTop': clipTop, 'clipBottom': clipBottom, 'clipLeft': clipLeft, 'clipRight': clipRight };
+  }
+
+  return result
 
 };
 
-export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, letterSpacing = 0, lineSpacing, wordSpacing = 1, padding = 1, size = 1, height = 1, curveSegments = 12, bevelEnabled = false, bevelThickness = 10, bevelSize = 8, bevelOffset = 0, bevelSegments = 5) {
+export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=0, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5 ) {
   // Load the font
   loader.load(fontPath, (font) => {
-    const txtBox = textBox(boxWidth, boxHeight);
+    console.log("CLIPPED")
+    console.log(clipped)
+    const txtBox = textBox(boxWidth, boxHeight, clipped);
     let lineWidth = -(txtBox.box.geometry.parameters.width / 2) + padding;
     let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
-    let merge = new THREE.BufferGeometry();
     const letterGeometries = [];
 
-    const mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight])
+    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    if(clipped){
+      mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
+    }
     
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
@@ -124,19 +135,24 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
 
     scene.add(txtBox.box);
     scene.add(mergedMesh);
+
   });
 }
 
-export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, letterSpacing = 0, lineSpacing, wordSpacing = 1, padding = 1, size = 1, height = 1, curveSegments = 12, bevelEnabled = false, bevelThickness = 10, bevelSize = 8, bevelOffset = 0, bevelSegments = 5) {
+export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing = 0, lineSpacing, wordSpacing = 1, padding = 1, size = 1, height = 1, curveSegments = 12, bevelEnabled = false, bevelThickness = 10, bevelSize = 8, bevelOffset = 0, bevelSegments = 5) {
   // Load the font
   loader.load(fontPath, (font) => {
-    const txtBox = textBox(boxWidth, boxHeight);
+    const txtBox = textBox(boxWidth, boxHeight, clipped);
     let lineWidth = -(txtBox.box.geometry.parameters.width / 2) + padding;
     let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
     let merge = new THREE.BufferGeometry();
     const letterGeometries = [];
     const letterMeshes = [];
-    const mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight])
+
+    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    if(clipped){
+      mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
+    }
     
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
