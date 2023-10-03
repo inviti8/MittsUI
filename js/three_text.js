@@ -13,17 +13,7 @@ function getGeometrySize(geometry) {
   return { width, height };
 }
 
-// Global pool for text geometries
-const textGeometryPool = [];
-let mergeGeom = new THREE.BufferGeometry();
-
 function createTextGeometry(character, font, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments) {
-  // Check if there's a geometry in the pool
-  if (textGeometryPool.length > 0) {
-    const geometry = textGeometryPool.pop();
-    geometry.parameters.text = character; // Reset text content
-    return geometry;
-  }
 
   // Create a new geometry if the pool is empty
   return new TextGeometry(character, {
@@ -62,17 +52,17 @@ export function clipMaterial(clippingPlanes){
   return mat
 }
 
-export function textBox(width, height, clipped=true){
+export function textBox(width, height, padding, clipped=true){
 
-  const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 1), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
+  const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
   
   let result = { 'box': box };
 
   if(clipped){
-    const clipTop = new THREE.Plane( new THREE.Vector3( 0, -1, 0 ), height/2 );
-    const clipBottom = new THREE.Plane( new THREE.Vector3( 0, 1, 0 ), height/2 );
-    const clipRight = new THREE.Plane( new THREE.Vector3( -1, 0, 0 ), width/2 );
-    const clipLeft = new THREE.Plane( new THREE.Vector3( 1, 0, 0 ), width/2 );
+    const clipTop = new THREE.Plane( new THREE.Vector3( 0, -1, 0 ), height/2+padding );
+    const clipBottom = new THREE.Plane( new THREE.Vector3( 0, 1, 0 ), height/2-padding );
+    const clipRight = new THREE.Plane( new THREE.Vector3( -1, 0, 0 ), width/2+padding );
+    const clipLeft = new THREE.Plane( new THREE.Vector3( 1, 0, 0 ), width/2-padding );
 
     result = { 'box': box, 'clipTop': clipTop, 'clipBottom': clipBottom, 'clipLeft': clipLeft, 'clipRight': clipRight };
   }
@@ -81,13 +71,13 @@ export function textBox(width, height, clipped=true){
 
 };
 
-export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=0, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5 ) {
+export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5 ) {
   // Load the font
   loader.load(fontPath, (font) => {
-    console.log("CLIPPED")
-    console.log(clipped)
-    const txtBox = textBox(boxWidth, boxHeight, clipped);
-    let lineWidth = -(txtBox.box.geometry.parameters.width / 2) + padding;
+    const xPad = boxWidth*padding;
+    const yPad = boxHeight*padding;
+    const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
+    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
     let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
     const letterGeometries = [];
 
@@ -104,20 +94,18 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
         lineWidth += wordSpacing;
       } else {
         const geometry = createTextGeometry(character, font, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments);
-
         geometry.translate(lineWidth, yPosition, 0);
 
         // Calculate the width of the letter geometry
         const { width } = getGeometrySize(geometry);
-        let lWidth = width * letterSpacing;
 
         // Check if the letter is within the bounds of the txtBox mesh
-        if (lineWidth + lWidth <= txtBox.box.geometry.parameters.width / 2 - padding) {
+        if (width <= txtBox.box.geometry.parameters.width / 2 - padding) {
           letterGeometries.push(geometry);
         }
 
         // Update lineWidth
-        lineWidth += letterSpacing + width + padding;
+        lineWidth += width;
       }
 
       // Check if lineWidth exceeds txtBox width - padding
@@ -132,18 +120,80 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
 
     // Create a mesh from the merged geometry
     const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
-
+    const gSize = getGeometrySize(mergedGeometry);
+    mergedMesh.userData.initialPosition = txtBox.box.geometry.parameters.height / 2 - gSize.height / 2;
+    mergedMesh.userData.maxScroll = gSize.height / 2-txtBox.box.geometry.parameters.height/2;
+    mergedMesh.userData.settleThreshold = gSize.height / 50;
     scene.add(txtBox.box);
-    scene.add(mergedMesh);
+    txtBox.box.add(mergedMesh);
 
   });
 }
 
-export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing = 0, lineSpacing, wordSpacing = 1, padding = 1, size = 1, height = 1, curveSegments = 12, bevelEnabled = false, bevelThickness = 10, bevelSize = 8, bevelOffset = 0, bevelSegments = 5) {
+export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5 ) {
   // Load the font
   loader.load(fontPath, (font) => {
-    const txtBox = textBox(boxWidth, boxHeight, clipped);
-    let lineWidth = -(txtBox.box.geometry.parameters.width / 2) + padding;
+    const xPad = boxWidth*padding;
+    const yPad = boxHeight*padding;
+    const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
+    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
+    let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
+    const letterGeometries = [];
+
+    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    if(clipped){
+      mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
+    }
+    
+    for (let i = 0; i < text.length; i++) {
+      const character = text[i];
+
+      if (character === ' ') {
+        // Handle spaces by adjusting the x position
+        lineWidth += wordSpacing;
+      } else {
+        const geometry = createTextGeometry(character, font, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments);
+        geometry.translate(lineWidth, yPosition, 0);
+
+        // Calculate the width of the letter geometry
+        const { width } = getGeometrySize(geometry);
+
+        // Check if the letter is within the bounds of the txtBox mesh
+        if (width <= txtBox.box.geometry.parameters.width / 2 - padding) {
+          letterGeometries.push(geometry);
+        }
+
+        // Update lineWidth
+        lineWidth += width;
+      }
+
+      // Check if lineWidth exceeds txtBox width - padding
+      if (lineWidth > txtBox.box.geometry.parameters.width / 2 - padding) {
+        lineWidth = -(txtBox.box.geometry.parameters.width / 2) + padding; // Reset x position to the upper-left corner
+        yPosition -= lineSpacing; // Move to the next line
+      }
+    }
+
+    // Merge the individual letter geometries into a single buffer geometry
+    const mergedGeometry = BufferGeometryUtils.mergeGeometries(letterGeometries);
+
+    // Create a mesh from the merged geometry
+    const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
+    const gSize = getGeometrySize(mergedGeometry);
+    mergedMesh.userData.initialPosition = txtBox.box.geometry.parameters.height / 2 - gSize.height / 2;
+    mergedMesh.userData.maxScroll = gSize.height / 2-txtBox.box.geometry.parameters.height/2;
+    mergedMesh.userData.settleThreshold = gSize.height / 50;
+    scene.add(txtBox.box);
+    txtBox.box.add(mergedMesh);
+
+  });
+}
+
+export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, lineSpacing, wordSpacing = 1, padding = 1, size = 1, height = 1, curveSegments = 12, bevelEnabled = false, bevelThickness = 10, bevelSize = 8, bevelOffset = 0, bevelSegments = 5) {
+  // Load the font
+  loader.load(fontPath, (font) => {
+    const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
+    let lineWidth = -(txtBox.box.geometry.parameters.width / 2) - padding;
     let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
     let merge = new THREE.BufferGeometry();
     const letterGeometries = [];
@@ -172,17 +222,15 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, c
 
         // Calculate the width of the letter geometry
         const { width } = getGeometrySize(geometry);
-        let lWidth = width * letterSpacing;
 
-        // Check if the letter is within the bounds of the textBox mesh
-        if (lineWidth + lWidth <= txtBox.box.geometry.parameters.width / 2 - padding) {
-          // Add the letter to the text scene
+        // Check if the letter is within the bounds of the txtBox mesh
+        if (width <= txtBox.box.geometry.parameters.width / 2 - padding) {
           txtBox.box.add(letterMesh);
           letterGeometries.push(geometry);
         }
 
         // Update lineWidth
-        lineWidth += letterSpacing + width + padding;
+        lineWidth += width;
       }
 
       // Check if lineWidth exceeds textBox width - padding
