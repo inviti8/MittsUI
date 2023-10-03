@@ -59,7 +59,7 @@ export function textBox(width, height, padding, clipped=true){
   let result = { 'box': box };
 
   if(clipped){
-    const clipTop = new THREE.Plane( new THREE.Vector3( 0, -1, 0 ), height/2+padding );
+    const clipTop = new THREE.Plane( new THREE.Vector3( 0, -1, 0 ), height/2-padding );
     const clipBottom = new THREE.Plane( new THREE.Vector3( 0, 1, 0 ), height/2-padding );
     const clipRight = new THREE.Plane( new THREE.Vector3( -1, 0, 0 ), width/2+padding );
     const clipLeft = new THREE.Plane( new THREE.Vector3( 1, 0, 0 ), width/2-padding );
@@ -71,7 +71,7 @@ export function textBox(width, height, padding, clipped=true){
 
 };
 
-export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5 ) {
+export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5 ) {
   // Load the font
   loader.load(fontPath, (font) => {
     const xPad = boxWidth*padding;
@@ -97,7 +97,8 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
         geometry.translate(lineWidth, yPosition, 0);
 
         // Calculate the width of the letter geometry
-        const { width } = getGeometrySize(geometry);
+        let { width } = getGeometrySize(geometry);
+        width+=letterSpacing;
 
         // Check if the letter is within the bounds of the txtBox mesh
         if (width <= txtBox.box.geometry.parameters.width / 2 - padding) {
@@ -130,7 +131,7 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
   });
 }
 
-export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5 ) {
+export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5 ) {
   // Load the font
   loader.load(fontPath, (font) => {
     const xPad = boxWidth*padding;
@@ -156,7 +157,8 @@ export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, 
         geometry.translate(lineWidth, yPosition, 0);
 
         // Calculate the width of the letter geometry
-        const { width } = getGeometrySize(geometry);
+        let { width } = getGeometrySize(geometry);
+        width+=letterSpacing;
 
         // Check if the letter is within the bounds of the txtBox mesh
         if (width <= txtBox.box.geometry.parameters.width / 2 - padding) {
@@ -179,17 +181,21 @@ export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, 
 
     // Create a mesh from the merged geometry
     const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
+    const bSize = getGeometrySize(txtBox.box.geometry);
     const gSize = getGeometrySize(mergedGeometry);
-    mergedMesh.userData.initialPosition = txtBox.box.geometry.parameters.height / 2 - gSize.height / 2;
-    mergedMesh.userData.maxScroll = gSize.height / 2-txtBox.box.geometry.parameters.height/2;
-    mergedMesh.userData.settleThreshold = gSize.height / 50;
+    mergedMesh.position.set(0, -padding, 0);
     scene.add(txtBox.box);
     txtBox.box.add(mergedMesh);
-
+    mergedMesh.userData.initialPositionY = bSize.height/2 - gSize.height/2;
+    mergedMesh.userData.maxScroll = gSize.height/2 - bSize.height/2;
+    mergedMesh.userData.settleThreshold = gSize.height/50;
+    
+    console.log(txtBox.box)
+    onCreated(txtBox.box);
   });
 }
 
-export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, lineSpacing, wordSpacing = 1, padding = 1, size = 1, height = 1, curveSegments = 12, bevelEnabled = false, bevelThickness = 10, bevelSize = 8, bevelOffset = 0, bevelSegments = 5) {
+export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -222,6 +228,7 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, c
 
         // Calculate the width of the letter geometry
         const { width } = getGeometrySize(geometry);
+        width+=letterSpacing;
 
         // Check if the letter is within the bounds of the txtBox mesh
         if (width <= txtBox.box.geometry.parameters.width / 2 - padding) {
