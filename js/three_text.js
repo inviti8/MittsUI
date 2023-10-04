@@ -7,6 +7,7 @@ import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUti
 const loader = new FontLoader();
 let posVar = new THREE.Vector3();
 let scaleVar = new THREE.Vector3();
+let draggable = [];
 
 function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
@@ -238,6 +239,14 @@ export function transparentMaterial(){
   return mat
 }
 
+export function getDraggable(obj){
+  return draggable;
+};
+
+export function addToDraggable(obj){
+  draggable.push(obj);
+};
+
 export function textBox(width, height, padding, clipped=true){
 
   const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
@@ -268,10 +277,15 @@ export function meshProperties(curveSegments=12, bevelEnabled=false, bevelThickn
   }
 }
 
-export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
-  // Load the font
-  loader.load(fontPath, (font) => {
-    const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
+function setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh){
+  mergedMesh.userData.initialPositionY = boxSize.height/2 - geomSize.height/2;
+  mergedMesh.userData.maxScroll = geomSize.height/2 - boxSize.height/2;
+  mergedMesh.userData.minScroll = mergedMesh.userData.initialPositionY+mergedMesh.userData.maxScroll+padding;
+  mergedMesh.userData.padding = padding;
+  mergedMesh.userData.settleThreshold = geomSize.height/50;
+}
+
+export function createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
     let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
     let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
     const letterGeometries = [];
@@ -316,19 +330,30 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
     }
 
     // Merge the individual letter geometries into a single buffer geometry
-    const mergedGeometry = BufferGeometryUtils.mergeGeometries(letterGeometries);
+    return BufferGeometryUtils.mergeGeometries(letterGeometries);
+}
+
+export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+  // Load the font
+  loader.load(fontPath, (font) => {
+    const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
+
+    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    if(clipped){
+      mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
+    }
+    
+    // Merge the individual letter geometries into a single buffer geometry
+    let mergedGeometry = createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
+    // Create a mesh from the merged geometry
+    const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
     if(animConfig!=undefined){
       mergedMesh.material.transparent=true;
       mergedMesh.material.opacity=0;
     }
-    // Create a mesh from the merged geometry
-    const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
-    const gSize = getGeometrySize(mergedGeometry);
-    mergedMesh.userData.initialPosition = txtBox.box.geometry.parameters.height / 2 - gSize.height / 2;
-    mergedMesh.userData.maxScroll = gSize.height / 2-txtBox.box.geometry.parameters.height/2;
-    mergedMesh.userData.minScroll = mergedMesh.userData.initialPositionY+mergedMesh.userData.maxScroll+padding;
-    mergedMesh.userData.padding = padding;
-    mergedMesh.userData.settleThreshold = gSize.height / 50;
+    const boxSize = getGeometrySize(txtBox.box.geometry);
+    const geomSize = getGeometrySize(mergedGeometry);
+    setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh);
     scene.add(txtBox.box);
     txtBox.box.add(mergedMesh);
 
@@ -340,55 +365,17 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
   });
 }
 
-export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
-    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
-    let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
-    const letterGeometries = [];
 
     let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
     if(clipped){
       mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
     }
-    
-    for (let i = 0; i < text.length; i++) {
-      const character = text[i];
-
-      if (character === ' ') {
-        // Handle spaces by adjusting the x position
-        lineWidth += wordSpacing;
-      } else {
-
-        if(meshProps == undefined){
-          meshProps = meshProperties()
-        }
-        const geometry = createTextGeometry(character, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
-        geometry.translate(lineWidth, yPosition, 0);
-
-        // Calculate the width of the letter geometry
-        let { width } = getGeometrySize(geometry);
-        width+=letterSpacing;
-
-        // Check if the letter is within the bounds of the txtBox mesh
-        if (width <= txtBox.box.geometry.parameters.width / 2 - padding) {
-          letterGeometries.push(geometry);
-        }
-
-        // Update lineWidth
-        lineWidth += width;
-      }
-
-      // Check if lineWidth exceeds txtBox width - padding
-      if (lineWidth > txtBox.box.geometry.parameters.width / 2 - padding) {
-        lineWidth = -(txtBox.box.geometry.parameters.width / 2) + padding; // Reset x position to the upper-left corner
-        yPosition -= lineSpacing; // Move to the next line
-      }
-    }
-
     // Merge the individual letter geometries into a single buffer geometry
-    const mergedGeometry = BufferGeometryUtils.mergeGeometries(letterGeometries);
+    let mergedGeometry = createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
 
     // Create a mesh from the merged geometry
     const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
@@ -396,18 +383,14 @@ export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, 
       mergedMesh.material.transparent=true;
       mergedMesh.material.opacity=0;
     }
-    const bSize = getGeometrySize(txtBox.box.geometry);
-    const gSize = getGeometrySize(mergedGeometry);
+    const boxSize = getGeometrySize(txtBox.box.geometry);
+    const geomSize = getGeometrySize(mergedGeometry);
     mergedMesh.position.set(0, -padding, 0);
     scene.add(txtBox.box);
     txtBox.box.add(mergedMesh);
-    mergedMesh.userData.initialPositionY = bSize.height/2 - gSize.height/2;
-    mergedMesh.userData.maxScroll = gSize.height/2 - bSize.height/2;
-    mergedMesh.userData.minScroll = mergedMesh.userData.initialPositionY+mergedMesh.userData.maxScroll+padding;
-    mergedMesh.userData.padding = padding;
-    mergedMesh.userData.settleThreshold = gSize.height/50;
+    setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh);
     
-    onCreated(txtBox.box);
+    draggable.push(mergedMesh);
     if(animConfig!=undefined){
       //anim, action, duration, ease, delay, onComplete
       txtAnimation(txtBox.box, mergedMesh, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, 0, animConfig.callback);
