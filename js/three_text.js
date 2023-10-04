@@ -187,6 +187,7 @@ function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ea
 }
 
 function getGeometrySize(geometry) {
+  console.log(geometry)
   const bbox = new THREE.Box3().setFromObject(new THREE.Mesh(geometry));
   const width = bbox.max.x - bbox.min.x;
   const height = bbox.max.y - bbox.min.y;
@@ -398,7 +399,7 @@ export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, 
   });
 }
 
-export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -425,9 +426,9 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, o
           meshProps = meshProperties()
         }
         const geometry = createTextGeometry(character, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
-        geometry.translate(lineWidth, yPosition, 0);
 
         const letterMesh = new THREE.Mesh(geometry, mat);
+        letterMesh.position.set(lineWidth, yPosition, 0);
         if(animConfig!=undefined){
           letterMesh.material.transparent=true;
           letterMesh.material.opacity=0;
@@ -463,7 +464,7 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, o
   });
 }
 
-export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -515,7 +516,6 @@ export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, f
           letterGeometries.push(geometry);
           cubes.push(cube);
         }
-
         // Update lineWidth
         lineWidth += width;
       }
@@ -526,26 +526,18 @@ export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, f
         yPosition -= lineSpacing; // Move to the next line
       }
     }
-
     const mergedGeometry = BufferGeometryUtils.mergeGeometries(cubes);
     const mergedMesh = new THREE.Mesh(mergedGeometry, transparentMaterial());
     txtBox.box.add(mergedMesh);
-    const bSize = getGeometrySize(txtBox.box.geometry);
-    const gSize = getGeometrySize(mergedGeometry);
+    const boxSize = getGeometrySize(txtBox.box.geometry);
+    const geomSize = getGeometrySize(mergedGeometry);
     mergedMesh.position.set(0, -padding, 0);
-    mergedMesh.userData.initialPositionY = bSize.height/2 - gSize.height/2;
-    mergedMesh.userData.maxScroll = gSize.height/2 - bSize.height/2;
-    mergedMesh.userData.minScroll = mergedMesh.userData.initialPositionY+mergedMesh.userData.maxScroll+padding;
-    mergedMesh.userData.padding = padding;
-    mergedMesh.userData.settleThreshold = gSize.height/50;
-
+    setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh);
     letterMeshes.forEach((m, i) => {
       mergedMesh.add(m);
     })
-
     scene.add(txtBox.box);
-    onCreated(txtBox.box);
-
+    draggable.push(mergedMesh);
     if(animConfig!=undefined){
       //anim, action, duration, ease, delay, onComplete
       multiAnimation(txtBox.box, mergedMesh.children, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, animConfig.callback);
@@ -553,7 +545,7 @@ export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, f
     //TEST
     // let aConfig = animationConfig('SLIDE_RIGHT', 'OUT', 2, 'back.inOut', 0)
     // setTimeout(() => {
-    //   multiAnimation(mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
+    //   multiAnimation(txtBox.box, mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
     // }, "4000");
   });
   
