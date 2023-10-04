@@ -23,16 +23,14 @@ export function animationConfig(anim='FADE', action='IN', duration=0.07, ease="p
   }
 };
 
-function multiAnimation(txtArr, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
-  let delayIdx=0;
-  const top = txtArr[0].parent.parent.geometry.parameters.height/2+5;
-  const bottom = top-txtArr[0].parent.parent.geometry.parameters.height-5;
-  const right = txtArr[0].parent.parent.geometry.parameters.width;
-  const left = -txtArr[0].parent.parent.geometry.parameters.width;
+function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, delayIdx=0, onComplete=undefined){
+  const top = box.geometry.parameters.height/2+10;
+  const bottom = top-box.geometry.parameters.height-10;
+  const right = box.geometry.parameters.width;
+  const left = -box.geometry.parameters.width;
   let props = {};
-  
-  txtArr.forEach((txt, i) => {
-    switch (anim) {
+
+  switch (anim) {
       case 'FADE':
         let opacityTarget = 1;
         if(action == 'OUT'){
@@ -44,7 +42,7 @@ function multiAnimation(txtArr, anim='FADE', action='IN', duration=0.07, ease="p
         if(onComplete != undefined){
           props.onComplete = onComplete;
         }
-        gsap.to(txt.material, props).delay(delay*i);
+        gsap.to(txt.material, props).delay(delay*delayIdx);
         break;
       case 'SCALE':
         if(action == 'OUT'){
@@ -58,7 +56,7 @@ function multiAnimation(txtArr, anim='FADE', action='IN', duration=0.07, ease="p
         if(onComplete != undefined){
           props.onComplete = onComplete;
         }
-        gsap.to(txt.scale, props).delay(delay*i);
+        gsap.to(txt.scale, props).delay(delay*delayIdx);
         break;
       case 'SLIDE_DOWN':
         if(txt.position.y>bottom){
@@ -76,122 +74,113 @@ function multiAnimation(txtArr, anim='FADE', action='IN', duration=0.07, ease="p
           }
           
           gsap.to(txt.position, props).delay(delay*delayIdx);
-          delayIdx+=1;
         }
         break;
       case 'SLIDE_UP':
-        if(txt.position.y>bottom){
-          if(action == 'OUT'){
-            posVar.set(txt.position.x, bottom, txt.position.z);
-          }else{
-            posVar.copy(txt.position);
-            txt.position.set(txt.position.x, bottom, txt.position.z);
-            txt.material.opacity=1;
-          }
-          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-          if(onComplete != undefined){
-            props.onComplete = onComplete;
-          }
+        if(action == 'OUT'){
+          posVar.set(txt.position.x, bottom, txt.position.z);
+        }else{
+          posVar.copy(txt.position);
+          txt.position.set(txt.position.x, bottom, txt.position.z);
+          txt.material.opacity=1;
+        }
+        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+        if(onComplete != undefined){
+          props.onComplete = onComplete;
+        }
 
           gsap.to(txt.position, props).delay(delay*delayIdx);
-          delayIdx+=1;
-        }
         break;
       case 'SLIDE_RIGHT':
-        if(txt.position.y>bottom){
-          if(action == 'OUT'){
+        if(action == 'OUT'){
             posVar.set(right, txt.position.y, txt.position.z);
-          }else{
-            posVar.copy(txt.position);
-            txt.position.set(right, txt.position.y, txt.position.z);
-            txt.material.opacity=1;
-          }
-          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-          if(onComplete != undefined){
-            props.onComplete = onComplete;
-          }
+        }else{
+          posVar.copy(txt.position);
+          txt.position.set(right, txt.position.y, txt.position.z);
+          txt.material.opacity=1;
+        }
+        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+        if(onComplete != undefined){
+          props.onComplete = onComplete;
+        }
           
           gsap.to(txt.position, props).delay(delay*delayIdx);
-          delayIdx+=1;
-        }
         break;
       case 'SLIDE_LEFT':
-        if(txt.position.y>bottom){
-          if(action == 'OUT'){
-            posVar.set(left, txt.position.y, txt.position.z);
-          }else{
-            posVar.copy(txt.position);
-            txt.position.set(left, txt.position.y, txt.position.z);
-            txt.material.opacity=1;
-          }
-          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-          if(onComplete != undefined){
-            props.onComplete = onComplete;
-          }
-          
-          gsap.to(txt.position, props).delay(delay*delayIdx);
-          delayIdx+=1;
+        if(action == 'OUT'){
+          posVar.set(left, txt.position.y, txt.position.z);
+        }else{
+          posVar.copy(txt.position);
+          txt.position.set(left, txt.position.y, txt.position.z);
+          txt.material.opacity=1;
         }
+        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+        if(onComplete != undefined){
+          props.onComplete = onComplete;
+        }
+          
+        gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       case 'UNSCRAMBLE0':
-        if(txt.position.y>bottom){
-          if(action == 'OUT'){
-            posVar.set(txt.position.x+randomNumber(-0.1, 0.1), txt.position.y+randomNumber(-0.1, 0.1), txt.position.z);
-          }else{
-            posVar.copy(txt.position);
-            txt.position.set(txt.position.x+randomNumber(-0.1, 0.1), txt.position.y+randomNumber(-0.1, 0.1), txt.position.z);
-            txt.material.opacity=1;
-          }
-          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-          if(onComplete != undefined){
-            props.onComplete = onComplete;
-          }
-          
-          gsap.to(txt.position, props).delay(delay*delayIdx);
-          delayIdx+=1;
+        if(action == 'OUT'){
+          posVar.set(txt.position.x+randomNumber(-0.1, 0.1), txt.position.y+randomNumber(-0.1, 0.1), txt.position.z);
+        }else{
+          posVar.copy(txt.position);
+          txt.position.set(txt.position.x+randomNumber(-0.1, 0.1), txt.position.y+randomNumber(-0.1, 0.1), txt.position.z);
+          txt.material.opacity=1;
         }
+        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+        if(onComplete != undefined){
+          props.onComplete = onComplete;
+        }
+          
+        gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       case 'UNSCRAMBLE1':
-        if(txt.position.y>bottom){
-          if(action == 'OUT'){
-            posVar.set(txt.position.x+randomNumber(-1, 1), txt.position.y+randomNumber(-1, 1), txt.position.z);
-          }else{
-            posVar.copy(txt.position);
-            txt.position.set(txt.position.x+randomNumber(-1, 1), txt.position.y+randomNumber(-1, 1), txt.position.z);
-            txt.material.opacity=1;
-          }
-          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-          if(onComplete != undefined){
-            props.onComplete = onComplete;
-          }
-          
-          gsap.to(txt.position, props).delay(delay*delayIdx);
-          delayIdx+=1;
+        if(action == 'OUT'){
+          posVar.set(txt.position.x+randomNumber(-1, 1), txt.position.y+randomNumber(-1, 1), txt.position.z);
+        }else{
+          posVar.copy(txt.position);
+          txt.position.set(txt.position.x+randomNumber(-1, 1), txt.position.y+randomNumber(-1, 1), txt.position.z);
+          txt.material.opacity=1;
         }
+        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+        if(onComplete != undefined){
+          props.onComplete = onComplete;
+        }
+          
+        gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       case 'UNSCRAMBLE2':
-        if(txt.position.y>bottom){
-          if(action == 'OUT'){
-            posVar.set(txt.position.x+randomNumber(-2, 2), txt.position.y+randomNumber(-2, 2), txt.position.z);
-          }else{
-            posVar.copy(txt.position);
-            txt.position.set(txt.position.x+randomNumber(-2, 2), txt.position.y+randomNumber(-2, 2), txt.position.z);
-            txt.material.opacity=1;
-          }
-          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-          if(onComplete != undefined){
-            props.onComplete = onComplete;
-          }
-          
-          gsap.to(txt.position, props).delay(delay*delayIdx);
-          delayIdx+=1;
+        if(action == 'OUT'){
+          posVar.set(txt.position.x+randomNumber(-2, 2), txt.position.y+randomNumber(-2, 2), txt.position.z);
+        }else{
+          posVar.copy(txt.position);
+          txt.position.set(txt.position.x+randomNumber(-2, 2), txt.position.y+randomNumber(-2, 2), txt.position.z);
+          txt.material.opacity=1;
         }
+        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+        if(onComplete != undefined){
+          props.onComplete = onComplete;
+        }
+          
+        gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       default:
-        console.log(`Sorry, we are out of ${expr}.`);
+        console.log("");
     }
+}
 
-
+function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
+  let delayIdx=0;
+  const top = box.geometry.parameters.height/2+5;
+  const bottom = top-box.geometry.parameters.height-5;
+  
+  txtArr.forEach((txt, i) => {
+    if(txt.position.y>bottom){
+      txtAnimation(box, txt, anim, action, duration, ease, delay, delayIdx, onComplete);
+      delayIdx+=1;
+    }
   });
 
 }
@@ -279,7 +268,7 @@ export function meshProperties(curveSegments=12, bevelEnabled=false, bevelThickn
   }
 }
 
-export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined ) {
+export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -328,7 +317,10 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
 
     // Merge the individual letter geometries into a single buffer geometry
     const mergedGeometry = BufferGeometryUtils.mergeGeometries(letterGeometries);
-
+    if(animConfig!=undefined){
+      mergedMesh.material.transparent=true;
+      mergedMesh.material.opacity=0;
+    }
     // Create a mesh from the merged geometry
     const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
     const gSize = getGeometrySize(mergedGeometry);
@@ -340,10 +332,15 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
     scene.add(txtBox.box);
     txtBox.box.add(mergedMesh);
 
+    if(animConfig!=undefined){
+      //anim, action, duration, ease, delay, onComplete
+      txtAnimation(txtBox.box, mergedMesh, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, 0, animConfig.callback);
+    }
+
   });
 }
 
-export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined) {
+export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -395,6 +392,10 @@ export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, 
 
     // Create a mesh from the merged geometry
     const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
+    if(animConfig!=undefined){
+      mergedMesh.material.transparent=true;
+      mergedMesh.material.opacity=0;
+    }
     const bSize = getGeometrySize(txtBox.box.geometry);
     const gSize = getGeometrySize(mergedGeometry);
     mergedMesh.position.set(0, -padding, 0);
@@ -407,10 +408,14 @@ export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, 
     mergedMesh.userData.settleThreshold = gSize.height/50;
     
     onCreated(txtBox.box);
+    if(animConfig!=undefined){
+      //anim, action, duration, ease, delay, onComplete
+      txtAnimation(txtBox.box, mergedMesh, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, 0, animConfig.callback);
+    }
   });
 }
 
-export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined) {
+export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -440,6 +445,10 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, o
         geometry.translate(lineWidth, yPosition, 0);
 
         const letterMesh = new THREE.Mesh(geometry, mat);
+        if(animConfig!=undefined){
+          letterMesh.material.transparent=true;
+          letterMesh.material.opacity=0;
+        }
 
         // Calculate the width of the letter geometry
         let { width } = getGeometrySize(geometry);
@@ -464,6 +473,10 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, o
     }
 
     scene.add(txtBox.box)
+    if(animConfig!=undefined){
+      //anim, action, duration, ease, delay, onComplete
+      multiAnimation(txtBox.box, txtBox.box.children, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, animConfig.callback);
+    }
   });
 }
 
@@ -552,14 +565,13 @@ export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, f
 
     if(animConfig!=undefined){
       //anim, action, duration, ease, delay, onComplete
-      
-      multiAnimation(mergedMesh.children, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, animConfig.callback);
+      multiAnimation(txtBox.box, mergedMesh.children, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, animConfig.callback);
     }
     //TEST
-    // let aConfig = animationConfig('UNSCRAMBLE2', 'OUT', 2, 'back.inOut', 0)
+    // let aConfig = animationConfig('SLIDE_RIGHT', 'OUT', 2, 'back.inOut', 0)
     // setTimeout(() => {
     //   multiAnimation(mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
-    // }, "3000");
+    // }, "4000");
   });
   
 }
