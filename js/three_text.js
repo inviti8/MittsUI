@@ -1,10 +1,200 @@
 import * as THREE from 'three';
+import { gsap } from "gsap";
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 const loader = new FontLoader();
+let posVar = new THREE.Vector3();
+let scaleVar = new THREE.Vector3();
 
+function randomNumber(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+export function animationConfig(anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
+  return {
+    'anim': anim,
+    'action': action,
+    'duration': duration,
+    'ease': ease,
+    'delay': delay,
+    'onComplete': onComplete
+  }
+};
+
+function multiAnimation(txtArr, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
+  let delayIdx=0;
+  const top = txtArr[0].parent.parent.geometry.parameters.height/2+5;
+  const bottom = top-txtArr[0].parent.parent.geometry.parameters.height-5;
+  const right = txtArr[0].parent.parent.geometry.parameters.width;
+  const left = -txtArr[0].parent.parent.geometry.parameters.width;
+  let props = {};
+  
+  txtArr.forEach((txt, i) => {
+    switch (anim) {
+      case 'FADE':
+        let opacityTarget = 1;
+        if(action == 'OUT'){
+          opacityTarget = 0;
+        }else{
+          txt.material.opacity=0;
+        }
+        props = {duration: duration, opacity: opacityTarget, ease: ease };
+        if(onComplete != undefined){
+          props.onComplete = onComplete;
+        }
+        gsap.to(txt.material, props).delay(delay*i);
+        break;
+      case 'SCALE':
+        if(action == 'OUT'){
+          scaleVar.set(0,0,0);
+        }else{
+          scaleVar.copy(txt.scale);
+          txt.scale.set(0,0,0);
+          txt.material.opacity=1;
+        }
+        props = {duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: ease };
+        if(onComplete != undefined){
+          props.onComplete = onComplete;
+        }
+        gsap.to(txt.scale, props).delay(delay*i);
+        break;
+      case 'SLIDE_DOWN':
+        if(txt.position.y>bottom){
+          if(action == 'OUT'){
+            posVar.set(txt.position.x, top, txt.position.z);
+            txt.material.opacity=1;
+          }else{
+            posVar.copy(txt.position);
+            txt.position.set(txt.position.x, top, txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+          
+          gsap.to(txt.position, props).delay(delay*delayIdx);
+          delayIdx+=1;
+        }
+        break;
+      case 'SLIDE_UP':
+        if(txt.position.y>bottom){
+          if(action == 'OUT'){
+            posVar.set(txt.position.x, bottom, txt.position.z);
+          }else{
+            posVar.copy(txt.position);
+            txt.position.set(txt.position.x, bottom, txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+
+          gsap.to(txt.position, props).delay(delay*delayIdx);
+          delayIdx+=1;
+        }
+        break;
+      case 'SLIDE_RIGHT':
+        if(txt.position.y>bottom){
+          if(action == 'OUT'){
+            posVar.set(right, txt.position.y, txt.position.z);
+          }else{
+            posVar.copy(txt.position);
+            txt.position.set(right, txt.position.y, txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+          
+          gsap.to(txt.position, props).delay(delay*delayIdx);
+          delayIdx+=1;
+        }
+        break;
+      case 'SLIDE_LEFT':
+        if(txt.position.y>bottom){
+          if(action == 'OUT'){
+            posVar.set(left, txt.position.y, txt.position.z);
+          }else{
+            posVar.copy(txt.position);
+            txt.position.set(left, txt.position.y, txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+          
+          gsap.to(txt.position, props).delay(delay*delayIdx);
+          delayIdx+=1;
+        }
+        break;
+      case 'UNSCRAMBLE0':
+        if(txt.position.y>bottom){
+          if(action == 'OUT'){
+            posVar.set(txt.position.x+randomNumber(-0.1, 0.1), txt.position.y+randomNumber(-0.1, 0.1), txt.position.z);
+          }else{
+            posVar.copy(txt.position);
+            txt.position.set(txt.position.x+randomNumber(-0.1, 0.1), txt.position.y+randomNumber(-0.1, 0.1), txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+          
+          gsap.to(txt.position, props).delay(delay*delayIdx);
+          delayIdx+=1;
+        }
+        break;
+      case 'UNSCRAMBLE1':
+        if(txt.position.y>bottom){
+          if(action == 'OUT'){
+            posVar.set(txt.position.x+randomNumber(-1, 1), txt.position.y+randomNumber(-1, 1), txt.position.z);
+          }else{
+            posVar.copy(txt.position);
+            txt.position.set(txt.position.x+randomNumber(-1, 1), txt.position.y+randomNumber(-1, 1), txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+          
+          gsap.to(txt.position, props).delay(delay*delayIdx);
+          delayIdx+=1;
+        }
+        break;
+      case 'UNSCRAMBLE2':
+        if(txt.position.y>bottom){
+          if(action == 'OUT'){
+            posVar.set(txt.position.x+randomNumber(-2, 2), txt.position.y+randomNumber(-2, 2), txt.position.z);
+          }else{
+            posVar.copy(txt.position);
+            txt.position.set(txt.position.x+randomNumber(-2, 2), txt.position.y+randomNumber(-2, 2), txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+          
+          gsap.to(txt.position, props).delay(delay*delayIdx);
+          delayIdx+=1;
+        }
+        break;
+      default:
+        console.log(`Sorry, we are out of ${expr}.`);
+    }
+
+
+  });
+
+}
 
 function getGeometrySize(geometry) {
   const bbox = new THREE.Box3().setFromObject(new THREE.Mesh(geometry));
@@ -77,44 +267,6 @@ export function textBox(width, height, padding, clipped=true){
   return result
 
 };
-
-export function quad(sizeX, sizeY, x, y){
-  const geometries = [];
-  const originX = 0;
-  const originY = 0;
-  
-  const geom0 = new THREE.Geometry();
-  const v1 = new THREE.Vector3(originX+x,originY+y,0);
-  const v2 = new THREE.Vector3(originX+x+sizeX,originY+y,0);
-  const v3 = new THREE.Vector3(originX+x+sizeX,originY+y+sizeY,0);
-    
-  const geom1 = new THREE.Geometry();
-  const v4 = new THREE.Vector3(originX+x,originY+y,0);
-  const v5 = new THREE.Vector3(originX+x+sizeX,originY+y+sizeY,0);
-  const v6 = new THREE.Vector3(originX+x,originY+y+sizeY,0);
-
-  const triangle0 = new THREE.Triangle( v1, v2, v3 );
-  const triangle1 = new THREE.Triangle( v4, v5, v6 );
-  const normal0 = triangle0.normal();
-  const normal1 = triangle1.normal();
-  
-  geom0.vertices.push(triangle0.a);
-  geom0.vertices.push(triangle0.b);
-  geom0.vertices.push(triangle0.c);
-
-  geom1.vertices.push(triangle1.a);
-  geom1.vertices.push(triangle1.b);
-  geom1.vertices.push(triangle1.c);
-  
-  geom0.faces.push( new THREE.Face3( 0, 1, 2, normal0 ) );
-  geom1.faces.push( new THREE.Face3( 0, 1, 2, normal1 ) );
-
-  geometries.push(geom0);
-  geometries.push(geom1);
-
-  const quad = BufferGeometryUtils.mergeGeometries(geometries);
-
-}
 
 export function meshProperties(curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5){
   return {
@@ -315,7 +467,7 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, o
   });
 }
 
-export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined) {
+export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, onCreated, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -345,10 +497,16 @@ export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, f
         const geometry = createTextGeometry(character, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
         const cube = new THREE.BoxGeometry(size*2, size*2, height);
 
-        geometry.translate(lineWidth, yPosition, 0);
+        //geometry.translate(lineWidth, yPosition, 0);
         cube.translate((size/2)+lineWidth, (size/2)+yPosition, 0);
 
         const letterMesh = new THREE.Mesh(geometry, mat);
+        letterMesh.position.set(lineWidth, yPosition, 0);
+
+        if(animConfig!=undefined){
+          letterMesh.material.transparent=true;
+          letterMesh.material.opacity=0;
+        }
 
         // Calculate the width of the letter geometry
         let { width } = getGeometrySize(geometry);
@@ -391,5 +549,18 @@ export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, f
 
     scene.add(txtBox.box);
     onCreated(txtBox.box);
+
+    if(animConfig!=undefined){
+      //anim, action, duration, ease, delay, onComplete
+      
+      multiAnimation(mergedMesh.children, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, animConfig.callback);
+    }
+    //TEST
+    // let aConfig = animationConfig('UNSCRAMBLE2', 'OUT', 2, 'back.inOut', 0)
+    // setTimeout(() => {
+    //   multiAnimation(mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
+    // }, "3000");
   });
+  
 }
+
