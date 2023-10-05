@@ -3,7 +3,7 @@ import { gsap } from "gsap";
 import * as extensions from './js/three_extensions';
 import editor_data from './editor_data.json' assert {type: 'json'};
 import * as editor from './js/editor_pane';
-import * as text from './js/three_text';
+import { getDraggable, animationConfig, clipMaterial, meshProperties, createMultiTextBox, createMultiScrollableTextBox, createStaticTextBox, createStaticScrollableTextBox } from './js/three_text';
 
 let INITIALIZED = false;
 // Initialize Three.js scene with an orthographic camera

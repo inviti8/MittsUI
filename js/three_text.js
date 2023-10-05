@@ -167,6 +167,21 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
           
         gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
+      case 'SPIRAL':
+        if(action == 'OUT'){
+            posVar.set(right, top, txt.position.z);
+        }else{
+          posVar.copy(txt.position);
+          txt.position.set(right, top, txt.position.z);
+          txt.material.opacity=1;
+        }
+        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: 'cubic-bezier(0.55,0.055,0.675,0.19)' };
+        if(onComplete != undefined){
+          props.onComplete = onComplete;
+        }
+          
+        gsap.to(txt.position, props).delay(delay*delayIdx);
+        break;
       default:
         console.log("");
     }
@@ -187,7 +202,6 @@ function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ea
 }
 
 function getGeometrySize(geometry) {
-  console.log(geometry)
   const bbox = new THREE.Box3().setFromObject(new THREE.Mesh(geometry));
   const width = bbox.max.x - bbox.min.x;
   const height = bbox.max.y - bbox.min.y;
@@ -390,6 +404,7 @@ export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, 
     scene.add(txtBox.box);
     txtBox.box.add(mergedMesh);
     setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh);
+    mergedMesh.userData.draggable=true;
     
     draggable.push(mergedMesh);
     if(animConfig!=undefined){
@@ -404,7 +419,7 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, c
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
     let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
-    let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
+    let yPosition = txtBox.box.geometry.parameters.height / 2 - padding*2;
     let merge = new THREE.BufferGeometry();
     const letterGeometries = [];
     const letterMeshes = [];
@@ -533,6 +548,7 @@ export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, f
     const geomSize = getGeometrySize(mergedGeometry);
     mergedMesh.position.set(0, -padding, 0);
     setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh);
+    mergedMesh.userData.draggable=true;
     letterMeshes.forEach((m, i) => {
       mergedMesh.add(m);
     })
@@ -550,4 +566,3 @@ export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, f
   });
   
 }
-
