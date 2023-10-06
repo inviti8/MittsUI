@@ -281,7 +281,7 @@ export function textBox(width, height, padding, clipped=true){
 
 };
 
-export function meshProperties(curveSegments=12, bevelEnabled=false, bevelThickness=10, bevelSize=8, bevelOffset=0, bevelSegments=5){
+export function meshProperties(curveSegments=12, bevelEnabled=false, bevelThickness=0.1, bevelSize=0.1, bevelOffset=0, bevelSegments=3){
   return {
     'curveSegments': curveSegments,
     'bevelEnabled': bevelEnabled,
@@ -298,6 +298,21 @@ function setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh){
   mergedMesh.userData.minScroll = mergedMesh.userData.initialPositionY+mergedMesh.userData.maxScroll+padding;
   mergedMesh.userData.padding = padding;
   mergedMesh.userData.settleThreshold = geomSize.height/50;
+}
+
+function adjustBoxScaleRatio(box, parent){
+  let ratio = parent.userData.ratio;
+  let scaleX = parent.scale.x;
+  let scaleY = parent.scale.y;
+  let newX = box.scale.x;
+  let newY = box.scale.y;
+  if(scaleX > scaleY){
+    newX = newX*(ratio);
+  }else if(scaleY > scaleX){
+    newY = newY*(ratio);
+  }
+
+  box.scale.set(newX, newY, box.scale.z);
 }
 
 export function createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
@@ -348,7 +363,7 @@ export function createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text
     return BufferGeometryUtils.mergeGeometries(letterGeometries);
 }
 
-export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+export function createStaticTextBox(parent, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -369,8 +384,9 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
     const boxSize = getGeometrySize(txtBox.box.geometry);
     const geomSize = getGeometrySize(mergedGeometry);
     setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh);
-    scene.add(txtBox.box);
+    parent.add(txtBox.box);
     txtBox.box.add(mergedMesh);
+    adjustBoxScaleRatio(txtBox.box, parent);
 
     if(animConfig!=undefined){
       //anim, action, duration, ease, delay, onComplete
@@ -380,7 +396,7 @@ export function createStaticTextBox(scene, boxWidth, boxHeight, text, fontPath, 
   });
 }
 
-export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -401,8 +417,9 @@ export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, 
     const boxSize = getGeometrySize(txtBox.box.geometry);
     const geomSize = getGeometrySize(mergedGeometry);
     mergedMesh.position.set(0, -padding, 0);
-    scene.add(txtBox.box);
+    parent.add(txtBox.box);
     txtBox.box.add(mergedMesh);
+    adjustBoxScaleRatio(txtBox.box, parent);
     setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh);
     mergedMesh.userData.draggable=true;
     
@@ -414,7 +431,7 @@ export function createStaticScrollableTextBox(scene, boxWidth, boxHeight, text, 
   });
 }
 
-export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+export function createMultiTextBox(parent, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -471,7 +488,9 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, c
       }
     }
 
-    scene.add(txtBox.box)
+    parent.add(txtBox.box)
+    adjustBoxScaleRatio(txtBox.box, parent);
+
     if(animConfig!=undefined){
       //anim, action, duration, ease, delay, onComplete
       multiAnimation(txtBox.box, txtBox.box.children, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, animConfig.callback);
@@ -479,7 +498,7 @@ export function createMultiTextBox(scene, boxWidth, boxHeight, text, fontPath, c
   });
 }
 
-export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -552,7 +571,8 @@ export function createMultiScrollableTextBox(scene, boxWidth, boxHeight, text, f
     letterMeshes.forEach((m, i) => {
       mergedMesh.add(m);
     })
-    scene.add(txtBox.box);
+    parent.add(txtBox.box);
+    adjustBoxScaleRatio(txtBox.box, parent);
     draggable.push(mergedMesh);
     if(animConfig!=undefined){
       //anim, action, duration, ease, delay, onComplete

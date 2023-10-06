@@ -313,6 +313,8 @@ export function addPanelUI(obj, props, index, handler){
 	}).on('change', (ev) => {
 		handler('edit', props);
 	});
+
+	createFolder.addBinding(props.element_text, 'text');
 	
 	props.actions.forEach((action, idx) => {
 
@@ -329,6 +331,53 @@ export function removePanelUI(obj){
 	
 	panels[obj.id].dispose();
 	delete panels[obj.id];
+};
+
+export function addElementUI(obj, props, index, handler){
+	// if(elements[obj.id] != null){
+	// 	//removePanelUI(obj);
+	// }
+
+	Object.keys(props).forEach((prop, i) => {
+		console.log(prop)
+	})
+
+	// let folder = elementCtrls[index].addFolder({
+	// 	 title: obj.name,
+	// 	 expanded: false,   // optional
+	// });
+	// let createFolder = folder.addFolder({
+	// 	 title: 'Element Creation',
+	// 	 expanded: false,   // optional
+	// });
+	// let elemFolder = folder.addFolder({
+	// 	 title: 'Elements',
+	// 	 expanded: true,   // optional
+	// });
+	// panels[obj.id] = folder;
+	// let options = {};
+
+	// props.elements.forEach((elem, idx) => {
+	// 	options[elem] = elem;
+	// });
+
+	// createFolder.addBinding(props.create, 'element', {
+	//   options: options,
+	// }).on('change', (ev) => {
+	// 	handler('edit', props);
+	// });
+
+	// createFolder.addBinding(props.element_text, 'text');
+	
+	// props.actions.forEach((action, idx) => {
+
+	// 	createFolder.addButton({
+	//   		title: action
+	// 	}).on('click', () => {
+	//   		handler(action, props);
+	// 	});
+	    	
+	// });
 };
 
 export function bindElemCtrl(props, onIndexChange){

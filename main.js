@@ -43,9 +43,9 @@ let PAGES = editor.getPages();
 const PANEL_CREATE_PROPS = editor_data.panels.creation;
 const PANEL_PROPS = editor_data.panels.properties;
 const PANEL_CONST = editor_data.panels.constants;
-const INPUT_CREATE_PROPS = editor_data.inputs.creation;
-const INPUT_PROPS = editor_data.inputs.properties;
-const INPUT_CONST = editor_data.inputs.constants;
+const ELEM_PROPS = editor_data.elements;
+const ELEM_CREATE_PROPS = ELEM_PROPS.creation;
+const ELEM_CONST = editor_data.elements.constants;
 let STYLE_PROPS = editor_data.style;
 editor.bindNavVars(GRID, NAV_SPEED, NAV_EASING, updateGrid, setDebug);
 editor.bindStyleVars(STYLE_PROPS, updateStyle);
@@ -453,11 +453,11 @@ function panelHandler( action, props ){
                 }
                 let btn = createMinimizeMesh(panel, cubeSize*spans.x, cubeSize*spans.y);
                 viewGrps[activeView].panels[LAST_INDEX] = panel;
-                viewGrps[activeView].inputs[panel.id] = [];
+                viewGrps[activeView].elements[panel.id] = [];
                 viewGrps[activeView].backBtns.push(btn);
                 updateCornerButton(panel, btn, spans);
                 let index = Object.keys(viewGrps).indexOf(activeView);
-                editor.addPanelUI(panel, INPUT_CREATE_PROPS, index, inputHandler);
+                editor.addPanelUI(panel, ELEM_CREATE_PROPS, index, elementHandler);
             }else{
                 alert("Slot is taken, remove to add a new panel container.")
             }
@@ -468,7 +468,7 @@ function panelHandler( action, props ){
             if(viewGrps[activeView].panels[LAST_INDEX] != null){
                 let panel = viewGrps[activeView].panels[LAST_INDEX];
                 delete viewGrps[activeView].panels[LAST_INDEX];
-                delete viewGrps[activeView].inputs[panel.id];
+                delete viewGrps[activeView].elements[panel.id];
                 editor.removePanelUI(panel);
                 parent.remove(panel);
             }else{
@@ -510,7 +510,7 @@ function panelHandler( action, props ){
                 panel.userData.maxSpans=maxSpans;
                 panel.userData.ratio=getScaleRatio(panel);
                 let index = Object.keys(viewGrps).indexOf(activeView);
-                editor.addPanelUI(panel, INPUT_CREATE_PROPS, index, inputHandler);
+                editor.addPanelUI(panel, ELEM_CREATE_PROPS, index, elementHandler);
 
             }
             break;
@@ -520,13 +520,25 @@ function panelHandler( action, props ){
     }
 }
 
-function inputHandler( action, props ){
+function elementHandler( action, props ){
     if(viewGrps[activeView] == undefined)
         return;
 
      switch (action) {
         case 'add':
-            console.log('Should add element: '+props.create.element)
+            console.log(props);
+            console.log(ELEM_PROPS[props.create.element])
+            console.log('Should add element: '+props.create.element);
+            console.log(STYLE_PROPS)
+            const panel = viewGrps[activeView].panels[LAST_INDEX];
+            const font = STYLE_PROPS.selected_font.font;
+            console.log(font)
+            let index = Object.keys(viewGrps).indexOf(activeView);
+            let meshProps = meshProperties(12, false, 0.1, 0.1, 0, 3);
+            //anim, action, duration, ease, delay, onComplete
+            let aConfig = animationConfig('SPIRAL', 'IN', 1, 'elastic.out', 0.01)
+            createMultiTextBox(panel, 50, 10, 'text', font, true, 1, 5, 1, 2, 5, 0.05, meshProps, aConfig);
+            //editor.addElementUI(panel, ELEM_PROPS, index, elemUpdateHandler);
 
         break;
         case 'remove':
@@ -539,6 +551,14 @@ function inputHandler( action, props ){
         default:
             //console.log("Not used");
         }
+
+}
+
+function onElemCreated(elem){
+
+}
+
+function elemUpdateHandler(action, props){
 
 }
 
@@ -615,7 +635,7 @@ function onTabCreation(){
     }
     activeView = PAGES[0].title;
     PAGES.forEach((page, idx) => {
-        viewGrps[page.title] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}, 'inputs':{}};
+        viewGrps[page.title] = {'grp':new THREE.Group(), 'cubes':[], 'grids':[[],[],[],[]], 'cubePos':[], 'backBtns':[], 'panels':{}, 'elements':{}};
         viewGrps[page.title].grp.scale.set(0.5, 0.5, 0.5);
     });
 
