@@ -73,13 +73,6 @@ export function getPages(){
 };
 
 export function createPage(page){
-
-	// const nCtrl = page.addFolder({
-	// 	 title: 'Navigation Variables',
-	// 	 expanded: false,   // optional
-	// });
-	// navCtrls.push(nCtrl);
-
 	const cCtrl = page.addFolder({
 		 title: 'Panel Creation',
 		 expanded: false,   // optional
@@ -244,10 +237,6 @@ export function bindNavVars(grid_vars, speed_vars, ease_vars, updateGrid, setDeb
 export function bindPanelCtrl(props, ctrls, onIndexChange, handler){
 
 	creationCtrls.forEach((ctrl, idx) => {
-		// const index = {
-		// 	index: props.index,
-		// }
-
 		const name = {
 			name:props.name,
 		}
@@ -272,8 +261,8 @@ export function bindPanelCtrl(props, ctrls, onIndexChange, handler){
 			handler('edit', props);
 		});
 
-		createButtons(ctrls.actions, ctrl, props, handler);
-		
+		createButtons(ctrls.actions, ctrl, handler, props);
+
 	});
 
 };
@@ -298,45 +287,34 @@ export function addPanelUI(obj, props, index, handler){
 	panels[obj.id] = folder;
 	elemFolders[obj.id] = elemFolder;
 	uiDropdown(props.elements, props.create, 'element', createFolder, handler, props, 'edit');
-	createFolder.addBinding(props.element_name, 'name');
-	createButtons(props.actions, createFolder, props, handler);
-
+	textInput(props.element_name, createFolder, 'name', handler);
+	createButtons(props.actions, createFolder, handler, props);
 };
 
 export function removePanelUI(obj){
-	
 	panels[obj.id].dispose();
 	delete panels[obj.id];
 };
 
 export function addElementUI(obj, props, index, handler){
-	// if(elements[obj.id] != null){
-	// 	//removePanelUI(obj);
-	// }
-	console.log(elemFolders)
+	if(elements[obj.id] != null){
+		removeElementUI(obj);
+	}
 	const elemsFolder = elemFolders[obj.parent.id];
-	console.log(obj);
-	console.log(obj.name);
-
-	console.log(elemsFolder)
-
 	const elemFolder = elemsFolder.addFolder({
 		 title: obj.name,
 		 expanded: false,   // optional
 	});
-
 	Object.keys(props).forEach((prop, i) => {
-		console.log(prop);
 		let elem = props[prop];
 		elements[obj.id] = obj;
 
 		switch (prop) {
       case 'label':
-      	console.log(props[prop]);
-      	uiDropdown(elem.text_classes, elem.text_class, 'class', elemFolder, handler, props, 'edit');
-				elemFolder.addBinding(elem.label_text, 'text');
 
-				createButtons(elem.actions, elemFolder, props, handler);
+      	uiDropdown(elem.text_classes, elem.text_class, 'class', elemFolder, handler, props, 'edit');
+      	textInput(elem.label_text, elemFolder, 'text', handler);
+				createButtons(elem.actions, elemFolder, handler, props);
 
       break;
       case 'button':
@@ -358,40 +336,22 @@ export function addElementUI(obj, props, index, handler){
 
 	});
 
-	// let createFolder = folder.addFolder({
-	// 	 title: 'Element Creation',
-	// 	 expanded: false,   // optional
-	// });
-	// let elemFolder = folder.addFolder({
-	// 	 title: 'Elements',
-	// 	 expanded: true,   // optional
-	// });
-	// panels[obj.id] = folder;
-	// let options = {};
-
-	// props.elements.forEach((elem, idx) => {
-	// 	options[elem] = elem;
-	// });
-
-	// createFolder.addBinding(props.create, 'element', {
-	//   options: options,
-	// }).on('change', (ev) => {
-	// 	handler('edit', props);
-	// });
-
-	// createFolder.addBinding(props.element_text, 'text');
-	
-	// props.actions.forEach((action, idx) => {
-
-	// 	createFolder.addButton({
-	//   		title: action
-	// 	}).on('click', () => {
-	//   		handler(action, props);
-	// 	});
-	    	
-	// });
 };
 
+export function removeElementUI(obj){
+	elements[obj.id].dispose();
+	delete elements[obj.id];
+};
+
+function textInput(textData, folder, textKey, handler, props, action=undefined){
+	folder.addBinding(textData, textKey).on('change', (ev) => {
+		if(action==undefined){
+			handler(props);
+		}else{
+			handler(action, props);
+		}
+	});
+}
 
 function uiDropdown(optionList, optionData, optionKey, folder, handler, props, action){
 	let options = {};
@@ -407,7 +367,8 @@ function uiDropdown(optionList, optionData, optionKey, folder, handler, props, a
 	});
 }
 
-function createButtons(buttonList, folder, props, handler){
+function createButtons(buttonList, folder, handler, props){
+	console.log(handler)
 	buttonList.forEach((action, idx) => {
 
 		folder.addButton({
