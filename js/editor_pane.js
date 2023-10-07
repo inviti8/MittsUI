@@ -11,6 +11,7 @@ const MAX_SPACING = 20
 const creationCtrls = [];
 const panelCtrls = [];
 let panels = {};
+let elemFolders = {};
 const elemCtrls = [];
 let elements = {};
 //callbacks for tab actions
@@ -271,15 +272,8 @@ export function bindPanelCtrl(props, ctrls, onIndexChange, handler){
 			handler('edit', props);
 		});
 
-		ctrls.actions.forEach((action, idx) => {
-
-			ctrl.addButton({
-	  			title: action
-			}).on('click', () => {
-	  			handler(action, props);
-			});
-	    	
-		});
+		createButtons(ctrls.actions, ctrl, props, handler);
+		
 	});
 
 };
@@ -302,29 +296,11 @@ export function addPanelUI(obj, props, index, handler){
 		 expanded: true,   // optional
 	});
 	panels[obj.id] = folder;
-	let options = {};
+	elemFolders[obj.id] = elemFolder;
+	uiDropdown(props.elements, props.create, 'element', createFolder, handler, props, 'edit');
+	createFolder.addBinding(props.element_name, 'name');
+	createButtons(props.actions, createFolder, props, handler);
 
-	props.elements.forEach((elem, idx) => {
-		options[elem] = elem;
-	});
-
-	createFolder.addBinding(props.create, 'element', {
-	  options: options,
-	}).on('change', (ev) => {
-		handler('edit', props);
-	});
-
-	createFolder.addBinding(props.element_text, 'text');
-	
-	props.actions.forEach((action, idx) => {
-
-		createFolder.addButton({
-	  		title: action
-		}).on('click', () => {
-	  		handler(action, props);
-		});
-	    	
-	});
 };
 
 export function removePanelUI(obj){
@@ -337,15 +313,51 @@ export function addElementUI(obj, props, index, handler){
 	// if(elements[obj.id] != null){
 	// 	//removePanelUI(obj);
 	// }
+	console.log(elemFolders)
+	const elemsFolder = elemFolders[obj.parent.id];
+	console.log(obj);
+	console.log(obj.name);
+
+	console.log(elemsFolder)
+
+	const elemFolder = elemsFolder.addFolder({
+		 title: obj.name,
+		 expanded: false,   // optional
+	});
 
 	Object.keys(props).forEach((prop, i) => {
-		console.log(prop)
-	})
+		console.log(prop);
+		let elem = props[prop];
+		elements[obj.id] = obj;
 
-	// let folder = elementCtrls[index].addFolder({
-	// 	 title: obj.name,
-	// 	 expanded: false,   // optional
-	// });
+		switch (prop) {
+      case 'label':
+      	console.log(props[prop]);
+      	uiDropdown(elem.text_classes, elem.text_class, 'class', elemFolder, handler, props, 'edit');
+				elemFolder.addBinding(elem.label_text, 'text');
+
+				createButtons(elem.actions, elemFolder, props, handler);
+
+      break;
+      case 'button':
+
+      break;
+    	case 'dropdown':
+
+      break;
+    	case 'text_input':
+
+      break;
+    	case 'text_multiline':
+
+      break;
+
+      default:
+        //console.log("Not used");
+    }
+
+	});
+
 	// let createFolder = folder.addFolder({
 	// 	 title: 'Element Creation',
 	// 	 expanded: false,   // optional
@@ -380,43 +392,30 @@ export function addElementUI(obj, props, index, handler){
 	// });
 };
 
-export function bindElemCtrl(props, onIndexChange){
 
-	elemCtrl.addBinding(props.creation, 'element', {
-	    options: {
-	  	button: 'button',
-	    input: 'input',
-	    toggle: 'toggle'
-	  },
+function uiDropdown(optionList, optionData, optionKey, folder, handler, props, action){
+	let options = {};
+
+	optionList.forEach((option, idx) => {
+		options[option] = option;
 	});
 
-	elemCtrl.addBinding(props.creation, 'alignment', {
-	    options: {
-	  	center: 'center',
-	    left: 'left',
-	    right: 'right',
-	    top:'top',
-	    bottom:'bottom'
-	  },
+	folder.addBinding(optionData, optionKey, {
+			options: options,
+	}).on('change', (ev) => {
+		handler(action, props);
 	});
+}
 
-	// props.actions.forEach((action, idx) => {
+function createButtons(buttonList, folder, props, handler){
+	buttonList.forEach((action, idx) => {
 
-	// 	panelCtrl.addButton({
-  	// 		title: action
-	// 	}).on('click', (e) => {
-  	// 		console.log(e);
-	// 	});;
-    	
-	// });
+		folder.addButton({
+			title: action
+		}).on('click', () => {
+			handler(action, props);
+		});
+				    	
+	});
+}
 
-
-};
-
-
-// const tab = editor.addTab({
-//   pages: [
-//     {title: 'Configure'},
-//     {title: 'Settings'},
-//   ],
-// });

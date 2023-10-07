@@ -532,14 +532,11 @@ function elementHandler( action, props ){
             console.log(STYLE_PROPS)
             const panel = viewGrps[activeView].panels[LAST_INDEX];
             const font = STYLE_PROPS.selected_font.font;
-            console.log(font)
-            let index = Object.keys(viewGrps).indexOf(activeView);
+            let name = props.element_name.name;
             let meshProps = meshProperties(12, false, 0.1, 0.1, 0, 3);
             //anim, action, duration, ease, delay, onComplete
-            let aConfig = animationConfig('SPIRAL', 'IN', 1, 'elastic.out', 0.01)
-            createMultiTextBox(panel, 50, 10, 'text', font, true, 1, 5, 1, 2, 5, 0.05, meshProps, aConfig);
-            //editor.addElementUI(panel, ELEM_PROPS, index, elemUpdateHandler);
-
+            let aConfig = animationConfig('SCALE', 'IN', 1, 'elastic.out', 0.01)
+            createMultiTextBox(panel, 50, 10, name, 'text', font, true, 1, 5, 1, 4, 5, 0.5, meshProps, aConfig, onElemCreated);
         break;
         case 'remove':
 
@@ -555,7 +552,9 @@ function elementHandler( action, props ){
 }
 
 function onElemCreated(elem){
-
+    viewGrps[activeView].elements[elem.parent.id] = elem;
+    let index = Object.keys(viewGrps).indexOf(activeView);
+    editor.addElementUI(elem, ELEM_PROPS, index, elemUpdateHandler);
 }
 
 function elemUpdateHandler(action, props){

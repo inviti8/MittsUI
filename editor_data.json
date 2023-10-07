@@ -80,10 +80,9 @@
 				"text_multiline",
 				"switch"
 			],
-			"element_text":{"text":""},
+			"element_name":{"name":""},
 			"actions":[
-				"add",
-				"remove"
+				"add"
 			]
 		},
 		"constants":{
@@ -107,7 +106,10 @@
 				"h1",
 				"h2"
 			],
-			"text_class":{"class":"p"}
+			"text_class":{"class":"p"},
+			"actions":[
+				"remove"
+			]
 		},
 		"button":{
 			"button":{"text":""},
