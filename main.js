@@ -558,7 +558,30 @@ function onElemCreated(elem){
 }
 
 function elemUpdateHandler(action, props){
+    switch (action) {
+        case 'add':
+            console.log(props);
+            console.log(ELEM_PROPS[props.create.element])
+            console.log('Should add element: '+props.create.element);
+            console.log(STYLE_PROPS)
+            const panel = viewGrps[activeView].panels[LAST_INDEX];
+            const font = STYLE_PROPS.selected_font.font;
+            let name = props.element_name.name;
+            let meshProps = meshProperties(12, false, 0.1, 0.1, 0, 3);
+            //anim, action, duration, ease, delay, onComplete
+            let aConfig = animationConfig('SCALE', 'IN', 1, 'elastic.out', 0.01)
+            createMultiTextBox(panel, 50, 10, name, 'text', font, true, 1, 5, 1, 4, 5, 0.5, meshProps, aConfig, onElemCreated);
+        break;
+        case 'remove':
 
+        break;
+        case 'edit':
+
+        break;
+
+        default:
+            //console.log("Not used");
+        }
 }
 
 function updateCornerButton(parent, btn, spans, dirX=-1, dirY=1){

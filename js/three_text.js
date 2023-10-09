@@ -616,4 +616,34 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
     // }, "4000");
   });
   
-}
+};
+
+export function createTextInputPrompt(mouse, camera, raycaster, parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+  loader.load(fontPath, (font) => {
+    const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
+    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
+    let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
+
+    const letterGeometries = [];
+    const letterMeshes = [];
+
+    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    if(clipped){
+      mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
+    }
+
+    const promptGeometry = createTextGeometry(text, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+    const promptMesh = new THREE.Mesh(promptGeometry, mat);
+    const boxSize = getGeometrySize(txtBox.box.geometry);
+
+    promptMesh.userData.type = 'INPUT_PROMPT';
+    txtBox.box.add(promptMesh);
+    txtBox.box.position.set(0, 0, 0);
+    parent.add(txtBox.box);
+    promptMesh.position.set(-boxSize.width/2+padding, 0, 0);
+    inputPrompts.push(promptMesh);
+    const geoProps = {'txtBox': txtBox, 'font': font, 'size': size, 'height': height, 'meshProps': meshProps};
+    promptMesh.userData.geoProps = geoProps;
+
+  });
+};
