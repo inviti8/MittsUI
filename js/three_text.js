@@ -8,6 +8,9 @@ const loader = new FontLoader();
 let posVar = new THREE.Vector3();
 let scaleVar = new THREE.Vector3();
 let draggable = [];
+let mouseOverable = [];
+let inputPrompts = [];
+let inputText = [];
 
 function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
@@ -254,12 +257,36 @@ export function transparentMaterial(){
   return mat
 }
 
-export function getDraggable(obj){
+export function getDraggable(){
   return draggable;
 };
 
 export function addToDraggable(obj){
   draggable.push(obj);
+};
+
+export function getMouseOverable(){
+  return mouseOverable;
+};
+
+export function addToMouseOverable(obj){
+  mouseOverable.push(obj);
+};
+
+export function getInputPrompts(){
+  return inputPrompts;
+};
+
+export function addToInputPrompts(obj){
+  inputPrompts.push(obj);
+};
+
+export function getInputText(){
+  return inputText;
+};
+
+export function addToInputText(obj){
+  inputText.push(obj);
 };
 
 export function textBox(width, height, padding, clipped=true){

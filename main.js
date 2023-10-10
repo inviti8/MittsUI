@@ -3,7 +3,7 @@ import { gsap } from "gsap";
 import * as extensions from './js/three_extensions';
 import editor_data from './editor_data.json' assert {type: 'json'};
 import * as editor from './js/editor_pane';
-import { getDraggable, animationConfig, clipMaterial, meshProperties, createMultiTextBox, createMultiScrollableTextBox, createStaticTextBox, createStaticScrollableTextBox } from './js/three_text';
+import { getDraggable, getInputPrompts, getMouseOverable, getInputText, createTextGeometry, animationConfig, clipMaterial, meshProperties, createMultiTextBox, createMultiScrollableTextBox, createStaticTextBox, createStaticScrollableTextBox } from './js/three_text';
 
 let INITIALIZED = false;
 // Initialize Three.js scene with an orthographic camera
@@ -56,6 +56,18 @@ let activeView = 'home';
 // Initialize the mouse vector
 const mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
+let isDragging = false;
+let lastDragged = undefined;
+let previousMouseY = 0;
+let moveDir = 1;
+let dragDistY = 0;
+let lastClick = 0;
+let mouseOver = [];
+
+const draggable = getDraggable();
+const mouseOverable = getMouseOverable();
+const inputPrompts = getInputPrompts();
+const inputText = getInputText();
 
 let RESET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_START.x+GRID.offsetScale, CUBE_SCALE_START.y+GRID.offsetScale, CUBE_SCALE_START.z);
 let TARGET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_TARGET.x+GRID.offsetScale, CUBE_SCALE_TARGET.y+GRID.offsetScale, CUBE_SCALE_TARGET.z);
@@ -405,6 +417,49 @@ window.addEventListener('click', (e) => {
   }
   lastClick = thisClick;
 });
+
+function onMouseMove(event) {
+  if (lastDragged != undefined && lastDragged.userData.draggable && mouseDown && isDragging) {
+    const deltaY = event.clientY - previousMouseY;
+    const dragPosition = lastDragged.position.clone();
+    dragDistY = deltaY;
+
+    if(deltaY<0){
+      moveDir=1
+    }else{
+      moveDir=-1;
+    }
+    // Limit scrolling
+    dragPosition.y = Math.max(lastDragged.userData.minScroll+lastDragged.userData.padding, Math.min(lastDragged.userData.maxScroll+lastDragged.userData.padding, dragPosition.y - deltaY * 0.01));
+    lastDragged.position.copy(dragPosition);
+    previousMouseY = event.clientY;
+  }
+
+  // Calculate mouse position in normalized device coordinates (NDC)
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // Update the picking ray with the camera and mouse position
+  raycaster.setFromCamera(mouse, camera);
+
+  const intersectsMouseOverable = raycaster.intersectObjects(mouseOverable);
+
+  if(intersectsMouseOverable.length > 0){
+
+    let obj = intersectsMouseOverable[0].object;
+    if(!mouseOver.includes(obj)){
+      mouseOver.push(obj);
+    }
+
+  }else{
+
+    mouseOver.forEach((elem, idx) => {
+      mouseOver.splice(mouseOver.indexOf(elem));
+    });
+  }
+}
+
+document.addEventListener('mousemove', onMouseMove);
 
 // Function to calculate the aspect ratio
 function calculateAspectRatio() {
