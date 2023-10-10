@@ -271,8 +271,8 @@ export function textBox(width, height, padding, clipped=true){
   if(clipped){
     const clipTop = new THREE.Plane( new THREE.Vector3( 0, -1, 0 ), height/2-padding );
     const clipBottom = new THREE.Plane( new THREE.Vector3( 0, 1, 0 ), height/2-padding );
-    const clipRight = new THREE.Plane( new THREE.Vector3( -1, 0, 0 ), width/2+padding );
-    const clipLeft = new THREE.Plane( new THREE.Vector3( 1, 0, 0 ), width/2-padding );
+    const clipRight = new THREE.Plane( new THREE.Vector3( -1, 0, 0 ), width/2-padding );
+    const clipLeft = new THREE.Plane( new THREE.Vector3( 1, 0, 0 ), width/2+padding );
 
     result = { 'box': box, 'clipTop': clipTop, 'clipBottom': clipBottom, 'clipLeft': clipLeft, 'clipRight': clipRight };
   }

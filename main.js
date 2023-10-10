@@ -328,6 +328,84 @@ function onMouseClick(event) {
 
 window.addEventListener('click', onMouseClick, false);
 
+function onDoubleClick() {
+    // Calculate mouse position in normalized device coordinates (NDC)
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Update the picking ray with the camera and mouse position
+    raycaster.setFromCamera(mouse, camera);
+
+    const intersectsInputPrompt = raycaster.intersectObjects(inputPrompts);
+
+    if(intersectsInputPrompt.length > 0){
+      
+          let clicked = intersectsInputPrompt[0].object;
+      const geoProps = clicked.userData.geoProps;
+
+      if(geoProps.txtBox.box.userData.inputText != undefined){
+          geoProps.txtBox.box.userData.inputText.geometry.dispose();
+          geoProps.txtBox.box.userData.inputText.material.dispose();
+          geoProps.txtBox.box.remove(geoProps.txtBox.box.userData.inputText);
+      }
+      // Initialize variables for typing
+      let currentText = '';
+      let parent = geoProps.txtBox.box;
+      let pos = new THREE.Vector3().copy(clicked.position);
+      const textGeometry = createTextGeometry(currentText, geoProps.font, geoProps.size, geoProps.height, geoProps.meshProps.curveSegments, geoProps.meshProps.bevelEnabled, geoProps.meshProps.bevelThickness, geoProps.meshProps.bevelSize, geoProps.meshProps.bevelOffset, geoProps.meshProps.bevelSegments);
+      let mat = clicked.material;
+
+      const typingTextMesh = new THREE.Mesh(textGeometry, mat);
+      typingTextMesh.userData.geoProps = geoProps;
+      typingTextMesh.position.copy(pos); // Adjust position in the scene
+      parent.add(typingTextMesh);
+      geoProps.txtBox.box.userData.inputText = typingTextMesh;
+      inputPrompts.push(typingTextMesh);
+
+      // Listen for keyboard input
+      window.addEventListener('keydown', (event) => {
+        if(clicked!=undefined){
+          clicked.geometry.dispose();
+          parent.remove(clicked);
+          clicked=undefined;
+        }
+          if (event.key === 'Enter') {
+              // Handle the entered text (e.g., send it to a server)
+              console.log('Entered text:', currentText);
+
+              // Clear the typing text
+              parent.remove(typingTextMesh);
+
+          } else if (event.key === 'Backspace') {
+              // Handle backspace
+              currentText = currentText.slice(0, -1);
+          } else if (event.key === 'Shift') {
+              
+          } else {
+            if(event.shiftKey){
+              currentText += event.key.toUpperCase();
+            }else{
+              currentText += event.key;
+            }
+          }
+
+          // Update the text in the typingTextMesh
+          typingTextMesh.geometry.dispose(); // Clear the previous text
+          typingTextMesh.geometry = createTextGeometry(currentText, geoProps.font, geoProps.size, geoProps.height, geoProps.meshProps.curveSegments, geoProps.meshProps.bevelEnabled, geoProps.meshProps.bevelThickness, geoProps.meshProps.bevelSize, geoProps.meshProps.bevelOffset, geoProps.meshProps.bevelSegments);
+      });
+    }
+}
+
+window.addEventListener('click', (e) => {
+  const thisClick = Date.now();
+  if (thisClick - lastClick < 500) {
+    onDoubleClick();
+    lastClick = thisClick;
+    return;
+  }
+  lastClick = thisClick;
+});
+
 // Function to calculate the aspect ratio
 function calculateAspectRatio() {
     return window.innerWidth / window.innerHeight;
