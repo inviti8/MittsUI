@@ -204,6 +204,36 @@ function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ea
 
 }
 
+export function mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power1.inOut", delay=0, onComplete=undefined){
+
+  let doAnim = false;
+
+  if(elem==undefined)
+    return;
+
+  if(elem.userData.hoverAnim != undefined && elem.userData.hoverAnim.isActive())
+    return;
+
+  if(elem.userData.mouseOver && (elem.scale.x == elem.userData.defaultScale.x && elem.scale.y == elem.userData.defaultScale.z)){
+    scaleVar.set(elem.userData.defaultScale.x*1.1,elem.userData.defaultScale.y*1.1,elem.userData.defaultScale.z);
+    elem.userData.mouseOverActive = true;
+    doAnim=true;
+    console.log('should scale up')
+    console.log(elem)
+  }else if (!elem.userData.mouseOver && elem.userData.mouseOverActive && (elem.scale.x != elem.userData.defaultScale.x || elem.scale.y != elem.userData.defaultScale.z)){
+    elem.userData.mouseOverActive = false;
+    scaleVar.copy(elem.userData.defaultScale);
+    doAnim=true;
+    console.log('should scale down')
+  }
+
+  if(doAnim){
+    let props = {duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: ease };
+    elem.userData.hoverAnim = gsap.to(elem.scale, props);
+  }
+       
+};
+
 function getGeometrySize(geometry) {
   const bbox = new THREE.Box3().setFromObject(new THREE.Mesh(geometry));
   const width = bbox.max.x - bbox.min.x;
@@ -327,6 +357,13 @@ function setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh){
   mergedMesh.userData.settleThreshold = geomSize.height/50;
 }
 
+function mouseOverUserData(elem){
+  elem.userData.defaultScale =  new THREE.Vector3().copy(elem.scale);
+  elem.userData.mouseOver =  false;
+  elem.userData.mouseOverActive = false;
+  elem.userData.hoverAnim = undefined;
+}
+
 function adjustBoxScaleRatio(box, parent){
   let ratio = parent.userData.ratio;
   let scaleX = parent.scale.x;
@@ -340,6 +377,7 @@ function adjustBoxScaleRatio(box, parent){
   }
 
   box.scale.set(newX, newY, box.scale.z);
+  box.userData.defaultScale = new THREE.Vector3().copy(box.scale);
 }
 
 export function createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
@@ -645,14 +683,9 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
   
 };
 
-export function createTextInputPrompt(mouse, camera, raycaster, parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+export function createTextInputPrompt(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
-    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
-    let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
-
-    const letterGeometries = [];
-    const letterMeshes = [];
 
     let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
     if(clipped){
@@ -662,15 +695,19 @@ export function createTextInputPrompt(mouse, camera, raycaster, parent, boxWidth
     const promptGeometry = createTextGeometry(text, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
     const promptMesh = new THREE.Mesh(promptGeometry, mat);
     const boxSize = getGeometrySize(txtBox.box.geometry);
+    const geomSize = getGeometrySize(promptGeometry);
+    setMergedMeshUserData(boxSize, geomSize, padding, promptMesh);
 
     promptMesh.userData.type = 'INPUT_PROMPT';
     txtBox.box.add(promptMesh);
     txtBox.box.position.set(0, 0, 0);
     parent.add(txtBox.box);
+    adjustBoxScaleRatio(txtBox.box, parent);
     promptMesh.position.set(-boxSize.width/2+padding, 0, 0);
     inputPrompts.push(promptMesh);
-    const geoProps = {'txtBox': txtBox, 'font': font, 'size': size, 'height': height, 'meshProps': meshProps};
-    promptMesh.userData.geoProps = geoProps;
-
+    mouseOverable.push(promptMesh);
+    const inputProps = {'txtBox': txtBox, 'font': font, 'size': size, 'height': height, 'meshProps': meshProps };
+    promptMesh.userData.inputProps = inputProps;
+    mouseOverUserData(promptMesh);
   });
 };

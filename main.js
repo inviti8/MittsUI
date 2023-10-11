@@ -352,27 +352,25 @@ function onDoubleClick() {
 
     if(intersectsInputPrompt.length > 0){
       
-          let clicked = intersectsInputPrompt[0].object;
-      const geoProps = clicked.userData.geoProps;
+      let clicked = intersectsInputPrompt[0].object;
+      let userData = clicked.userData;
+      const inputProps = clicked.userData.inputProps;
 
-      if(geoProps.txtBox.box.userData.inputText != undefined){
-          geoProps.txtBox.box.userData.inputText.geometry.dispose();
-          geoProps.txtBox.box.userData.inputText.material.dispose();
-          geoProps.txtBox.box.remove(geoProps.txtBox.box.userData.inputText);
-      }
       // Initialize variables for typing
       let currentText = '';
-      let parent = geoProps.txtBox.box;
+      let parent = inputProps.txtBox.box;
       let pos = new THREE.Vector3().copy(clicked.position);
-      const textGeometry = createTextGeometry(currentText, geoProps.font, geoProps.size, geoProps.height, geoProps.meshProps.curveSegments, geoProps.meshProps.bevelEnabled, geoProps.meshProps.bevelThickness, geoProps.meshProps.bevelSize, geoProps.meshProps.bevelOffset, geoProps.meshProps.bevelSegments);
+      const textGeometry = createTextGeometry(currentText, inputProps.font, inputProps.size, inputProps.height, inputProps.meshProps.curveSegments, inputProps.meshProps.bevelEnabled, inputProps.meshProps.bevelThickness, inputProps.meshProps.bevelSize, inputProps.meshProps.bevelOffset, inputProps.meshProps.bevelSegments);
       let mat = clicked.material;
 
       const typingTextMesh = new THREE.Mesh(textGeometry, mat);
-      typingTextMesh.userData.geoProps = geoProps;
+      typingTextMesh.userData = userData;
+      typingTextMesh.userData.inputProps = inputProps;
       typingTextMesh.position.copy(pos); // Adjust position in the scene
       parent.add(typingTextMesh);
-      geoProps.txtBox.box.userData.inputText = typingTextMesh;
+      inputProps.txtBox.box.userData.inputText = typingTextMesh;
       inputPrompts.push(typingTextMesh);
+      mouseOverable.push(typingTextMesh);
 
       // Listen for keyboard input
       window.addEventListener('keydown', (event) => {
@@ -403,7 +401,7 @@ function onDoubleClick() {
 
           // Update the text in the typingTextMesh
           typingTextMesh.geometry.dispose(); // Clear the previous text
-          typingTextMesh.geometry = createTextGeometry(currentText, geoProps.font, geoProps.size, geoProps.height, geoProps.meshProps.curveSegments, geoProps.meshProps.bevelEnabled, geoProps.meshProps.bevelThickness, geoProps.meshProps.bevelSize, geoProps.meshProps.bevelOffset, geoProps.meshProps.bevelSegments);
+          typingTextMesh.geometry = createTextGeometry(currentText, inputProps.font, inputProps.size, inputProps.height, inputProps.meshProps.curveSegments, inputProps.meshProps.bevelEnabled, inputProps.meshProps.bevelThickness, inputProps.meshProps.bevelSize, inputProps.meshProps.bevelOffset, inputProps.meshProps.bevelSegments);
       });
     }
 }
