@@ -8,6 +8,7 @@ const loader = new FontLoader();
 let posVar = new THREE.Vector3();
 let scaleVar = new THREE.Vector3();
 let draggable = [];
+let clickable = [];
 let mouseOverable = [];
 let inputPrompts = [];
 let inputText = [];
@@ -234,6 +235,17 @@ export function mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power
        
 };
 
+export function clickAnimation(elem, anim='SCALE', duration=0.15, easeIn="power1.in", easeOut="elastic.Out", onComplete=undefined){
+    scaleVar.set(elem.userData.defaultScale.x*0.9,elem.userData.defaultScale.y*0.9,elem.userData.defaultScale.z);
+    let props = { duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: easeIn, transformOrigin: '50% 50%' };
+    props.onComplete = function(e){
+      scaleVar.copy(elem.userData.defaultScale);
+      let props = { duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: easeOut, transformOrigin: '50% 50%' };
+      gsap.to(elem.scale, props);
+    }
+    gsap.to(elem.scale, props);
+};
+
 function getGeometrySize(geometry) {
   const bbox = new THREE.Box3().setFromObject(new THREE.Mesh(geometry));
   const width = bbox.max.x - bbox.min.x;
@@ -302,6 +314,14 @@ export function getMouseOverable(){
 export function addToMouseOverable(obj){
   mouseOverable.push(obj);
 };
+
+export function getClickable(){
+  return clickable;
+};
+
+export function addClickable(obj){
+  clickable.push(obj);
+}
 
 export function getInputPrompts(){
   return inputPrompts;
@@ -708,6 +728,9 @@ export function createTextInputPrompt(parent, boxWidth, boxHeight, name, text, f
     mouseOverable.push(promptMesh);
     const inputProps = {'txtBox': txtBox, 'font': font, 'size': size, 'height': height, 'meshProps': meshProps };
     promptMesh.userData.inputProps = inputProps;
+    txtBox.box.userData.mouseOverParent = true;
+    mouseOverable.push(txtBox.box)
     mouseOverUserData(promptMesh);
+
   });
 };
