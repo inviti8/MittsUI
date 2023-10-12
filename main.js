@@ -428,7 +428,7 @@ function onMouseMove(event) {
       moveDir=-1;
     }
     // Limit scrolling
-    dragPosition.y = Math.max(lastDragged.userData.minScroll+lastDragged.userData.padding, Math.min(lastDragged.userData.maxScroll+lastDragged.userData.padding, dragPosition.y - deltaY * 0.01));
+    dragPosition.y = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll+lastDragged.userData.padding, dragPosition.y - deltaY * 0.01));
     lastDragged.position.copy(dragPosition);
     previousMouseY = event.clientY;
   }
