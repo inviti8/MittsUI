@@ -247,7 +247,8 @@ export function getGeometrySize(geometry) {
   const bbox = new THREE.Box3().setFromObject(new THREE.Mesh(geometry));
   const width = bbox.max.x - bbox.min.x;
   const height = bbox.max.y - bbox.min.y;
-  return { width, height };
+  const depth = bbox.max.z - bbox.min.z;
+  return { width, height, depth };
 };
 
 export function createTextGeometry(character, font, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments) {
@@ -400,6 +401,7 @@ function adjustBoxScaleRatio(box, parent){
 export function createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
     let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
     let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
+    const boxSize = getGeometrySize(txtBox.box.geometry);
     const letterGeometries = [];
 
     let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
@@ -419,7 +421,7 @@ export function createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text
           meshProps = meshProperties()
         }
         const geometry = createTextGeometry(character, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
-        geometry.translate(lineWidth, yPosition, 0);
+        geometry.translate(lineWidth, yPosition, boxSize.depth);
 
         // Calculate the width of the letter geometry
         let { width } = getGeometrySize(geometry);
@@ -535,6 +537,7 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, font
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
     let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
     let yPosition = txtBox.box.geometry.parameters.height / 2 - padding*2;
+    const boxSize = getGeometrySize(txtBox.box.geometry);
     const letterGeometries = [];
     const letterMeshes = [];
 
@@ -557,7 +560,7 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, font
         const geometry = createTextGeometry(character, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
 
         const letterMesh = new THREE.Mesh(geometry, mat);
-        letterMesh.position.set(lineWidth, yPosition, 0);
+        letterMesh.position.set(lineWidth, yPosition, boxSize.depth/2-height/2);
         if(animConfig!=undefined){
           letterMesh.material.transparent=true;
           letterMesh.material.opacity=0;
@@ -696,32 +699,51 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
   
 }
 
+function textInput(parent, boxWidth, boxHeight, name, text, font, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
+  const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
+
+  let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+  if(clipped){
+    mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
+  }
+
+  const promptGeometry = createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text, 'fontPath', clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
+  const promptMesh = new THREE.Mesh(promptGeometry, mat);
+  const boxSize = getGeometrySize(txtBox.box.geometry);
+  const geomSize = getGeometrySize(promptGeometry);
+  const parentSize = getGeometrySize(parent.geometry);
+  setMergedMeshUserData(boxSize, geomSize, padding, promptMesh);
+
+  promptMesh.userData.type = 'INPUT_PROMPT';
+  txtBox.box.add(promptMesh);
+  parent.add(txtBox.box);
+  txtBox.box.position.set(txtBox.box.position.x, txtBox.box.position.y, parentSize.depth/2+boxSize.depth/2);
+  adjustBoxScaleRatio(txtBox.box, parent);
+
+  return {promptMesh, txtBox}
+}
+
 export function createTextInput(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
   loader.load(fontPath, (font) => {
-    const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
+    let inputProps = textInput(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
+    inputPrompts.push(inputProps.promptMesh);
+    mouseOverable.push(inputProps.promptMesh);
+    const textProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'scrollable': false, 'meshProps': meshProps };
+    inputProps.promptMesh.userData.textProps = textProps;
+    inputProps.txtBox.box.userData.mouseOverParent = true;
+    mouseOverable.push(inputProps.txtBox.box);
+    mouseOverUserData(inputProps.promptMesh);
+  });
+};
 
-    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    if(clipped){
-      mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
-    }
-
-    const promptGeometry = createMergedTextGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
-    const promptMesh = new THREE.Mesh(promptGeometry, mat);
-    const boxSize = getGeometrySize(txtBox.box.geometry);
-    const geomSize = getGeometrySize(promptGeometry);
-    setMergedMeshUserData(boxSize, geomSize, padding, promptMesh);
-
-    promptMesh.userData.type = 'INPUT_PROMPT';
-    txtBox.box.add(promptMesh);
-    parent.add(txtBox.box);
-    adjustBoxScaleRatio(txtBox.box, parent);
-    inputPrompts.push(promptMesh);
-    mouseOverable.push(promptMesh);
-    const textProps = {'txtBox': txtBox, 'text': '', 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'meshProps': meshProps };
-    promptMesh.userData.textProps = textProps;
-    txtBox.box.userData.mouseOverParent = true;
-    mouseOverable.push(txtBox.box);
-    mouseOverUserData(promptMesh);
-
+export function createScrollableTextInput(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+  loader.load(fontPath, (font) => {
+    let inputProps = textInput(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
+    inputPrompts.push(inputProps.promptMesh);
+    const textProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': meshProps };
+    inputProps.promptMesh.userData.textProps = textProps;
+    inputProps.promptMesh.AuserData.draggable=true;
+    inputProps.txtBox.box.userData.mouseOverParent = false;
+    mouseOverUserData(inputProps.promptMesh);
   });
 };
