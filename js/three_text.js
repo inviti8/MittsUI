@@ -238,12 +238,16 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
     let yPositions = [];
     elem.children.forEach((c, idx) => {
       let size = getGeometrySize(c.geometry);
-      let dir = Math.pow(-1, idx);
-      let yPos = size.height*idx*dir;
+      //let dir = Math.pow(-1, idx);
+      //let yPos = size.height*idx*dir;
+      let yPos = size.height*idx;
       if(anim=='CLOSE'){
         yPos=0;
       }
       yPositions.push(yPos);
+      if(idx>0){
+        yPositions.push(-yPos);
+      }
     });
 
     elem.userData.open = true;
@@ -252,17 +256,9 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
     }
 
     for (let i = 0; i < elem.children.length; i++) {
-      if(i>0){
         let current = elem.children[i];
-        let next = elem.children[i+1];
         let props = { duration: duration, x: current.position.x, y: yPositions[i], z: current.position.z, ease: easeIn };
         gsap.to(current.position, props);
-        if(next!=undefined){
-          props = { duration: duration, x: next.position.x, y: -yPositions[i], z: next.position.z, ease: easeIn };
-          gsap.to(next.position, props);
-          i+=1;
-        }
-      }
     }
 };
 
@@ -873,8 +869,18 @@ export function createListSelector(selectors, parent, boxWidth, boxHeight, name,
     }
     
     parent.add(txtBox.box);
-
   });
+};
 
-  
+export function button(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+  loader.load(fontPath, (font) => {
+    let txtMesh = selectionText(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
+    inputPrompts.push(txtMesh.promptMesh);
+    const textProps = {'txtBox': txtMesh.txtBox, 'text': '', 'textMesh': txtMesh.promptMesh, 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': meshProps };
+    txtMesh.promptMesh.userData.textProps = textProps;
+    txtMesh.promptMesh.userData.draggable=true;
+    txtMesh.txtBox.box.userData.mouseOverParent = true;
+    mouseOverUserData(txtMesh.promptMesh);
+    clickable.push(txtMesh.txtBox.box);
+  });
 };
