@@ -449,6 +449,7 @@ function onMouseMove(event) {
   if(intersectsMouseOverable.length > 0){
 
     let elem = intersectsMouseOverable[0].object;
+
     if(elem.userData.mouseOverParent != undefined){
       canMouseOver = false;
     }

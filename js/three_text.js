@@ -872,15 +872,19 @@ export function createListSelector(selectors, parent, boxWidth, boxHeight, name,
   });
 };
 
-export function button(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+export function button(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, mouseOver=true) {
   loader.load(fontPath, (font) => {
     let txtMesh = selectionText(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
     inputPrompts.push(txtMesh.promptMesh);
     const textProps = {'txtBox': txtMesh.txtBox, 'text': '', 'textMesh': txtMesh.promptMesh, 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': meshProps };
-    txtMesh.promptMesh.userData.textProps = textProps;
-    txtMesh.promptMesh.userData.draggable=true;
-    txtMesh.txtBox.box.userData.mouseOverParent = true;
-    mouseOverUserData(txtMesh.promptMesh);
+    txtMesh.txtBox.box.userData.textProps = textProps;
+    txtMesh.txtBox.box.userData.draggable=false;
+    txtMesh.promptMesh.userData.mouseOverParent = true;
+
+    mouseOverUserData(txtMesh.txtBox.box);
     clickable.push(txtMesh.txtBox.box);
+    if(!mouseOver)
+      return;
+    mouseOverable.push(txtMesh.txtBox.box);
   });
 };
