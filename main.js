@@ -441,18 +441,46 @@ function onMouseMove(event) {
   raycaster.setFromCamera(mouse, camera);
 
   const intersectsMouseOverable = raycaster.intersectObjects(mouseOverable);
+  const intersectsselectorElems = raycaster.intersectObjects(selectorElems);
+  let canMouseOver = true;
+
+  //console.log(selectorElems)
 
   if(intersectsMouseOverable.length > 0){
 
-    let obj = intersectsMouseOverable[0].object;
-    if(!mouseOver.includes(obj)){
-      mouseOver.push(obj);
+    let elem = intersectsMouseOverable[0].object;
+    if(elem.userData.mouseOverParent != undefined){
+      canMouseOver = false;
+    }
+
+    if(!mouseOver.includes(elem) && canMouseOver){
+      elem.userData.mouseOver = true;
+      mouseOver.push(elem);
+      mouseOverAnimation(elem);
+    }
+
+  }else if(intersectsselectorElems.length > 0){
+
+    let e = intersectsselectorElems[0].object;
+    // console.log("elem")
+    if(e.parent.userData.selectors != undefined && !e.parent.userData.open){
+      selectorAnimation(e.parent);
     }
 
   }else{
 
     mouseOver.forEach((elem, idx) => {
-      mouseOver.splice(mouseOver.indexOf(elem));
+      if(elem.userData.mouseOver && canMouseOver){
+        elem.userData.mouseOver = false;
+        mouseOverAnimation(elem);
+        mouseOver.splice(mouseOver.indexOf(elem));
+      }
+    });
+
+    selectorElems.forEach((elem, idx) => {
+      if(elem.parent.userData.selectors != undefined && elem.parent.userData.open){
+        selectorAnimation(elem.parent, 'CLOSE');
+      }
     });
   }
 }

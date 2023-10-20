@@ -240,10 +240,16 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
       let size = getGeometrySize(c.geometry);
       let dir = Math.pow(-1, idx);
       let yPos = size.height*idx*dir;
+      if(anim=='CLOSE'){
+        yPos=0;
+      }
       yPositions.push(yPos);
     });
 
     elem.userData.open = true;
+    if(anim=='CLOSE'){
+      elem.userData.open = false;
+    }
 
     for (let i = 0; i < elem.children.length; i++) {
       if(i>0){
