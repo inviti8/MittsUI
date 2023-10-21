@@ -13,6 +13,7 @@ let clickable = [];
 let inputPrompts = [];
 let inputText = [];
 let selectorElems = [];
+let toggles = [];
 
 function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
@@ -204,7 +205,7 @@ function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ea
     }
   });
 
-}
+};
 
 export function mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power1.inOut", delay=0, onComplete=undefined){
 
@@ -238,8 +239,6 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
     let yPositions = [];
     elem.children.forEach((c, idx) => {
       let size = getGeometrySize(c.geometry);
-      //let dir = Math.pow(-1, idx);
-      //let yPos = size.height*idx*dir;
       let yPos = size.height*idx;
       if(anim=='CLOSE'){
         yPos=0;
@@ -260,6 +259,21 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
         let props = { duration: duration, x: current.position.x, y: yPositions[i], z: current.position.z, ease: easeIn };
         gsap.to(current.position, props);
     }
+};
+
+export function toggleAnimation(elem, anim='ON', duration=0.15, easeIn="power1.in", easeOut="elastic.Out", onComplete=undefined){
+
+  let pos = elem.userData.onPos;
+  if(anim=='OFF'){
+    pos=elem.userData.offPos;
+  }
+
+  let props = { duration: duration, x: pos, y: elem.position.y, z: elem.position.z, ease: easeIn };
+  if(!elem.userData.horizontal){
+    props = { duration: duration, x: elem.position.x, y: pos, z: elem.position.z, ease: easeIn };
+  }
+  gsap.to(current.position, props);
+
 };
 
 export function clickAnimation(elem, anim='SCALE', duration=0.15, easeIn="power1.in", easeOut="elastic.Out", onComplete=undefined){
@@ -375,6 +389,14 @@ export function addToSelectorElems(obj){
   selectorElems.push(obj);
 };
 
+export function getToggles(){
+  return toggles;
+};
+
+export function addToToggles(obj){
+  toggles.push(obj);
+};
+
 export function textBox(width, height, padding, clipped=true){
 
   const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
@@ -394,6 +416,34 @@ export function textBox(width, height, padding, clipped=true){
 
 };
 
+export function toggleBox(width, height, padding=0.1, horizontal=true){
+
+  let baseWidth=width*2;
+  let baseHeight=height;
+  if(horizontal==false){
+    baseWidth=width;
+    baseHeight=height*2;
+  }
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
+  const base = new THREE.Mesh(new THREE.BoxGeometry(baseWidth+padding, baseHeight+padding, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
+  let baseSize = getGeometrySize(base.geometry);
+  let handleSize = getGeometrySize(handle.geometry);
+  base.add(handle);
+
+  if(horizontal){
+    handle.position.set(-(baseSize.width/2-width/2)+padding, handle.position.y, handle.position.z+baseSize.depth);
+  }else{
+    handle.position.set(handle.position.x, -(baseSize.height/2-height/s/2)+padding, handle.position.z+baseSize.depth);
+  }
+  base.userData.horizontal = horizontal;
+
+  let result = { 'handle': handle, 'base': base }
+  setToggleUserData(result, width, height, padding, horizontal)
+
+  return result
+
+};
+
 export function meshProperties(curveSegments=12, bevelEnabled=false, bevelThickness=0.1, bevelSize=0.1, bevelOffset=0, bevelSegments=3){
   return {
     'curveSegments': curveSegments,
@@ -403,6 +453,26 @@ export function meshProperties(curveSegments=12, bevelEnabled=false, bevelThickn
     'bevelOffset': bevelOffset,
     'bevelSegments': bevelSegments
   }
+}
+
+function setToggleUserData(toggle, width, height, padding, horizontal=true){
+  let baseSize = getGeometrySize(toggle.base.geometry);
+  let handleSize = getGeometrySize(toggle.handle.geometry);
+
+  toggle.base.userData.type = 'TOGGLE';
+  toggle.base.userData.size = baseSize;
+  toggle.base.userData.handle = toggle.handle;
+
+  toggle.handle.userData.type = 'TOGGLE';
+  toggle.handle.userData.size = handleSize;
+  toggle.handle.userData.offPos = new THREE.Vector3().copy(toggle.handle.position);
+
+  if(horizontal){
+    toggle.handle.userData.onPos = new THREE.Vector3(-(baseSize.width/2-width/2)+padding, toggle.handle.position.y, toggle.handle.position.z+baseSize.depth);
+  }else{
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, -(baseSize.height/2-height/s/2)+padding, toggle.handle.position.z+baseSize.depth);
+  }
+
 }
 
 function setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh){
@@ -872,7 +942,7 @@ export function createListSelector(selectors, parent, boxWidth, boxHeight, name,
   });
 };
 
-export function button(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, mouseOver=true) {
+export function createButton(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, mouseOver=true) {
   loader.load(fontPath, (font) => {
     let txtMesh = selectionText(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
     inputPrompts.push(txtMesh.promptMesh);
@@ -886,5 +956,16 @@ export function button(parent, boxWidth, boxHeight, name, text, fontPath, clippe
     if(!mouseOver)
       return;
     mouseOverable.push(txtMesh.txtBox.box);
+  });
+};
+
+export function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, useLabel=true) {
+  loader.load(fontPath, (font) => {
+
+    let toggle = toggleBox(boxWidth, boxHeight);
+    parent.add(toggle.base);
+    console.log(toggle.handle);
+    clickable.push(toggle.handle);
+    
   });
 };
