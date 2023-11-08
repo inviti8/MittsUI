@@ -79,7 +79,7 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
           if(onComplete != undefined){
             props.onComplete = onComplete;
           }
-          
+
           gsap.to(txt.position, props).delay(delay*delayIdx);
         }
         break;
@@ -110,7 +110,7 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
         if(onComplete != undefined){
           props.onComplete = onComplete;
         }
-          
+
           gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       case 'SLIDE_LEFT':
@@ -125,7 +125,7 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
         if(onComplete != undefined){
           props.onComplete = onComplete;
         }
-          
+
         gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       case 'UNSCRAMBLE0':
@@ -140,7 +140,7 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
         if(onComplete != undefined){
           props.onComplete = onComplete;
         }
-          
+
         gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       case 'UNSCRAMBLE1':
@@ -155,7 +155,7 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
         if(onComplete != undefined){
           props.onComplete = onComplete;
         }
-          
+
         gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       case 'UNSCRAMBLE2':
@@ -170,7 +170,7 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
         if(onComplete != undefined){
           props.onComplete = onComplete;
         }
-          
+
         gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       case 'SPIRAL':
@@ -185,7 +185,7 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
         if(onComplete != undefined){
           props.onComplete = onComplete;
         }
-          
+
         gsap.to(txt.position, props).delay(delay*delayIdx);
         break;
       default:
@@ -197,7 +197,7 @@ function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ea
   let delayIdx=0;
   const top = box.geometry.parameters.height/2+5;
   const bottom = top-box.geometry.parameters.height-5;
-  
+
   txtArr.forEach((txt, i) => {
     if(txt.position.y>bottom){
       txtAnimation(box, txt, anim, action, duration, ease, delay, delayIdx, onComplete);
@@ -231,7 +231,7 @@ export function mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power
     let props = { duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: ease };
     elem.userData.hoverAnim = gsap.to(elem.scale, props);
   }
-       
+
 };
 
 export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="power1.in", easeOut="elastic.Out", onComplete=undefined){
@@ -261,18 +261,24 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
     }
 };
 
-export function toggleAnimation(elem, anim='ON', duration=0.15, easeIn="power1.in", easeOut="elastic.Out", onComplete=undefined){
+export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
+
+  if(elem.userData.anim != false && gsap.isTweening( elem.userData.anim ))
+  return;
 
   let pos = elem.userData.onPos;
-  if(anim=='OFF'){
+
+  if(elem.userData.on){
     pos=elem.userData.offPos;
   }
 
-  let props = { duration: duration, x: pos, y: elem.position.y, z: elem.position.z, ease: easeIn };
+  let props = { duration: duration, x: pos.x, y: elem.position.y, z: elem.position.z, ease: easeIn, onComplete: updateToggleState, onCompleteParams:[elem] };
+
   if(!elem.userData.horizontal){
-    props = { duration: duration, x: elem.position.x, y: pos, z: elem.position.z, ease: easeIn };
+    props = { duration: duration, x: elem.position.x, y: pos.y, z: elem.position.z, ease: easeIn, onComplete: updateToggleState, onCompleteParams:[elem] };
   }
-  gsap.to(current.position, props);
+
+  elem.userData.anim = gsap.to(elem.position, props);
 
 };
 
@@ -308,6 +314,12 @@ export function createTextGeometry(character, font, size, height, curveSegments,
     bevelSegments: bevelSegments,
   });
 };
+
+function updateToggleState(elem){
+
+  elem.userData.on=!elem.userData.on;
+
+}
 
 function baseClipMaterial(){
   const mat = new THREE.MeshBasicMaterial();
@@ -400,7 +412,7 @@ export function addToToggles(obj){
 export function textBox(width, height, padding, clipped=true){
 
   const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
-  
+
   let result = { 'box': box };
 
   if(clipped){
@@ -462,13 +474,17 @@ function setToggleUserData(toggle, width, height, padding, horizontal=true){
   toggle.base.userData.type = 'TOGGLE';
   toggle.base.userData.size = baseSize;
   toggle.base.userData.handle = toggle.handle;
+  toggle.base.userData.horizontal = horizontal;
 
   toggle.handle.userData.type = 'TOGGLE';
   toggle.handle.userData.size = handleSize;
   toggle.handle.userData.offPos = new THREE.Vector3().copy(toggle.handle.position);
+  toggle.handle.userData.horizontal = horizontal;
+  toggle.handle.userData.anim = false;
+  toggle.handle.userData.on = false;
 
   if(horizontal){
-    toggle.handle.userData.onPos = new THREE.Vector3(-(baseSize.width/2-width/2)+padding, toggle.handle.position.y, toggle.handle.position.z+baseSize.depth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+baseSize.width/2-padding, toggle.handle.position.y, toggle.handle.position.z+baseSize.depth);
   }else{
     toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, -(baseSize.height/2-height/s/2)+padding, toggle.handle.position.z+baseSize.depth);
   }
@@ -521,7 +537,7 @@ export function createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, t
     if(clipped){
       mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
     }
-    
+
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
@@ -564,7 +580,7 @@ export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPa
     let lineWidth = 0;
     let yPosition = boxHeight / 2 - padding;
     const letterGeometries = [];
-    
+
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
@@ -604,7 +620,7 @@ export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, fon
     if(clipped){
       mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
     }
-    
+
     // Merge the individual letter geometries into a single buffer geometry
     let mergedGeometry = createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
     // Create a mesh from the merged geometry
@@ -666,7 +682,7 @@ export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name,
     adjustBoxScaleRatio(txtBox.box, parent);
     setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh);
     mergedMesh.userData.draggable=true;
-    
+
     draggable.push(mergedMesh);
     if(animConfig!=undefined){
       //anim, action, duration, ease, delay, onComplete
@@ -693,7 +709,7 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, font
     if(clipped){
       mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
     }
-    
+
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
@@ -768,7 +784,7 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
     if(clipped){
       mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
     }
-    
+
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
@@ -844,7 +860,7 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
     //   multiAnimation(txtBox.box, mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
     // }, "4000");
   });
-  
+
 }
 
 function selectionTextBox(parent, boxWidth, boxHeight, name, text, font, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
@@ -873,7 +889,7 @@ function selectionTextBox(parent, boxWidth, boxHeight, name, text, font, clipped
 function selectionText(parent, boxWidth, boxHeight, name, text, font, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
 
   const promptGeometry = createMergedTextGeometry(font, boxWidth, boxHeight, text, 'fontPath', clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
-  
+
   const geomSize = getGeometrySize(promptGeometry);
   const parentSize = getGeometrySize(parent.geometry);
   let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
@@ -883,7 +899,7 @@ function selectionText(parent, boxWidth, boxHeight, name, text, font, clipped=tr
     mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
   }
   const promptMesh = new THREE.Mesh(promptGeometry, mat);
-  
+
   setMergedMeshUserData(boxSize, geomSize, padding, promptMesh);
 
   txtBox.box.add(promptMesh);
@@ -937,7 +953,7 @@ export function createListSelector(selectors, parent, boxWidth, boxHeight, name,
       txtBox.box.userData.selectors.push(inputProps);
       selectorElems.push(inputProps.txtBox.box);
     }
-    
+
     parent.add(txtBox.box);
   });
 };
@@ -964,8 +980,7 @@ export function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, 
 
     let toggle = toggleBox(boxWidth, boxHeight);
     parent.add(toggle.base);
-    console.log(toggle.handle);
-    clickable.push(toggle.handle);
-    
+    toggles.push(toggle.handle);
+
   });
 };
