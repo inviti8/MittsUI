@@ -994,3 +994,28 @@ export function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, 
 
   });
 };
+
+export function createImageSprite(parent, boxWidth, boxHeight, imgUrl){
+
+  const boxSize = getGeometrySize(parent.geometry);
+  const map = new THREE.TextureLoader().load( imgUrl );
+  const material = new THREE.SpriteMaterial( { map: map } );
+
+  const sprite = new THREE.Sprite( material );
+  sprite.position.set(0, 0, boxSize.depth);
+
+  parent.add(sprite);
+
+};
+
+export function createImageBox(parent, boxWidth, boxHeight, imgUrl){
+
+  const txtBox = textBox(boxWidth, boxHeight, 0, false);
+  const boxSize = getGeometrySize(txtBox.box.geometry);
+  const map = new THREE.TextureLoader().load( imgUrl );
+  const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
+  txtBox.box.material = material;
+
+  parent.add(txtBox.box);
+
+};
