@@ -6,6 +6,6 @@
     "tweakpane": "^4.0.1"
   },
   "devDependencies": {
-    "vite": "^4.4.9"
+    "vite": "^4.5.0"
   }
 }

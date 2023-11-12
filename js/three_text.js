@@ -445,7 +445,7 @@ export function toggleBox(width, height, padding=0.1, horizontal=true){
   if(horizontal){
     handle.position.set(-(baseSize.width/2-width/2)+padding, handle.position.y, handle.position.z+baseSize.depth);
   }else{
-    handle.position.set(handle.position.x, -(baseSize.height/2-height/s/2)+padding, handle.position.z+baseSize.depth);
+    handle.position.set(handle.position.x, -(baseSize.height/2-height/2)+padding, handle.position.z+baseSize.depth);
   }
   base.userData.horizontal = horizontal;
 
@@ -486,7 +486,7 @@ function setToggleUserData(toggle, width, height, padding, horizontal=true){
   if(horizontal){
     toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+baseSize.width/2-padding, toggle.handle.position.y, toggle.handle.position.z+baseSize.depth);
   }else{
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, -(baseSize.height/2-height/s/2)+padding, toggle.handle.position.z+baseSize.depth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, (baseSize.height/2-height/2)-padding, toggle.handle.position.z+baseSize.depth);
   }
 
 }
@@ -975,12 +975,22 @@ export function createButton(parent, boxWidth, boxHeight, name, text, fontPath, 
   });
 };
 
-export function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, useLabel=true) {
+export function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, useLabel=true, horizontal=true) {
   loader.load(fontPath, (font) => {
 
-    let toggle = toggleBox(boxWidth, boxHeight);
+    let toggle = toggleBox(boxWidth, boxHeight, padding, horizontal);
     parent.add(toggle.base);
     toggles.push(toggle.handle);
+
+    if(useLabel){
+
+      let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+      const geometry = createTextGeometry(name, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+      const mergedMesh = new THREE.Mesh(geometry, mat);
+      mergedMesh.position.set(-boxWidth, boxHeight, 0);
+      parent.add(mergedMesh);
+
+    }
 
   });
 };
