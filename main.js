@@ -68,6 +68,8 @@ const draggable = three_text.getDraggable();
 const mouseOverable = three_text.getMouseOverable();
 const inputPrompts = three_text.getInputPrompts();
 const inputText = three_text.getInputText();
+const selectorElems = three_text.getSelectorElems();
+const toggles = three_text.getToggles();
 
 let RESET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_START.x+GRID.offsetScale, CUBE_SCALE_START.y+GRID.offsetScale, CUBE_SCALE_START.z);
 let TARGET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_TARGET.x+GRID.offsetScale, CUBE_SCALE_TARGET.y+GRID.offsetScale, CUBE_SCALE_TARGET.z);
@@ -580,6 +582,7 @@ function updateStyle(props){
 function panelHandler( action, props ){
     if(viewGrps[activeView].cubes[LAST_INDEX] == undefined)
         return;
+    console.log(props)
     const name = props.name;
     const spans = props.span;
     const maxSpans = PANEL_CONST.maxSpans;

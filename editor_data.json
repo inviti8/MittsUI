@@ -78,7 +78,10 @@
 				"dropdown",
 				"text_input",
 				"text_multiline",
-				"switch"
+				"switch",
+				"img_sprite",
+				"img_mesh",
+				"gltf"
 			],
 			"element_name":{"name":""},
 			"actions":[
