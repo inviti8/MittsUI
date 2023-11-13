@@ -19,6 +19,9 @@ let inputText = [];
 let selectorElems = [];
 let toggles = [];
 
+let renderer = undefined;
+let camera = undefined;
+
 function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
 }
@@ -1085,12 +1088,22 @@ export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl, isMouseOve
   );
 };
 
-export function addTranslationControl(camera, renderer, elem){
+export function addTranslationControl(elem){
 
-  control = new TransformControls( currentCamera, renderer.domElement );
+  if(camera == undefined || render == undefined)
+    return;
+
+  control = new TransformControls( camera, renderer.domElement );
   control.addEventListener( 'change', render );
   control.attach( elem );
 
 
 };
+
+export function setCameraAndRenderer(camera, renderer){
+
+  camera = camera;
+  renderer = renderer;
+
+}
 
