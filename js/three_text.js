@@ -1037,14 +1037,16 @@ export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl){
       const sceneSize = box.getSize(new THREE.Vector3());
 
       let axis = 'y';
+      let prop = 'height';
       if(sceneSize.x > sceneSize.y){
         axis = 'x';
+        prop = 'width';
       }
 
-      let ratio = boxSize.height/sceneSize[axis];
+      let ratio = boxSize[prop]/sceneSize[axis];
 
-      if(boxSize.height>sceneSize[axis]){
-        ratio = sceneSize[axis]/boxSize.height;
+      if(boxSize[prop]>sceneSize[axis]){
+        ratio = sceneSize[axis]/boxSize[prop];
       }
 
       gltf.scene.scale.set(gltf.scene.scale.x*ratio, gltf.scene.scale.y*ratio, gltf.scene.scale.z*ratio);
@@ -1067,4 +1069,4 @@ export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl){
 
     }
   );
-}
+};
