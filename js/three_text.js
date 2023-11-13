@@ -19,8 +19,26 @@ let inputText = [];
 let selectorElems = [];
 let toggles = [];
 
+let mainScene = undefined;
 let renderer = undefined;
 let camera = undefined;
+
+export function setSceneCameraAndRenderer(scene, camera, renderer){
+
+  mainScene = scene;
+  camera = camera;
+  renderer = renderer;
+
+};
+
+function render(){
+
+  if(mainScene == undefined || renderer == undefined || camera == undefined)
+    return;
+
+  renderer.render(mainScene, camera);
+
+}
 
 function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
@@ -1096,14 +1114,8 @@ export function addTranslationControl(elem){
   control = new TransformControls( camera, renderer.domElement );
   control.addEventListener( 'change', render );
   control.attach( elem );
+  elem.userData.control = control;
 
 
 };
-
-export function setCameraAndRenderer(camera, renderer){
-
-  camera = camera;
-  renderer = renderer;
-
-}
 
