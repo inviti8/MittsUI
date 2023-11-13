@@ -4,9 +4,11 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
 
 const loader = new FontLoader();
+const gltfLoader = new GLTFLoader();
 let posVar = new THREE.Vector3();
 let scaleVar = new THREE.Vector3();
 let draggable = [];
@@ -1022,13 +1024,12 @@ export function createImageBox(parent, boxWidth, boxHeight, imgUrl){
 
 };
 
-export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl){
+export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl, isMouseOverable=false, isClickable=false, onClick=undefined){
   // Instantiate a loader
-  const loader = new GLTFLoader();
   const txtBox = textBox(boxWidth, boxHeight, 0, false);
   const boxSize = getGeometrySize(txtBox.box.geometry);
 
-  loader.load(
+  gltfLoader.load(
     // resource URL
     gltfUrl,
     // called when the resource is loaded
@@ -1043,6 +1044,10 @@ export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl){
         prop = 'width';
       }
 
+      console.log(txtBox.box.material)
+      txtBox.box.material.opacity = 0;
+      txtBox.box.material.transparent = true;
+
       let ratio = boxSize[prop]/sceneSize[axis];
 
       if(boxSize[prop]>sceneSize[axis]){
@@ -1054,6 +1059,15 @@ export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl){
 
       txtBox.box.add( gltf.scene );
       parent.add(txtBox.box);
+
+      if(isMouseOverable){
+        mouseOverUserData(txtBox.box);
+        mouseOverable.push(txtBox.box);
+      }
+
+      if(isClickable){
+        clickable.push(txtBox.box);
+      }
 
     },
     // called while loading is progressing
@@ -1070,3 +1084,13 @@ export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl){
     }
   );
 };
+
+export function addTranslationControl(camera, renderer, elem){
+
+  control = new TransformControls( currentCamera, renderer.domElement );
+  control.addEventListener( 'change', render );
+  control.attach( elem );
+
+
+};
+
