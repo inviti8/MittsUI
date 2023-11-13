@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { gsap } from "gsap";
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
+
 
 const loader = new FontLoader();
 let posVar = new THREE.Vector3();
@@ -1019,3 +1021,50 @@ export function createImageBox(parent, boxWidth, boxHeight, imgUrl){
   parent.add(txtBox.box);
 
 };
+
+export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl){
+  // Instantiate a loader
+  const loader = new GLTFLoader();
+  const txtBox = textBox(boxWidth, boxHeight, 0, false);
+  const boxSize = getGeometrySize(txtBox.box.geometry);
+
+  loader.load(
+    // resource URL
+    gltfUrl,
+    // called when the resource is loaded
+    function ( gltf ) {
+      const box = new THREE.Box3().setFromObject( gltf.scene ); 
+      const sceneSize = box.getSize(new THREE.Vector3());
+
+      let axis = 'y';
+      if(sceneSize.x > sceneSize.y){
+        axis = 'x';
+      }
+
+      let ratio = boxSize.height/sceneSize[axis];
+
+      if(boxSize.height>sceneSize[axis]){
+        ratio = sceneSize[axis]/boxSize.height;
+      }
+
+      gltf.scene.scale.set(gltf.scene.scale.x*ratio, gltf.scene.scale.y*ratio, gltf.scene.scale.z*ratio);
+      gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z+boxSize.depth+(sceneSize.z/2*ratio))
+
+      txtBox.box.add( gltf.scene );
+      parent.add(txtBox.box);
+
+    },
+    // called while loading is progressing
+    function ( xhr ) {
+
+      console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+
+    },
+    // called when loading has errors
+    function ( error ) {
+
+      console.log( 'An error happened' );
+
+    }
+  );
+}
