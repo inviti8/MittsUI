@@ -19,26 +19,15 @@ let inputText = [];
 let selectorElems = [];
 let toggles = [];
 
-let mainScene = undefined;
 let renderer = undefined;
 let camera = undefined;
 
-export function setSceneCameraAndRenderer(scene, camera, renderer){
+export function setCameraAndRenderer(camera, renderer){
 
-  mainScene = scene;
   camera = camera;
   renderer = renderer;
 
 };
-
-function render(){
-
-  if(mainScene == undefined || renderer == undefined || camera == undefined)
-    return;
-
-  renderer.render(mainScene, camera);
-
-}
 
 function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
@@ -983,7 +972,7 @@ export function createListSelector(selectors, parent, boxWidth, boxHeight, name,
   });
 };
 
-export function createButton(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, mouseOver=true) {
+function Button(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, mouseOver=true) {
   loader.load(fontPath, (font) => {
     let txtMesh = selectionText(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
     inputPrompts.push(txtMesh.promptMesh);
@@ -998,16 +987,24 @@ export function createButton(parent, boxWidth, boxHeight, name, text, fontPath, 
       return;
     mouseOverable.push(txtMesh.txtBox.box);
   });
+}
+
+export function createButton(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
+  Button(parent, boxWidth, boxHeight, name, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated, false);
 };
 
-export function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, useLabel=true, horizontal=true) {
+export function createMouseOverButton(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
+  Button(parent, boxWidth, boxHeight, name, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated, true);
+};
+
+function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, horizontal=true) {
   loader.load(fontPath, (font) => {
 
     let toggle = toggleBox(boxWidth, boxHeight, padding, horizontal);
     parent.add(toggle.base);
     toggles.push(toggle.handle);
 
-    if(useLabel){
+    if(name.length>0){
 
       let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
       const geometry = createTextGeometry(name, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
@@ -1018,6 +1015,14 @@ export function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, 
     }
 
   });
+}
+
+export function createHorizontalToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
+  createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated, true);
+};
+
+export function createVerticalToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
+  createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated, false);
 };
 
 export function createImageSprite(parent, boxWidth, boxHeight, imgUrl){
@@ -1106,15 +1111,77 @@ export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl, isMouseOve
   );
 };
 
+export function createListItem( parent, boxWidth, boxHeight, author, content, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+
+  const contentSize = getGeometrySize(content.geometry);
+  const elemBox = textBox(boxWidth, boxHeight, 0, false);
+  const elemBoxSize = getGeometrySize(elemBox.box.geometry);
+  const title = content.name;
+  elemBox.box.add(content);
+  content.position.set(0, 0, elemBoxSize.depth);
+
+  // if(title.length>0 || author.length>0 || useTimestamp){
+  if(title.length>0){
+
+    loader.load(fontPath, (font) => {
+      console.log("Here!!!")
+
+      let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+
+      if(title.length>0){
+
+          const geometry = createTextGeometry(title, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+          geometry.center();
+          const textMesh = new THREE.Mesh(geometry, mat);
+          const textMeshSize = getGeometrySize(textMesh.geometry);
+          elemBox.box.add(textMesh);
+
+          textMesh.position.set(0, (elemBoxSize.height/2)-(textMeshSize.height/2)-padding, elemBoxSize.depth+textMeshSize.depth/2);
+          elemBox.box.userData.title = textMesh;
+
+      }
+
+      if(author.length>0){
+
+        const geometry = createTextGeometry(author, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+        geometry.center();
+        const textMesh = new THREE.Mesh(geometry, mat);
+        const textMeshSize = getGeometrySize(textMesh.geometry);
+        elemBox.box.add(textMesh);
+
+        textMesh.position.set(-(elemBoxSize.width/2-padding)+(textMeshSize.width/2)+padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+padding, elemBoxSize.depth+textMeshSize.depth/2);
+        elemBox.box.userData.author = textMesh;
+
+      }
+
+      let timestamp = Number(new Date());
+      let date = new Date(timestamp).toString()
+      const geometry = createTextGeometry(date, font, size*0.5, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+      geometry.center();
+      const textMesh = new THREE.Mesh(geometry, mat);
+      const textMeshSize = getGeometrySize(textMesh.geometry);
+      elemBox.box.add(textMesh);
+      textMesh.position.set(-(elemBoxSize.width/2-padding)+(textMeshSize.width/2)+padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+padding, elemBoxSize.depth+textMeshSize.depth/2);
+
+      parent.add(elemBox.box);
+      elemBox.box.userData.date = textMesh;
+      if( 'author' in elemBox.box.userData && elemBox.box.userData.author != undefined){
+        elemBox.box.userData.author.position.set(elemBox.box.userData.author.position.x, elemBox.box.userData.author.position.y+textMeshSize.height+padding, elemBox.box.userData.author.position.z)
+      }
+
+    });
+  }
+
+};
+
 export function addTranslationControl(elem){
 
-  if(camera == undefined || render == undefined)
+  if(camera == undefined || renderer == undefined)
     return;
 
   control = new TransformControls( camera, renderer.domElement );
   control.addEventListener( 'change', render );
   control.attach( elem );
-  elem.userData.control = control;
 
 
 };
