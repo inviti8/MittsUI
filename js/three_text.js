@@ -33,7 +33,18 @@ function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-export function animationConfig(anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
+export function listItemConfig(width, height, depth, textProps=undefined, meshProps=undefined, animProps=undefined){
+  return {
+    'width': width,
+    'height': height,
+    'depth': depth,
+    'textProps': textProps,
+    'meshProps': meshProps,
+    'animProps': animProps
+  }
+}
+
+export function animationProperties(anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
   return {
     'anim': anim,
     'action': action,
@@ -315,6 +326,20 @@ export function getGeometrySize(geometry) {
   return { width, height, depth };
 };
 
+
+export function textProperties(font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height) {
+  return {
+    font: font,
+    clipped: clipped,
+    letterSpacing: letterSpacing,
+    lineSpacing: lineSpacing,
+    wordSpacing: wordSpacing,
+    padding: padding,
+    size: size,
+    height: height,
+  }
+};
+
 export function createTextGeometry(character, font, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments) {
   return new TextGeometry(character, {
     font: font,
@@ -541,7 +566,7 @@ function adjustBoxScaleRatio(box, parent){
   box.userData.defaultScale = new THREE.Vector3().copy(box.scale);
 }
 
-export function createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+export function createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined) {
     let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
     let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
     const boxSize = getGeometrySize(txtBox.box.geometry);
@@ -590,7 +615,7 @@ export function createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, t
     return BufferGeometryUtils.mergeGeometries(letterGeometries);
 }
 
-export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined) {
+export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined) {
     let lineWidth = 0;
     let yPosition = boxHeight / 2 - padding;
     const letterGeometries = [];
@@ -625,7 +650,7 @@ export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPa
     return BufferGeometryUtils.mergeGeometries(letterGeometries);
 }
 
-export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -636,10 +661,10 @@ export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, fon
     }
 
     // Merge the individual letter geometries into a single buffer geometry
-    let mergedGeometry = createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
+    let mergedGeometry = createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animProps);
     // Create a mesh from the merged geometry
     const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
-    if(animConfig!=undefined){
+    if(animProps!=undefined){
       mergedMesh.material.transparent=true;
       mergedMesh.material.opacity=0;
     }
@@ -654,9 +679,9 @@ export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, fon
     txtBox.box.name = name;
     adjustBoxScaleRatio(txtBox.box, parent);
 
-    if(animConfig!=undefined){
+    if(animProps!=undefined){
       //anim, action, duration, ease, delay, onComplete
-      txtAnimation(txtBox.box, mergedMesh, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, 0, animConfig.callback);
+      txtAnimation(txtBox.box, mergedMesh, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, 0, animProps.callback);
     }
 
     if(onCreated!=undefined){
@@ -666,7 +691,7 @@ export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, fon
   });
 }
 
-export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -676,11 +701,11 @@ export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name,
       mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
     }
     // Merge the individual letter geometries into a single buffer geometry
-    let mergedGeometry = createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
+    let mergedGeometry = createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animProps);
 
     // Create a mesh from the merged geometry
     const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
-    if(animConfig!=undefined){
+    if(animProps!=undefined){
       mergedMesh.material.transparent=true;
       mergedMesh.material.opacity=0;
     }
@@ -698,9 +723,9 @@ export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name,
     mergedMesh.userData.draggable=true;
 
     draggable.push(mergedMesh);
-    if(animConfig!=undefined){
+    if(animProps!=undefined){
       //anim, action, duration, ease, delay, onComplete
-      txtAnimation(txtBox.box, mergedMesh, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, 0, animConfig.callback);
+      txtAnimation(txtBox.box, mergedMesh, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, 0, animProps.callback);
     }
     if(onCreated!=undefined){
       onCreated(txtBox.box);
@@ -709,7 +734,7 @@ export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name,
   });
 }
 
-export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined) {
   // Load the font
   loader.load(fontPath, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
@@ -739,7 +764,7 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, font
 
         const letterMesh = new THREE.Mesh(geometry, mat);
         letterMesh.position.set(lineWidth, yPosition, boxSize.depth/2-height/2);
-        if(animConfig!=undefined){
+        if(animProps!=undefined){
           letterMesh.material.transparent=true;
           letterMesh.material.opacity=0;
         }
@@ -773,9 +798,9 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, font
     }
     txtBox.box.name = name;
 
-    if(animConfig!=undefined){
+    if(animProps!=undefined){
       //anim, action, duration, ease, delay, onComplete
-      multiAnimation(txtBox.box, txtBox.box.children, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, animConfig.callback);
+      multiAnimation(txtBox.box, txtBox.box.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
     }
     if(onCreated!=undefined){
       onCreated(txtBox.box);
@@ -784,18 +809,18 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, font
   });
 }
 
-export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined) {
   // Load the font
-  loader.load(fontPath, (font) => {
-    const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
-    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - padding);
-    let yPosition = txtBox.box.geometry.parameters.height / 2 - padding;
+  loader.load(textProps.font, (font) => {
+    const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
+    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - textProps.padding);
+    let yPosition = txtBox.box.geometry.parameters.height / 2 - textProps.padding;
     const letterGeometries = [];
     const letterMeshes = [];
     const cubes = [];
 
     let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    if(clipped){
+    if(textProps.clipped){
       mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
     }
 
@@ -804,31 +829,31 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
 
       if (character === ' ') {
         // Handle spaces by adjusting the x position
-        lineWidth += wordSpacing;
+        lineWidth += textProps.wordSpacing;
       } else {
 
          if(meshProps == undefined){
           meshProps = meshProperties()
         }
-        const geometry = createTextGeometry(character, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
-        const cube = new THREE.BoxGeometry(size*2, size*2, height);
+        const geometry = createTextGeometry(character, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+        const cube = new THREE.BoxGeometry(textProps.size*2, textProps.size*2, textProps.height);
 
-        cube.translate((size/2)+lineWidth, (size/2)+yPosition, 0);
+        cube.translate((textProps.size/2)+lineWidth, (textProps.size/2)+yPosition, 0);
 
         const letterMesh = new THREE.Mesh(geometry, mat);
         letterMesh.position.set(lineWidth, yPosition, 0);
 
-        if(animConfig!=undefined){
+        if(animProps!=undefined){
           letterMesh.material.transparent=true;
           letterMesh.material.opacity=0;
         }
 
         // Calculate the width of the letter geometry
         let { width } = getGeometrySize(geometry);
-        width+=letterSpacing;
+        width+=textProps.letterSpacing;
 
         // Check if the letter is within the bounds of the txtBox mesh
-        if (width <= txtBox.box.geometry.parameters.width / 2 - padding) {
+        if (width <= txtBox.box.geometry.parameters.width / 2 - textProps.padding) {
           letterMeshes.push(letterMesh);
           letterGeometries.push(geometry);
           cubes.push(cube);
@@ -838,9 +863,9 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
       }
 
       // Check if lineWidth exceeds txtBox width - padding
-      if (lineWidth > txtBox.box.geometry.parameters.width / 2 - padding) {
-        lineWidth = -(txtBox.box.geometry.parameters.width / 2) + padding; // Reset x position to the upper-left corner
-        yPosition -= lineSpacing; // Move to the next line
+      if (lineWidth > txtBox.box.geometry.parameters.width / 2 - textProps.padding) {
+        lineWidth = -(txtBox.box.geometry.parameters.width / 2) + textProps.padding; // Reset x position to the upper-left corner
+        yPosition -= textProps.lineSpacing; // Move to the next line
       }
     }
     const mergedGeometry = BufferGeometryUtils.mergeGeometries(cubes);
@@ -848,8 +873,8 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
     txtBox.box.add(mergedMesh);
     const boxSize = getGeometrySize(txtBox.box.geometry);
     const geomSize = getGeometrySize(mergedGeometry);
-    mergedMesh.position.set(0, -padding, 0);
-    setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh);
+    mergedMesh.position.set(0, -textProps.padding, 0);
+    setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
     mergedMesh.userData.draggable=true;
     if(name==''){
       name='text-'+txtBox.box.id;
@@ -861,9 +886,9 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
     parent.add(txtBox.box);
     adjustBoxScaleRatio(txtBox.box, parent);
     draggable.push(mergedMesh);
-    if(animConfig!=undefined){
+    if(animProps!=undefined){
       //anim, action, duration, ease, delay, onComplete
-      multiAnimation(txtBox.box, mergedMesh.children, animConfig.anim, animConfig.action, animConfig.duration, animConfig.ease, animConfig.delay, animConfig.callback);
+      multiAnimation(txtBox.box, mergedMesh.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
     }
     if(onCreated!=undefined){
       onCreated(txtBox.box);
@@ -877,7 +902,7 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
 
 }
 
-function selectionTextBox(parent, boxWidth, boxHeight, name, text, font, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
+function selectionTextBox(parent, boxWidth, boxHeight, name, text, font, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined){
   const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
 
   let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
@@ -885,7 +910,7 @@ function selectionTextBox(parent, boxWidth, boxHeight, name, text, font, clipped
     mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
   }
 
-  const promptGeometry = createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, 'fontPath', clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
+  const promptGeometry = createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, 'fontPath', clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animProps);
   const promptMesh = new THREE.Mesh(promptGeometry, mat);
   const boxSize = getGeometrySize(txtBox.box.geometry);
   const geomSize = getGeometrySize(promptGeometry);
@@ -900,9 +925,9 @@ function selectionTextBox(parent, boxWidth, boxHeight, name, text, font, clipped
   return {promptMesh, txtBox}
 }
 
-function selectionText(parent, boxWidth, boxHeight, name, text, font, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
+function selectionText(parent, boxWidth, boxHeight, name, text, font, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined){
 
-  const promptGeometry = createMergedTextGeometry(font, boxWidth, boxHeight, text, 'fontPath', clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig);
+  const promptGeometry = createMergedTextGeometry(font, boxWidth, boxHeight, text, 'fontPath', clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animProps);
 
   const geomSize = getGeometrySize(promptGeometry);
   const parentSize = getGeometrySize(parent.geometry);
@@ -925,39 +950,39 @@ function selectionText(parent, boxWidth, boxHeight, name, text, font, clipped=tr
   return {promptMesh, txtBox}
 }
 
-export function createTextInput(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
-  loader.load(fontPath, (font) => {
-    let inputProps = selectionTextBox(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
+export function createTextInput(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined) {
+  loader.load(textProps.font, (font) => {
+    let inputProps = selectionTextBox(parent, boxWidth, boxHeight, name, text, font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated);
     inputPrompts.push(inputProps.promptMesh);
     mouseOverable.push(inputProps.promptMesh);
-    const textProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'scrollable': false, 'meshProps': meshProps };
-    inputProps.promptMesh.userData.textProps = textProps;
+    const tProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': meshProps };
+    inputProps.promptMesh.userData.textProps = tProps;
     inputProps.txtBox.box.userData.mouseOverParent = true;
     mouseOverable.push(inputProps.txtBox.box);
     mouseOverUserData(inputProps.promptMesh);
   });
 };
 
-export function createScrollableTextInput(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
-  loader.load(fontPath, (font) => {
-    let inputProps = selectionTextBox(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
+export function createScrollableTextInput(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined) {
+  loader.load(textProps.font, (font) => {
+    let inputProps = selectionTextBox(parent, boxWidth, boxHeight, name, text, font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated);
     inputPrompts.push(inputProps.promptMesh);
-    const textProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': meshProps };
-    inputProps.promptMesh.userData.textProps = textProps;
+    const tProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'draggable': true, 'meshProps': meshProps };
+    inputProps.promptMesh.userData.textProps = tProps;
     inputProps.promptMesh.userData.draggable=true;
     inputProps.txtBox.box.userData.mouseOverParent = false;
     mouseOverUserData(inputProps.promptMesh);
   });
 };
 
-export function createListSelector(selectors, parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
-  loader.load(fontPath, (font) => {
-    const txtBox = textBox(boxWidth, boxHeight, padding, clipped);
+export function createListSelector(selectors, parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined) {
+  loader.load(textProps.font, (font) => {
+    const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
     selectorUserData(txtBox.box);
     for (const [selTxt, url] of Object.entries(selectors)) {
-      let inputProps = selectionText(txtBox.box, boxWidth, boxHeight, name, selTxt, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
-      const textProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': meshProps };
-      inputProps.promptMesh.userData.textProps = textProps;
+      let inputProps = selectionText(txtBox.box, boxWidth, boxHeight, name, selTxt, font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated);
+      const tProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'draggable': true, 'meshProps': meshProps };
+      inputProps.promptMesh.userData.textProps = tProps;
       inputPrompts.push(inputProps.promptMesh);
       mouseOverable.push(inputProps.promptMesh);
       clickable.push(inputProps.promptMesh);
@@ -972,9 +997,9 @@ export function createListSelector(selectors, parent, boxWidth, boxHeight, name,
   });
 };
 
-function Button(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, mouseOver=true) {
+function Button(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined, mouseOver=true) {
   loader.load(fontPath, (font) => {
-    let txtMesh = selectionText(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated);
+    let txtMesh = selectionText(parent, boxWidth, boxHeight, name, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animProps, onCreated);
     inputPrompts.push(txtMesh.promptMesh);
     const textProps = {'txtBox': txtMesh.txtBox, 'text': '', 'textMesh': txtMesh.promptMesh, 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': meshProps };
     txtMesh.txtBox.box.userData.textProps = textProps;
@@ -989,15 +1014,15 @@ function Button(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true,
   });
 }
 
-export function createButton(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
-  Button(parent, boxWidth, boxHeight, name, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated, false);
+export function createButton(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  Button(parent, boxWidth, boxHeight, name, text, textProps.font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, false);
 };
 
-export function createMouseOverButton(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
-  Button(parent, boxWidth, boxHeight, name, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated, true);
+export function createMouseOverButton(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  Button(parent, boxWidth, boxHeight, name, text, textProps.font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, true);
 };
 
-function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined, horizontal=true) {
+function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true) {
   loader.load(fontPath, (font) => {
 
     let toggle = toggleBox(boxWidth, boxHeight, padding, horizontal);
@@ -1017,28 +1042,16 @@ function createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped
   });
 }
 
-export function createHorizontalToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
-  createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated, true);
+export function createHorizontalToggle(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  createToggle(parent, boxWidth, boxHeight, name, text, textProps.font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, true);
 };
 
-export function createVerticalToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined){
-  createToggle(parent, boxWidth, boxHeight, name, text, fontPath, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animConfig, onCreated, false);
+export function createVerticalToggle(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  createToggle(parent, boxWidth, boxHeight, name, text, textProps.font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, false);
 };
 
-export function createImageSprite(parent, boxWidth, boxHeight, imgUrl){
 
-  const boxSize = getGeometrySize(parent.geometry);
-  const map = new THREE.TextureLoader().load( imgUrl );
-  const material = new THREE.SpriteMaterial( { map: map } );
-
-  const sprite = new THREE.Sprite( material );
-  sprite.position.set(0, 0, boxSize.depth);
-
-  parent.add(sprite);
-
-};
-
-export function createImageBox(parent, boxWidth, boxHeight, imgUrl){
+export function createImageBox(parent, boxWidth, boxHeight, name, imgUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listItemConfig=undefined, onCreated=undefined){
 
   const txtBox = textBox(boxWidth, boxHeight, 0, false);
   const boxSize = getGeometrySize(txtBox.box.geometry);
@@ -1046,11 +1059,16 @@ export function createImageBox(parent, boxWidth, boxHeight, imgUrl){
   const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
   txtBox.box.material = material;
 
-  parent.add(txtBox.box);
+  if(listItemConfig != undefined){
+    let tProps = listItemConfig.textProps;
+    createListItem(parent, boxWidth, boxHeight, name, txtBox.box, tProps.font, tProps.clipped, tProps.letterSpacing, tProps.lineSpacing, tProps.wordSpacing, tProps.padding, tProps.size, tProps.height, tProps.meshProps, tProps.animProps);
+  }else{
+    parent.add(txtBox.box);
+  }
 
 };
 
-export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl, isMouseOverable=false, isClickable=false, onClick=undefined){
+export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listItemConfig=undefined, onCreated=undefined){
   // Instantiate a loader
   const txtBox = textBox(boxWidth, boxHeight, 0, false);
   const boxSize = getGeometrySize(txtBox.box.geometry);
@@ -1084,15 +1102,12 @@ export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl, isMouseOve
       gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z+boxSize.depth+(sceneSize.z/2*ratio))
 
       txtBox.box.add( gltf.scene );
-      parent.add(txtBox.box);
 
-      if(isMouseOverable){
-        mouseOverUserData(txtBox.box);
-        mouseOverable.push(txtBox.box);
-      }
-
-      if(isClickable){
-        clickable.push(txtBox.box);
+      if(listItemConfig != undefined){
+        let tProps = listItemConfig.textProps;
+        createListItem(parent, boxWidth, boxHeight, name, txtBox.box, tProps.font, tProps.clipped, tProps.letterSpacing, tProps.lineSpacing, tProps.wordSpacing, tProps.padding, tProps.size, tProps.height, tProps.meshProps, tProps.animProps);
+      }else{
+        parent.add(txtBox.box);
       }
 
     },
@@ -1111,7 +1126,7 @@ export function createGLTFModel(parent, boxWidth, boxHeight, gltfUrl, isMouseOve
   );
 };
 
-export function createListItem( parent, boxWidth, boxHeight, author, content, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animConfig=undefined, onCreated=undefined) {
+export function createListItem( parent, boxWidth, boxHeight, author, content, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined) {
 
   const contentSize = getGeometrySize(content.geometry);
   const elemBox = textBox(boxWidth, boxHeight, 0, false);
@@ -1120,53 +1135,51 @@ export function createListItem( parent, boxWidth, boxHeight, author, content, fo
   elemBox.box.add(content);
   content.position.set(0, 0, elemBoxSize.depth);
 
-  // if(title.length>0 || author.length>0 || useTimestamp){
-  if(title.length>0){
+  if(title.length>0 || author.length>0 || useTimestamp){
 
-    loader.load(fontPath, (font) => {
-      console.log("Here!!!")
+    loader.load(textProps.font, (font) => {
 
       let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
 
       if(title.length>0){
 
-          const geometry = createTextGeometry(title, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+          const geometry = createTextGeometry(title, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
           geometry.center();
           const textMesh = new THREE.Mesh(geometry, mat);
           const textMeshSize = getGeometrySize(textMesh.geometry);
           elemBox.box.add(textMesh);
 
-          textMesh.position.set(0, (elemBoxSize.height/2)-(textMeshSize.height/2)-padding, elemBoxSize.depth+textMeshSize.depth/2);
+          textMesh.position.set(0, (elemBoxSize.height/2)-(textMeshSize.height/2)-textProps.padding, elemBoxSize.depth+textMeshSize.depth/2);
           elemBox.box.userData.title = textMesh;
 
       }
 
       if(author.length>0){
 
-        const geometry = createTextGeometry(author, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+        const geometry = createTextGeometry(author, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
         geometry.center();
         const textMesh = new THREE.Mesh(geometry, mat);
         const textMeshSize = getGeometrySize(textMesh.geometry);
         elemBox.box.add(textMesh);
 
-        textMesh.position.set(-(elemBoxSize.width/2-padding)+(textMeshSize.width/2)+padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+padding, elemBoxSize.depth+textMeshSize.depth/2);
+        textMesh.position.set(-(elemBoxSize.width/2-textProps.padding)+(textMeshSize.width/2)+textProps.padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+textProps.adding, elemBoxSize.depth+textMeshSize.depth/2);
         elemBox.box.userData.author = textMesh;
 
       }
 
       let timestamp = Number(new Date());
       let date = new Date(timestamp).toString()
-      const geometry = createTextGeometry(date, font, size*0.5, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+      const geometry = createTextGeometry(date, font, textProps.size*0.5, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
       geometry.center();
       const textMesh = new THREE.Mesh(geometry, mat);
       const textMeshSize = getGeometrySize(textMesh.geometry);
       elemBox.box.add(textMesh);
-      textMesh.position.set(-(elemBoxSize.width/2-padding)+(textMeshSize.width/2)+padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+padding, elemBoxSize.depth+textMeshSize.depth/2);
+      textMesh.position.set(-(elemBoxSize.width/2-textProps.padding)+(textMeshSize.width/2)+textProps.padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+textProps.padding, elemBoxSize.depth+textMeshSize.depth/2);
 
       parent.add(elemBox.box);
       elemBox.box.userData.date = textMesh;
       if( 'author' in elemBox.box.userData && elemBox.box.userData.author != undefined){
-        elemBox.box.userData.author.position.set(elemBox.box.userData.author.position.x, elemBox.box.userData.author.position.y+textMeshSize.height+padding, elemBox.box.userData.author.position.z)
+        elemBox.box.userData.author.position.set(elemBox.box.userData.author.position.x, elemBox.box.userData.author.position.y+textMeshSize.height+textProps.padding, elemBox.box.userData.author.position.z)
       }
 
     });
