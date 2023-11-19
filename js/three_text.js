@@ -1181,7 +1181,7 @@ export function createListItem( parent, boxWidth, boxHeight, author, content, te
       parent.add(elemBox.box);
       elemBox.box.userData.date = textMesh;
       if( 'author' in elemBox.box.userData && elemBox.box.userData.author != undefined){
-        elemBox.box.userData.author.position.set(elemBox.box.userData.author.position.x, elemBox.box.userData.author.position.y+textMeshSize.height+textProps.padding, elemBox.box.userData.author.position.z)
+        elemBox.box.userData.author.position.set(elemBox.box.userData.author.position.x, elemBox.box.userData.author.position.y+textMeshSize.height+textProps.padding, elemBox.box.userData.author.position.z);
       }
 
     });
