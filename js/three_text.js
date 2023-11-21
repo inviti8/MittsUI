@@ -33,7 +33,7 @@ function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-export function listItemConfig(width, height, depth, textProps=undefined, meshProps=undefined, animProps=undefined, infoProps=undefined, useTimeStamp=true){
+export function listItemConfig(width, height, depth, textProps=undefined, meshProps=undefined, animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, index=0){
   return {
     'width': width,
     'height': height,
@@ -42,7 +42,9 @@ export function listItemConfig(width, height, depth, textProps=undefined, meshPr
     'meshProps': meshProps,
     'animProps': animProps,
     'infoProps': infoProps,
-    'useTimeStamp': true
+    'useTimeStamp': true,
+    'spacing': spacing,
+    'index': index
   }
 }
 
@@ -659,7 +661,7 @@ export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPa
     return BufferGeometryUtils.mergeGeometries(letterGeometries);
 }
 
-export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listItemConfig=undefined, onCreated=undefined) {
+export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
@@ -681,9 +683,9 @@ export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, tex
     const geomSize = getGeometrySize(mergedGeometry);
     setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
 
-    if(listItemConfig != undefined){
+    if(listConfig != undefined){
       txtBox.box.name = name;
-      createListItem(parent, listItemConfig.width, listItemConfig.height, txtBox.box, listItemConfig.textProps, listItemConfig.meshProps, listItemConfig.animProps, listItemConfig.infoProps);
+      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
     }else{
       parent.add(txtBox.box);
     }
@@ -707,7 +709,7 @@ export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, tex
   });
 }
 
-export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listItemConfig=undefined, onCreated=undefined) {
+export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
@@ -731,7 +733,7 @@ export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name,
 
     if(listItemConfig != undefined){
       txtBox.box.name = name;
-      createListItem(parent, listItemConfig.width, listItemConfig.height, txtBox.box, listItemConfig.textProps, listItemConfig.meshProps, listItemConfig.animProps, listItemConfig.infoProps);
+      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
     }else{
       parent.add(txtBox.box);
     }
@@ -757,7 +759,7 @@ export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name,
   });
 }
 
-export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listItemConfig=undefined, onCreated=undefined) {
+export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
@@ -814,9 +816,9 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, text
       }
     }
 
-    if(listItemConfig != undefined){
+    if(listConfig != undefined){
       txtBox.box.name = name;
-      createListItem(parent, listItemConfig.width, listItemConfig.height, txtBox.box, listItemConfig.textProps, listItemConfig.meshProps, listItemConfig.animProps, listItemConfig.infoProps);
+      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
     }else{
       parent.add(txtBox.box);
     }
@@ -838,7 +840,7 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, text
   });
 }
 
-export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listItemConfig=undefined, onCreated=undefined) {
+export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
@@ -913,9 +915,9 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
       mergedMesh.add(m);
     })
 
-    if(listItemConfig != undefined){
+    if(listConfig != undefined){
       txtBox.box.name = name;
-      createListItem(parent, listItemConfig.width, listItemConfig.height, txtBox.box, listItemConfig.textProps, listItemConfig.meshProps, listItemConfig.animProps, listItemConfig.infoProps);
+      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
     }else{
       parent.add(txtBox.box);
     }
@@ -1090,7 +1092,7 @@ export function createVerticalToggle(parent, boxWidth, boxHeight, name, text, te
 };
 
 
-export function createImageBox(parent, boxWidth, boxHeight, name, imgUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listItemConfig=undefined, onCreated=undefined){
+export function createImageBox(parent, boxWidth, boxHeight, name, imgUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
 
   const txtBox = textBox(boxWidth, boxHeight, 0, false);
   const boxSize = getGeometrySize(txtBox.box.geometry);
@@ -1098,16 +1100,16 @@ export function createImageBox(parent, boxWidth, boxHeight, name, imgUrl, textPr
   const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
   txtBox.box.material = material;
 
-  if(listItemConfig != undefined){
+  if(listConfig != undefined){
     txtBox.box.name = name;
-    createListItem(parent, listItemConfig.width, listItemConfig.height, txtBox.box, listItemConfig.textProps, listItemConfig.meshProps, listItemConfig.animProps, listItemConfig.infoProps);
+    createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
   }else{
     parent.add(txtBox.box);
   }
 
 };
 
-export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listItemConfig=undefined, onCreated=undefined){
+export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
   // Instantiate a loader
   const txtBox = textBox(boxWidth, boxHeight, 0, false);
   const boxSize = getGeometrySize(txtBox.box.geometry);
@@ -1143,7 +1145,7 @@ export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, text
 
       if(listItemConfig != undefined){
         txtBox.box.name = name;
-        createListItem(parent, listItemConfig.width, listItemConfig.height, txtBox.box, listItemConfig.textProps, listItemConfig.meshProps, listItemConfig.animProps, listItemConfig.infoProps);
+        createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
       }else{
         parent.add(txtBox.box);
       }
@@ -1164,10 +1166,11 @@ export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, text
   );
 };
 
-export function createListItem( parent, boxWidth, boxHeight, content, textProps=undefined, meshProps=undefined, animProps=undefined, infoProps=undefined, useTimeStamp=true) {
-
+export function createListItem( parent, boxWidth, boxHeight, content, textProps=undefined, meshProps=undefined, animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, index=0) {
+  const parentSize = getGeometrySize(parent.geometry);
   const contentSize = getGeometrySize(content.geometry);
   const elemBox = textBox(boxWidth, boxHeight, 0, false);
+  elemBox.box.userData.elemIndex = index;
   const elemBoxSize = getGeometrySize(elemBox.box.geometry);
   elemBox.box.add(content);
   content.position.set(0, 0, elemBoxSize.depth);
@@ -1214,17 +1217,30 @@ export function createListItem( parent, boxWidth, boxHeight, content, textProps=
       textMesh.position.set(-(elemBoxSize.width/2-textProps.padding)+(textMeshSize.width/2)+textProps.padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+textProps.padding, elemBoxSize.depth+textMeshSize.depth/2);
 
       parent.add(elemBox.box);
+
       elemBox.box.userData.date = textMesh;
       if( 'author' in elemBox.box.userData && elemBox.box.userData.author != undefined){
         elemBox.box.userData.author.position.set(elemBox.box.userData.author.position.x, elemBox.box.userData.author.position.y+textMeshSize.height+textProps.padding, elemBox.box.userData.author.position.z)
       }
+      console.log(parent.geometry)
+      elemBox.box.position.set(elemBox.box.position.x, parent.geometry.parameters.height/2-elemBoxSize.height/2-((elemBoxSize.height+spacing)*index), elemBox.box.position.z+parentSize.depth)
 
     });
   }
 
 };
 
-export function createContentList( parent, contentArr, boxWidth, boxHeight, author, content, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined ) {
+export function createGLTFContentList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+  const listBoxSize = getGeometrySize(parent.geometry);
+  parent.userData.listElements = [];
+
+  console.log(contentArr)
+
+  contentArr.forEach((gltfUrl, index) =>{
+    console.log(gltfUrl)
+    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
+    createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+  });
 
 };
 
