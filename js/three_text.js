@@ -5,6 +5,7 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import * as CameraUtils from 'three/addons/utils/CameraUtils.js';
 
 
 const loader = new FontLoader();
@@ -18,16 +19,113 @@ let inputPrompts = [];
 let inputText = [];
 let selectorElems = [];
 let toggles = [];
+let clippedMeshes = [];//Everything that is clipped locally needs to have the tranform matrixes updated in render
+let stencilRefs = [];//For assigning a unique stencil ref to each clipped material
+let portalMeshes = [];
 
-let renderer = undefined;
-let camera = undefined;
+//Need pools for scenes and cameras to manage portal content
+let scenePool = [];
+let camPool = [];
 
-export function setCameraAndRenderer(camera, renderer){
+function getMainCam(scene){
+  const cameras = scene.getObjectsByProperty( 'isCamera', true );
+  let result = undefined;
 
-  camera = camera;
-  renderer = renderer;
+  cameras.forEach((cam) => {
+    if(cam.name=='MAINCAM'){
+      result = cam;
+    }
+  });
+
+  return result
+}
+
+function addSceneToPool(){
+  const scene = new THREE.Scene();
+  scenePool.push(scene);
+
+  return scene
+}
+
+function removeSceneFromPool(scene){
+  index = scenePool.indexOf(scene);
+  scenePool.splice(index, 1);
+}
+
+function addCameraToPool(mainCam){
+  const camera = mainCam.clone();
+  camPool.push(camera);
+
+  return camera
+}
+
+function removeCameraFromPool(camera){
+  index = camPool.indexOf(camera);
+  camPool.splice(index, 1);
+}
+
+function toScreenPosition(obj, camera, renderer)
+{
+    var vector = new THREE.Vector3();
+
+    var widthHalf = 0.5*renderer.context.canvas.width;
+    var heightHalf = 0.5*renderer.context.canvas.height;
+
+    obj.updateMatrixWorld();
+    vector.setFromMatrixPosition(obj.matrixWorld);
+    vector.project(camera);
+
+    vector.x = ( vector.x * widthHalf ) + widthHalf;
+    vector.y = - ( vector.y * heightHalf ) + heightHalf;
+
+    return { 
+        x: vector.x,
+        y: vector.y
+    };
 
 };
+
+function computeScreenSpaceBoundingBox(boundingBox, portal, camera) {
+
+  const positionAttribute = portal.box.geometry.getAttribute( 'position' );
+  const vertex = new THREE.Vector3();
+  let min = new THREE.Vector3(1, 1, 1);
+  let max = new THREE.Vector3(-1, -1, -1);
+  
+  boundingBox.set(min, max);
+
+  for ( let vertexIndex = 0; vertexIndex < positionAttribute.count; vertexIndex ++ ) {
+
+    let vertexWorldCoord = vertex.copy(vertex.fromBufferAttribute( positionAttribute, vertexIndex )).applyMatrix4(portal.box.matrixWorld);
+    vertexWorldCoord.y -= portal.height;
+    let vertexScreenSpace = vertexWorldCoord.project(camera);
+
+    boundingBox.min.min(vertexScreenSpace);
+    boundingBox.max.max(vertexScreenSpace);
+  }
+
+  return boundingBox
+}
+
+function normalizedToPixels(boundingBox) {
+  const renderWidth = window.innerWidth;
+  const renderHeight = window.innerHeight;
+  const renderWidthHalf = renderWidth / 2;
+  const renderHeightHalf = renderHeight / 2;
+
+  const bboxHeight =  boundingBox.max.y - boundingBox.min.y;
+
+  //console.log(bboxHeight)
+
+  // Convert normalized screen coordinates [-1, 1] to pixel coordinates:
+  const x = (boundingBox.min.x + 1) * renderWidthHalf;
+  const y = (1 + boundingBox.max.y) * renderHeightHalf;
+  const w = (boundingBox.max.x - boundingBox.min.x) * renderWidthHalf;
+  const h = (boundingBox.max.y - boundingBox.min.y) * renderHeightHalf;
+
+  return {'x': x, 'y': y, 'w': w, 'h': h}
+}
+
 
 function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
@@ -372,13 +470,16 @@ function updateToggleState(elem){
 }
 
 function baseClipMaterial(){
+  let stencilRef = stencilRefs.length;
   const mat = new THREE.MeshBasicMaterial();
   mat.color.set(Math.random() * 0xff00000 - 0xff00000);
-  mat.stencilRef = 0;
+  mat.stencilRef = stencilRef;
   mat.stencilFunc = THREE.NotEqualStencilFunc;
   mat.stencilFail = THREE.ReplaceStencilOp;
   mat.stencilZFail = THREE.ReplaceStencilOp;
   mat.stencilZPass = THREE.ReplaceStencilOp;
+
+  stencilRefs.push(stencilRefs.length+1);
 
   return mat
 }
@@ -459,17 +560,63 @@ export function addToToggles(obj){
   toggles.push(obj);
 };
 
+export function getClippedMeshes(){
+  return clippedMeshes;
+};
+
+export function addToClippedMeshes(obj){
+  clippedMeshes.push(obj);
+};
+
+export function getPortalMeshes(){
+  return portalMeshes;
+};
+
+export function addToPortalMeshes(obj){
+  portalMeshes.push(obj);
+};
+
+export function getScenePool(){
+  return scenePool;
+};
+
+export function getCamPool(){
+  return camPool;
+};
+
+export function updateTextBoxClipping(textBox){
+  const boxSize = getGeometrySize(textBox.box.geometry);
+  // textBox.box.userData.topClipVector.constant = boxSize.height/2;
+  // textBox.box.userData.bottomClipVector.constant = boxSize.height/2;
+  // textBox.box.userData.rightClipVector.constant = boxSize.width/2;
+  // textBox.box.userData.leftClipVector.constant = boxSize.width/2;
+
+  textBox.clipTop.applyMatrix4(textBox.box.matrixWorld);
+  textBox.clipBottom.applyMatrix4(textBox.box.matrixWorld);
+  textBox.clipRight.applyMatrix4(textBox.box.matrixWorld);
+  textBox.clipLeft.applyMatrix4(textBox.box.matrixWorld);
+}
+
 export function textBox(width, height, padding, clipped=true){
 
   const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
+  box.userData.topClipVector = new THREE.Vector3( 0, -1, 0 );
+  box.userData.bottomClipVector = new THREE.Vector3( 0, 1, 0 );
+  box.userData.rightClipVector = new THREE.Vector3( -1, 0, 0 );
+  box.userData.leftClipVector = new THREE.Vector3( 1, 0, 0 );
 
   let result = { 'box': box };
 
   if(clipped){
-    const clipTop = new THREE.Plane( new THREE.Vector3( 0, -1, 0 ), height/2);
-    const clipBottom = new THREE.Plane( new THREE.Vector3( 0, 1, 0 ), height/2);
-    const clipRight = new THREE.Plane( new THREE.Vector3( -1, 0, 0 ), width/2 );
-    const clipLeft = new THREE.Plane( new THREE.Vector3( 1, 0, 0 ), width/2);
+    const clipTop = new THREE.Plane( box.userData.topClipVector, height/2);
+    const clipBottom = new THREE.Plane( box.userData.bottomClipVector, height/2);
+    const clipRight = new THREE.Plane( box.userData.rightClipVector, width/2 );
+    const clipLeft = new THREE.Plane( box.userData.leftClipVector, width/2);
+
+    clipTop.applyMatrix4(box.matrixWorld);
+    clipBottom.applyMatrix4(box.matrixWorld);
+    clipRight.applyMatrix4(box.matrixWorld);
+    clipLeft.applyMatrix4(box.matrixWorld);
 
     result = { 'box': box, 'clipTop': clipTop, 'clipBottom': clipBottom, 'clipLeft': clipLeft, 'clipRight': clipRight, 'padding': padding };
   }
@@ -477,6 +624,48 @@ export function textBox(width, height, padding, clipped=true){
   return result
 
 };
+
+export function portalBox(width, height, padding, scene, camera){
+  const box = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial() );
+  const boundingBox = new THREE.Box2();
+
+  let result = { 'box': box, 'width': width, 'height': height, 'boundingBox': boundingBox, 'scene': scene, 'camera': camera };
+
+  portalMeshes.push(result);
+
+
+  return result
+};
+
+export function renderPortal(portal, mainScene, mainCam, renderer){
+
+  computeScreenSpaceBoundingBox(portal.boundingBox, portal, portal.camera);
+
+  // Convert normalized screen coordinates [-1, 1] to pixel coordinates:
+  let n = normalizedToPixels(portal.boundingBox);
+  const bboxHeight =  portal.boundingBox.max.y - portal.boundingBox.min.y;
+  renderer.setViewport(0, 0, window.innerWidth, 
+  window.innerHeight);
+  renderer.render(mainScene, mainCam);
+  renderer.clearDepth();
+  renderer.setScissorTest(true);
+  renderer.setScissor(
+      n.x,
+      n.y,
+      n.w,
+      n.h
+  );
+  renderer.setViewport(
+      0,
+      0,
+      window.innerWidth,
+      window.innerHeight
+  );
+  renderer.render(portal.scene, portal.camera);
+  renderer.setScissorTest(false);
+
+}
+
 
 export function toggleBox(width, height, padding=0.1, horizontal=true){
 
@@ -685,7 +874,7 @@ export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, tex
 
     if(listConfig != undefined){
       txtBox.box.name = name;
-      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
+      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
     }else{
       parent.add(txtBox.box);
     }
@@ -733,7 +922,7 @@ export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name,
 
     if(listItemConfig != undefined){
       txtBox.box.name = name;
-      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
+      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
     }else{
       parent.add(txtBox.box);
     }
@@ -764,7 +953,7 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, text
   loader.load(textProps.font, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
     let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - textProps.padding);
-    let yPosition = txtBox.box.geometry.parameters.height / 2 - textProps.padding*2;
+    let yPosition = txtBox.box.position.y+txtBox.box.geometry.parameters.height / 2 - textProps.padding*2;
     const boxSize = getGeometrySize(txtBox.box.geometry);
     const letterGeometries = [];
     const letterMeshes = [];
@@ -772,6 +961,7 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, text
     let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
     if(textProps.clipped){
       mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
+      clippedMeshes.push(txtBox);
     }
 
     for (let i = 0; i < text.length; i++) {
@@ -818,7 +1008,7 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, text
 
     if(listConfig != undefined){
       txtBox.box.name = name;
-      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
+      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
     }else{
       parent.add(txtBox.box);
     }
@@ -917,7 +1107,7 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
 
     if(listConfig != undefined){
       txtBox.box.name = name;
-      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
+      createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
     }else{
       parent.add(txtBox.box);
     }
@@ -1102,7 +1292,7 @@ export function createImageBox(parent, boxWidth, boxHeight, name, imgUrl, textPr
 
   if(listConfig != undefined){
     txtBox.box.name = name;
-    createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps);
+    createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
   }else{
     parent.add(txtBox.box);
   }
@@ -1110,10 +1300,10 @@ export function createImageBox(parent, boxWidth, boxHeight, name, imgUrl, textPr
 };
 
 export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
-  // Instantiate a loader
+  
   const txtBox = textBox(boxWidth, boxHeight, 0, false);
   const boxSize = getGeometrySize(txtBox.box.geometry);
-
+  // Instantiate a loader
   gltfLoader.load(
     // resource URL
     gltfUrl,
@@ -1165,6 +1355,65 @@ export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, text
     }
   );
 };
+
+export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
+  const mainCam = getMainCam(parent.parent);
+  const scene = addSceneToPool();
+  scene.background = new THREE.Color('red');
+  const portalCam = addCameraToPool(mainCam);
+
+  const portal = portalBox(boxWidth, boxHeight, 0, scene, portalCam);
+  const boxSize = getGeometrySize(portal.box.geometry);
+  mainCam.add(portalCam);
+  
+  // Instantiate a loader
+  gltfLoader.load(
+    // resource URL
+    gltfUrl,
+    // called when the resource is loaded
+    function ( gltf ) {
+      const test = new THREE.Mesh(new THREE.BoxGeometry(boxWidth/2, boxHeight/2, boxHeight/2), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
+      const box = new THREE.Box3().setFromObject( gltf.scene ); 
+      //portal.box.position.set(portal.box.position.x, portal.box.position.y, portal.box.position.z+0.1)
+      const sceneSize = box.getSize(new THREE.Vector3());
+
+      let axis = 'y';
+      let prop = 'height';
+      if(sceneSize.x > sceneSize.y){
+        axis = 'x';
+        prop = 'width';
+      }
+
+      let ratio = boxSize[prop]/sceneSize[axis];
+
+      if(boxSize[prop]>sceneSize[axis]){
+        ratio = sceneSize[axis]/boxSize[prop];
+      }
+
+      gltf.scene.scale.set(gltf.scene.scale.x*ratio, gltf.scene.scale.y*ratio, gltf.scene.scale.z*ratio);
+      gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z+boxSize.depth+(sceneSize.z/2*ratio))
+
+      //portal.box.add( gltf.scene );
+      scene.add( gltf.scene );
+      //portal.box.add(scene);
+
+      parent.add(portal.box);
+
+    },
+    // called while loading is progressing
+    function ( xhr ) {
+
+      console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+
+    },
+    // called when loading has errors
+    function ( error ) {
+
+      console.log( 'An error happened' );
+
+    }
+  );
+}
 
 export function createListItem( parent, boxWidth, boxHeight, content, textProps=undefined, meshProps=undefined, animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, index=0) {
   const parentSize = getGeometrySize(parent.geometry);
@@ -1222,11 +1471,70 @@ export function createListItem( parent, boxWidth, boxHeight, content, textProps=
       if( 'author' in elemBox.box.userData && elemBox.box.userData.author != undefined){
         elemBox.box.userData.author.position.set(elemBox.box.userData.author.position.x, elemBox.box.userData.author.position.y+textMeshSize.height+textProps.padding, elemBox.box.userData.author.position.z)
       }
-      console.log(parent.geometry)
-      elemBox.box.position.set(elemBox.box.position.x, parent.geometry.parameters.height/2-elemBoxSize.height/2-((elemBoxSize.height+spacing)*index), elemBox.box.position.z+parentSize.depth)
+
+      elemBox.box.position.set(elemBox.box.position.x, (parent.geometry.parameters.height-spacing)/2-elemBoxSize.height/2-((elemBoxSize.height+spacing)*index), elemBox.box.position.z+parentSize.depth)
 
     });
   }
+
+};
+
+export function createStaticTextList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+  const listBoxSize = getGeometrySize(parent.geometry);
+  parent.userData.listElements = [];
+
+  contentArr.forEach((text, index) =>{
+    console.log(text+ " "+index)
+    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createStaticTextBox(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+  });
+
+};
+
+export function createStaticScrollableTextList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+  const listBoxSize = getGeometrySize(parent.geometry);
+  parent.userData.listElements = [];
+
+  contentArr.forEach((text, index) =>{
+    console.log(text+ " "+index)
+    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createStaticScrollableTextBox(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+  });
+
+};
+
+export function createMultiTextList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+  const listBoxSize = getGeometrySize(parent.geometry);
+  parent.userData.listElements = [];
+
+  contentArr.forEach((text, index) =>{
+    console.log(text+ " "+index)
+    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createMultiTextBox(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+  });
+
+};
+
+export function createMultiScrollableTextList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+  const listBoxSize = getGeometrySize(parent.geometry);
+  parent.userData.listElements = [];
+
+  contentArr.forEach((text, index) =>{
+    console.log(text+ " "+index)
+    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createMultiScrollableTextBox(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+  });
+
+};
+
+export function createImageContentList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+  const listBoxSize = getGeometrySize(parent.geometry);
+  parent.userData.listElements = [];
+
+  contentArr.forEach((imgUrl, index) =>{
+    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
+    createImageBox(parent, boxWidth, boxHeight, author, imgUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+  });
 
 };
 
@@ -1234,20 +1542,14 @@ export function createGLTFContentList( parent, boxWidth, boxHeight, author, cont
   const listBoxSize = getGeometrySize(parent.geometry);
   parent.userData.listElements = [];
 
-  console.log(contentArr)
-
   contentArr.forEach((gltfUrl, index) =>{
-    console.log(gltfUrl)
     let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
-    createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    createGLTFModel(parent, boxWidth, boxHeight, author, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function addTranslationControl(elem){
-
-  if(camera == undefined || renderer == undefined)
-    return;
+export function addTranslationControl(elem, camera, renderer){
 
   control = new TransformControls( camera, renderer.domElement );
   control.addEventListener( 'change', render );
