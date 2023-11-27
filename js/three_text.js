@@ -27,13 +27,51 @@ let portalMeshes = [];
 let scenePool = [];
 let camPool = [];
 
+export function createMainSceneLighting(scene){
+  const ambientLight = new THREE.AmbientLight(0x404040);
+  ambientLight.name = 'MAIN_AMBIENT_LIGHT'
+  scene.add(ambientLight);
+  ambientLight.layers.set
+
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  directionalLight.name = 'MAIN_DIRECTIONAL_LIGHT'
+  directionalLight.position.set(1, 1, 1);
+  scene.add(directionalLight);
+};
+
 function getMainCam(scene){
   const cameras = scene.getObjectsByProperty( 'isCamera', true );
   let result = undefined;
 
   cameras.forEach((cam) => {
-    if(cam.name=='MAINCAM'){
+    if(cam.name=='MAIN_CAM'){
       result = cam;
+    }
+  });
+
+  return result
+}
+
+function getMainAmbientLight(scene){
+  const lights = scene.getObjectsByProperty( 'isLight', true );
+  let result = undefined;
+
+  lights.forEach((light) => {
+    if(light.name == 'MAIN_AMBIENT_LIGHT'){
+      result = light;
+    }
+  });
+
+  return result
+}
+
+function getMainDirectionalLight(scene){
+  const lights = scene.getObjectsByProperty( 'isLight', true );
+  let result = undefined;
+
+  lights.forEach((light) => {
+    if(light.name == 'MAIN_DIRECTIONAL_LIGHT'){
+      result = light;
     }
   });
 
@@ -50,13 +88,6 @@ function addSceneToPool(){
 function removeSceneFromPool(scene){
   index = scenePool.indexOf(scene);
   scenePool.splice(index, 1);
-}
-
-function addCameraToPool(mainCam){
-  const camera = mainCam.clone();
-  camPool.push(camera);
-
-  return camera
 }
 
 function removeCameraFromPool(camera){
@@ -118,7 +149,7 @@ function normalizedToPixels(boundingBox) {
   //console.log(bboxHeight)
 
   // Convert normalized screen coordinates [-1, 1] to pixel coordinates:
-  const x = (boundingBox.min.x + 1) * renderWidthHalf;
+  const x = (1 + boundingBox.min.x) * renderWidthHalf;
   const y = (1 + boundingBox.max.y) * renderHeightHalf;
   const w = (boundingBox.max.x - boundingBox.min.x) * renderWidthHalf;
   const h = (boundingBox.max.y - boundingBox.min.y) * renderHeightHalf;
@@ -625,11 +656,11 @@ export function textBox(width, height, padding, clipped=true){
 
 };
 
-export function portalBox(width, height, padding, scene, camera){
+export function portalBox(width, height, padding, scene){
   const box = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial() );
   const boundingBox = new THREE.Box2();
 
-  let result = { 'box': box, 'width': width, 'height': height, 'boundingBox': boundingBox, 'scene': scene, 'camera': camera };
+  let result = { 'box': box, 'width': width, 'height': height, 'boundingBox': boundingBox, 'scene': scene };
 
   portalMeshes.push(result);
 
@@ -637,13 +668,37 @@ export function portalBox(width, height, padding, scene, camera){
   return result
 };
 
+function updatePortalLighting(portal, mainScene){
+  const ambientLight = getMainAmbientLight(mainScene);
+  const directionalLight = getMainDirectionalLight(mainScene);
+
+  if(ambientLight == undefined || directionalLight == undefined)
+    return;
+
+  portal.scene.add(ambientLight);
+  ambientLight.layers.set(portal.box.layers.mask);
+  portal.scene.add(directionalLight);
+  directionalLight.layers.set(portal.box.layers.mask);
+}
+
+function resetMainSceneLighting(portal, mainScene){
+  const ambientLight = getMainAmbientLight(mainScene);
+  const directionalLight = getMainDirectionalLight(mainScene);
+
+  if(ambientLight == undefined || directionalLight == undefined)
+    return;
+
+  mainScene.add(ambientLight);
+  ambientLight.layers.set(0);
+  mainScene.add(directionalLight);
+  directionalLight.layers.set(0);
+}
+
 export function renderPortal(portal, mainScene, mainCam, renderer){
+  computeScreenSpaceBoundingBox(portal.boundingBox, portal, mainCam);
 
-  computeScreenSpaceBoundingBox(portal.boundingBox, portal, portal.camera);
-
-  // Convert normalized screen coordinates [-1, 1] to pixel coordinates:
   let n = normalizedToPixels(portal.boundingBox);
-  const bboxHeight =  portal.boundingBox.max.y - portal.boundingBox.min.y;
+
   renderer.setViewport(0, 0, window.innerWidth, 
   window.innerHeight);
   renderer.render(mainScene, mainCam);
@@ -661,8 +716,14 @@ export function renderPortal(portal, mainScene, mainCam, renderer){
       window.innerWidth,
       window.innerHeight
   );
-  renderer.render(portal.scene, portal.camera);
+  updatePortalLighting(portal, mainScene);
+  portal.scene.add(mainCam);
+  mainCam.layers.set(portal.box.layers.mask);
+  renderer.render(portal.scene, mainCam);
+  mainCam.layers.set(0);
+  mainScene.add(mainCam)
   renderer.setScissorTest(false);
+  resetMainSceneLighting(portal, mainScene);
 
 }
 
@@ -1358,14 +1419,13 @@ export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, text
 
 export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
   const mainCam = getMainCam(parent.parent);
+  const mainLight = getMainAmbientLight(parent.parent)
   const scene = addSceneToPool();
-  scene.background = new THREE.Color('red');
-  const portalCam = addCameraToPool(mainCam);
+  //scene.background = new THREE.Color('red');
 
-  const portal = portalBox(boxWidth, boxHeight, 0, scene, portalCam);
+  const portal = portalBox(boxWidth, boxHeight, 0, scene);
   const boxSize = getGeometrySize(portal.box.geometry);
-  mainCam.add(portalCam);
-  
+
   // Instantiate a loader
   gltfLoader.load(
     // resource URL
@@ -1374,8 +1434,13 @@ export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl
     function ( gltf ) {
       const test = new THREE.Mesh(new THREE.BoxGeometry(boxWidth/2, boxHeight/2, boxHeight/2), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
       const box = new THREE.Box3().setFromObject( gltf.scene ); 
-      //portal.box.position.set(portal.box.position.x, portal.box.position.y, portal.box.position.z+0.1)
       const sceneSize = box.getSize(new THREE.Vector3());
+
+      gltf.scene.traverse( function( object ) {
+
+          object.layers.set( 1 );
+
+      } );
 
       let axis = 'y';
       let prop = 'height';
@@ -1391,11 +1456,11 @@ export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl
       }
 
       gltf.scene.scale.set(gltf.scene.scale.x*ratio, gltf.scene.scale.y*ratio, gltf.scene.scale.z*ratio);
-      gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z+boxSize.depth+(sceneSize.z/2*ratio))
+      gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z-boxSize.depth-(sceneSize.z*ratio))
 
       //portal.box.add( gltf.scene );
       scene.add( gltf.scene );
-      //portal.box.add(scene);
+      portal.box.add(scene);
 
       parent.add(portal.box);
 
