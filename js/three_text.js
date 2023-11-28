@@ -7,7 +7,6 @@ import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUti
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import * as CameraUtils from 'three/addons/utils/CameraUtils.js';
 
-
 const loader = new FontLoader();
 const gltfLoader = new GLTFLoader();
 let posVar = new THREE.Vector3();
@@ -23,9 +22,9 @@ let clippedMeshes = [];//Everything that is clipped locally needs to have the tr
 let stencilRefs = [];//For assigning a unique stencil ref to each clipped material
 let portalMeshes = [];
 
-//Need pools for scenes and cameras to manage portal content
+//Need pools for scenes to manage portal content
+const SCENE_MAX = 32;
 let scenePool = [];
-let camPool = [];
 
 export function createMainSceneLighting(scene){
   const ambientLight = new THREE.AmbientLight(0x404040);
@@ -79,8 +78,14 @@ function getMainDirectionalLight(scene){
 }
 
 function addSceneToPool(){
+  
+  if (scenePool.length >= SCENE_MAX)
+    return;
+
   const scene = new THREE.Scene();
   scenePool.push(scene);
+  const layer_index = scenePool.indexOf(scene)+1;
+  scene.userData.layer_index = layer_index;
 
   return scene
 }
@@ -89,32 +94,6 @@ function removeSceneFromPool(scene){
   index = scenePool.indexOf(scene);
   scenePool.splice(index, 1);
 }
-
-function removeCameraFromPool(camera){
-  index = camPool.indexOf(camera);
-  camPool.splice(index, 1);
-}
-
-function toScreenPosition(obj, camera, renderer)
-{
-    var vector = new THREE.Vector3();
-
-    var widthHalf = 0.5*renderer.context.canvas.width;
-    var heightHalf = 0.5*renderer.context.canvas.height;
-
-    obj.updateMatrixWorld();
-    vector.setFromMatrixPosition(obj.matrixWorld);
-    vector.project(camera);
-
-    vector.x = ( vector.x * widthHalf ) + widthHalf;
-    vector.y = - ( vector.y * heightHalf ) + heightHalf;
-
-    return { 
-        x: vector.x,
-        y: vector.y
-    };
-
-};
 
 function computeScreenSpaceBoundingBox(boundingBox, portal, camera) {
 
@@ -528,7 +507,6 @@ export function clipMaterial(clippingPlanes){
 
 export function transparentMaterial(){
   const mat = new THREE.MeshBasicMaterial();
-  mat.color = 'red';
   mat.transparent = true;
   mat.opacity = 0;
 
@@ -611,10 +589,6 @@ export function getScenePool(){
   return scenePool;
 };
 
-export function getCamPool(){
-  return camPool;
-};
-
 export function updateTextBoxClipping(textBox){
   const boxSize = getGeometrySize(textBox.box.geometry);
   // textBox.box.userData.topClipVector.constant = boxSize.height/2;
@@ -668,30 +642,43 @@ export function portalBox(width, height, padding, scene){
   return result
 };
 
-function updatePortalLighting(portal, mainScene){
+
+//Manage lighting, to be put into portal scene, or to be put back for the main scene
+function handlePortalLighting(portal, mainScene, activate){
   const ambientLight = getMainAmbientLight(mainScene);
   const directionalLight = getMainDirectionalLight(mainScene);
 
   if(ambientLight == undefined || directionalLight == undefined)
     return;
 
-  portal.scene.add(ambientLight);
-  ambientLight.layers.set(portal.box.layers.mask);
-  portal.scene.add(directionalLight);
-  directionalLight.layers.set(portal.box.layers.mask);
+  if(activate){
+    portal.scene.add(ambientLight);
+    ambientLight.layers.set(portal.box.layers.mask);
+    portal.scene.add(directionalLight);
+    directionalLight.layers.set(portal.box.layers.mask);
+
+  }else{
+    mainScene.add(ambientLight);
+    ambientLight.layers.set(0);
+    mainScene.add(directionalLight);
+    directionalLight.layers.set(0);
+  }
 }
 
-function resetMainSceneLighting(portal, mainScene){
-  const ambientLight = getMainAmbientLight(mainScene);
-  const directionalLight = getMainDirectionalLight(mainScene);
-
-  if(ambientLight == undefined || directionalLight == undefined)
+//Manage putting portal and main camera on appropriate layers and scenes
+function handlePortalScene(portal, mainScene, mainCam, activate){
+  if(portal.box.parent == undefined || portal.scene == undefined)
     return;
 
-  mainScene.add(ambientLight);
-  ambientLight.layers.set(0);
-  mainScene.add(directionalLight);
-  directionalLight.layers.set(0);
+  if(activate){
+    portal.scene.add(mainCam);
+    portal.scene.add(portal.box.parent);
+    mainCam.layers.set(portal.box.layers.mask);
+  }else{
+    mainCam.layers.set(0);
+    mainScene.add(mainCam);
+    mainScene.add(portal.box.parent);
+  }
 }
 
 export function renderPortal(portal, mainScene, mainCam, renderer){
@@ -716,17 +703,13 @@ export function renderPortal(portal, mainScene, mainCam, renderer){
       window.innerWidth,
       window.innerHeight
   );
-  updatePortalLighting(portal, mainScene);
-  portal.scene.add(mainCam);
-  mainCam.layers.set(portal.box.layers.mask);
+  handlePortalLighting(portal, mainScene, true);
+  handlePortalScene(portal, mainScene, mainCam, true);
   renderer.render(portal.scene, mainCam);
-  mainCam.layers.set(0);
-  mainScene.add(mainCam)
+  handlePortalScene(portal, mainScene, mainCam, false);
+  handlePortalLighting(portal, mainScene, false);
   renderer.setScissorTest(false);
-  resetMainSceneLighting(portal, mainScene);
-
 }
-
 
 export function toggleBox(width, height, padding=0.1, horizontal=true){
 
@@ -959,6 +942,62 @@ export function createStaticTextBox(parent, boxWidth, boxHeight, name, text, tex
   });
 }
 
+export function createStaticTextPortal(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
+  // Load the font
+  loader.load(textProps.font, (font) => {
+    const scene = addSceneToPool();
+    const portal = portalBox(boxWidth, boxHeight, 0, scene);
+    //const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
+
+    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+
+    // Merge the individual letter geometries into a single buffer geometry
+    let mergedGeometry = createMergedTextBoxGeometry(portal, font, boxWidth, boxHeight, text, textProps, meshProps, animProps);
+    // Create a mesh from the merged geometry
+    const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
+    if(animProps!=undefined){
+      mergedMesh.material.transparent=true;
+      mergedMesh.material.opacity=0;
+    }
+    const boxSize = getGeometrySize(portal.box.geometry);
+    const geomSize = getGeometrySize(mergedGeometry);
+    setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
+
+    if(listConfig != undefined){
+      portal.box.name = name;
+      createListItem(parent, listConfig.width, listConfig.height, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+    }else{
+      parent.add(portal.box);
+    }
+
+    portal.box.add(mergedMesh);
+    if(name==''){
+      name='text-'+portal.box.id;
+    }
+    portal.box.name = name;
+    adjustBoxScaleRatio(portal.box, parent);
+
+    scene.add( mergedMesh );
+
+    if(listConfig != undefined){
+      portal.box.name = name;
+      createListItem(parent, listConfig.width, listConfig.height, scene, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+    }else{
+      portal.box.add(scene);
+    }
+
+    if(animProps!=undefined){
+      //anim, action, duration, ease, delay, onComplete
+      txtAnimation(portal.box, mergedMesh, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, 0, animProps.callback);
+    }
+
+    if(onCreated!=undefined){
+      onCreated(portal.box);
+    }
+
+  });
+}
+
 export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
@@ -981,7 +1020,7 @@ export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name,
     const geomSize = getGeometrySize(mergedGeometry);
     mergedMesh.position.set(0, -textProps.padding, 0);
 
-    if(listItemConfig != undefined){
+    if(listConfig != undefined){
       txtBox.box.name = name;
       createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
     }else{
@@ -1009,6 +1048,58 @@ export function createStaticScrollableTextBox(parent, boxWidth, boxHeight, name,
   });
 }
 
+export function createStaticScrollableTextPortal(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
+  // Load the font
+  loader.load(textProps.font, (font) => {
+    const scene = addSceneToPool();
+    const portal = portalBox(boxWidth, boxHeight, 0, scene);
+
+    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+
+    // Merge the individual letter geometries into a single buffer geometry
+    let mergedGeometry = createMergedTextBoxGeometry(portal, font, boxWidth, boxHeight, text, textProps, meshProps, animProps);
+
+    // Create a mesh from the merged geometry
+    const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
+    if(animProps!=undefined){
+      mergedMesh.material.transparent=true;
+      mergedMesh.material.opacity=0;
+    }
+    const boxSize = getGeometrySize(portal.box.geometry);
+    const geomSize = getGeometrySize(mergedGeometry);
+    mergedMesh.position.set(0, -textProps.padding, 0);
+    mergedMesh.layers.set( scene.userData.layer_index );
+    
+
+    if(listConfig != undefined){
+      portal.box.name = name;
+      createListItem(parent, listConfig.width, listConfig.height, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+    }else{
+      portal.box.add(mergedMesh);
+      parent.add( portal.box );
+    }
+
+    if(name==''){
+      name='text-'+portal.box.id;
+    }
+
+    portal.box.name = name;
+    adjustBoxScaleRatio(portal.box, parent);
+    setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
+    mergedMesh.userData.draggable=true;
+
+    draggable.push(mergedMesh);
+    if(animProps!=undefined){
+      //anim, action, duration, ease, delay, onComplete
+      txtAnimation(portal.box, mergedMesh, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, 0, animProps.callback);
+    }
+    if(onCreated!=undefined){
+      onCreated(portal.box);
+    }
+
+  });
+}
+
 export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
@@ -1025,47 +1116,7 @@ export function createMultiTextBox(parent, boxWidth, boxHeight, name, text, text
       clippedMeshes.push(txtBox);
     }
 
-    for (let i = 0; i < text.length; i++) {
-      const character = text[i];
-
-      if (character === ' ') {
-        // Handle spaces by adjusting the x position
-        lineWidth += textProps.wordSpacing;
-      } else {
-
-         if(meshProps == undefined){
-          meshProps = meshProperties()
-        }
-        const geometry = createTextGeometry(character, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
-
-        const letterMesh = new THREE.Mesh(geometry, mat);
-        letterMesh.position.set(lineWidth, yPosition, boxSize.depth/2-textProps.height/2);
-        if(animProps!=undefined){
-          letterMesh.material.transparent=true;
-          letterMesh.material.opacity=0;
-        }
-
-        // Calculate the width of the letter geometry
-        let { width } = getGeometrySize(geometry);
-        width+=textProps.letterSpacing;
-
-        // Check if the letter is within the bounds of the txtBox mesh
-        if (width <= txtBox.box.geometry.parameters.width / 2 - textProps.padding) {
-          txtBox.box.add(letterMesh);
-          letterMeshes.push(letterMesh);
-          letterGeometries.push(geometry);
-        }
-
-        // Update lineWidth
-        lineWidth += width;
-      }
-
-      // Check if lineWidth exceeds txtBox width - padding
-      if (lineWidth > txtBox.box.geometry.parameters.width / 2 - textProps.padding) {
-        lineWidth = -(txtBox.box.geometry.parameters.width / 2) + textProps.padding; // Reset x position to the upper-left corner
-        yPosition -= textProps.lineSpacing; // Move to the next line
-      }
-    }
+    constructMultiMergedGeometry(txtBox, text, font, mat, textProps, meshProps, animProps);
 
     if(listConfig != undefined){
       txtBox.box.name = name;
@@ -1095,76 +1146,14 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
   // Load the font
   loader.load(textProps.font, (font) => {
     const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
-    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - textProps.padding);
-    let yPosition = txtBox.box.geometry.parameters.height / 2 - textProps.padding;
-    const letterGeometries = [];
-    const letterMeshes = [];
-    const cubes = [];
 
     let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
     if(textProps.clipped){
       mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
     }
 
-    for (let i = 0; i < text.length; i++) {
-      const character = text[i];
-
-      if (character === ' ') {
-        // Handle spaces by adjusting the x position
-        lineWidth += textProps.wordSpacing;
-      } else {
-
-         if(meshProps == undefined){
-          meshProps = meshProperties()
-        }
-        const geometry = createTextGeometry(character, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
-        const cube = new THREE.BoxGeometry(textProps.size*2, textProps.size*2, textProps.height);
-
-        cube.translate((textProps.size/2)+lineWidth, (textProps.size/2)+yPosition, 0);
-
-        const letterMesh = new THREE.Mesh(geometry, mat);
-        letterMesh.position.set(lineWidth, yPosition, 0);
-
-        if(animProps!=undefined){
-          letterMesh.material.transparent=true;
-          letterMesh.material.opacity=0;
-        }
-
-        // Calculate the width of the letter geometry
-        let { width } = getGeometrySize(geometry);
-        width+=textProps.letterSpacing;
-
-        // Check if the letter is within the bounds of the txtBox mesh
-        if (width <= txtBox.box.geometry.parameters.width / 2 - textProps.padding) {
-          letterMeshes.push(letterMesh);
-          letterGeometries.push(geometry);
-          cubes.push(cube);
-        }
-        // Update lineWidth
-        lineWidth += width;
-      }
-
-      // Check if lineWidth exceeds txtBox width - padding
-      if (lineWidth > txtBox.box.geometry.parameters.width / 2 - textProps.padding) {
-        lineWidth = -(txtBox.box.geometry.parameters.width / 2) + textProps.padding; // Reset x position to the upper-left corner
-        yPosition -= textProps.lineSpacing; // Move to the next line
-      }
-    }
-    const mergedGeometry = BufferGeometryUtils.mergeGeometries(cubes);
-    const mergedMesh = new THREE.Mesh(mergedGeometry, transparentMaterial());
+    const mergedMesh = constructMultiTextMerged(txtBox, text, font, mat, textProps, meshProps, animProps);
     txtBox.box.add(mergedMesh);
-    const boxSize = getGeometrySize(txtBox.box.geometry);
-    const geomSize = getGeometrySize(mergedGeometry);
-    mergedMesh.position.set(0, -textProps.padding, 0);
-    setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
-    mergedMesh.userData.draggable=true;
-    if(name==''){
-      name='text-'+txtBox.box.id;
-    }
-    txtBox.box.name = name;
-    letterMeshes.forEach((m, i) => {
-      mergedMesh.add(m);
-    })
 
     if(listConfig != undefined){
       txtBox.box.name = name;
@@ -1190,6 +1179,188 @@ export function createMultiScrollableTextBox(parent, boxWidth, boxHeight, name, 
     // }, "4000");
   });
 
+}
+
+export function createMultiScrollableTextPortal(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
+  // Load the font
+  loader.load(textProps.font, (font) => {
+    const scene = addSceneToPool();
+    const portal = portalBox(boxWidth, boxHeight, 0, scene);
+
+    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+
+    const mergedMesh = constructMultiTextMerged(portal, text, font, mat, textProps, meshProps, animProps, scene);
+    portal.box.add(mergedMesh);
+
+    if(listConfig != undefined){
+      portal.box.name = name;
+      createListItem(parent, listConfig.width, listConfig.height, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+    }else{
+      parent.add(portal.box);
+    }
+
+    adjustBoxScaleRatio(portal.box, parent);
+    draggable.push(mergedMesh);
+
+    if(animProps!=undefined){
+      //anim, action, duration, ease, delay, onComplete
+      multiAnimation(portal.box, mergedMesh.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
+    }
+    if(onCreated!=undefined){
+      onCreated(portal.box);
+    }
+    //TEST
+    // let aConfig = animationConfig('SLIDE_RIGHT', 'OUT', 2, 'back.inOut', 0)
+    // setTimeout(() => {
+    //   multiAnimation(txtBox.box, mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
+    // }, "4000");
+  });
+
+}
+
+function constructMultiMergedGeometry(obj, text, font, material, textProps, meshProps, animProps, scene = undefined){
+  let lineWidth = -(obj.box.geometry.parameters.width / 2 - textProps.padding);
+  let yPosition = obj.box.geometry.parameters.height / 2 - textProps.padding;
+  const boxSize = getGeometrySize(obj.box.geometry);
+  const letterGeometries = [];
+  const letterMeshes = [];
+  const cubes = [];
+
+  for (let i = 0; i < text.length; i++) {
+      const character = text[i];
+
+      if (character === ' ') {
+        // Handle spaces by adjusting the x position
+        lineWidth += textProps.wordSpacing;
+      } else {
+
+         if(meshProps == undefined){
+          meshProps = meshProperties()
+        }
+        const geometry = createTextGeometry(character, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+
+        const letterMesh = new THREE.Mesh(geometry, material);
+        if(scene != undefined){
+          letterMesh.layers.set(scene.userData.layer_index);
+        }
+        letterMesh.position.set(lineWidth, yPosition, boxSize.depth/2-textProps.height/2);
+        if(animProps!=undefined){
+          letterMesh.material.transparent=true;
+          letterMesh.material.opacity=0;
+        }
+
+        // Calculate the width of the letter geometry
+        let { width } = getGeometrySize(geometry);
+        width+=textProps.letterSpacing;
+
+        // Check if the letter is within the bounds of the txtBox mesh
+        if (width <= obj.box.geometry.parameters.width / 2 - textProps.padding) {
+          obj.box.add(letterMesh);
+          letterMeshes.push(letterMesh);
+          letterGeometries.push(geometry);
+        }
+
+        // Update lineWidth
+        lineWidth += width;
+      }
+
+      // Check if lineWidth exceeds txtBox width - padding
+      if (lineWidth > obj.box.geometry.parameters.width / 2 - textProps.padding) {
+        lineWidth = -(obj.box.geometry.parameters.width / 2) + textProps.padding; // Reset x position to the upper-left corner
+        yPosition -= textProps.lineSpacing; // Move to the next line
+      }
+  }
+
+}
+
+function constructMultiMergedScrollableGeometry(obj, text, font, material, textProps, meshProps, animProps, scene = undefined){
+  let lineWidth = -(obj.box.geometry.parameters.width / 2 - textProps.padding);
+  let yPosition = obj.box.geometry.parameters.height / 2 - textProps.padding;
+  const letterGeometries = [];
+  const letterMeshes = [];
+  const cubes = [];
+
+  for (let i = 0; i < text.length; i++) {
+      const character = text[i];
+
+      if (character === ' ') {
+        // Handle spaces by adjusting the x position
+        lineWidth += textProps.wordSpacing;
+      } else {
+
+         if(meshProps == undefined){
+          meshProps = meshProperties()
+        }
+        const geometry = createTextGeometry(character, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+        const cube = new THREE.BoxGeometry(textProps.size*2, textProps.size*2, textProps.height);
+
+        cube.translate((textProps.size/2)+lineWidth, (textProps.size/2)+yPosition, 0);
+
+        const letterMesh = new THREE.Mesh(geometry, material);
+        letterMesh.position.set(lineWidth, yPosition, 0);
+
+        if(scene != undefined){
+          //console.log(cube)
+          letterMesh.layers.set(scene.userData.layer_index);
+        }
+
+        if(animProps!=undefined){
+          letterMesh.material.transparent=true;
+          letterMesh.material.opacity=0;
+        }
+
+        // Calculate the width of the letter geometry
+        let { width } = getGeometrySize(geometry);
+        width+=textProps.letterSpacing;
+
+        // Check if the letter is within the bounds of the txtBox mesh
+        if (width <= obj.box.geometry.parameters.width / 2 - textProps.padding) {
+          letterMeshes.push(letterMesh);
+          letterGeometries.push(geometry);
+          cubes.push(cube);
+        }
+        // Update lineWidth
+        lineWidth += width;
+      }
+
+      // Check if lineWidth exceeds txtBox width - padding
+      if (lineWidth > obj.box.geometry.parameters.width / 2 - textProps.padding) {
+        lineWidth = -(obj.box.geometry.parameters.width / 2) + textProps.padding; // Reset x position to the upper-left corner
+        yPosition -= textProps.lineSpacing; // Move to the next line
+      }
+    }
+
+    const mergedGeometry = BufferGeometryUtils.mergeGeometries(cubes);
+
+    return { 'geometry': mergedGeometry, 'letterMeshes': letterMeshes }
+
+}
+
+function constructMultiTextMerged(obj, text, font, material, textProps, meshProps, animProps, scene = undefined){
+    const merged = constructMultiMergedScrollableGeometry(obj, text, font, material, textProps, meshProps, animProps, scene);
+
+    const mergedMesh = new THREE.Mesh(merged.geometry, transparentMaterial());
+    if(scene != undefined){
+      mergedMesh.layers.set(scene.userData.layer_index);
+    }
+
+    const boxSize = getGeometrySize(obj.box.geometry);
+    const geomSize = getGeometrySize(merged.geometry);
+    mergedMesh.position.set(0, -textProps.padding, 0);
+    setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
+    mergedMesh.userData.draggable=true;
+    if(name==''){
+      name='text-'+obj.box.id;
+    }
+    obj.box.name = name;
+    merged.letterMeshes.forEach((m, i) => {
+      if(scene != undefined){
+        m.layers.set(scene.userData.layer_index);
+      }
+      mergedMesh.add(m);
+    });
+
+    return mergedMesh
 }
 
 function selectionTextBox(parent, boxWidth, boxHeight, name, text, font, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
@@ -1390,11 +1561,11 @@ export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, text
       }
 
       gltf.scene.scale.set(gltf.scene.scale.x*ratio, gltf.scene.scale.y*ratio, gltf.scene.scale.z*ratio);
-      gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z+boxSize.depth+(sceneSize.z/2*ratio))
+      gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z+boxSize.depth+(sceneSize.z/2*ratio));
 
       txtBox.box.add( gltf.scene );
 
-      if(listItemConfig != undefined){
+      if(listConfig != undefined){
         txtBox.box.name = name;
         createListItem(parent, listConfig.width, listConfig.height, txtBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
       }else{
@@ -1418,11 +1589,7 @@ export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, text
 };
 
 export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
-  const mainCam = getMainCam(parent.parent);
-  const mainLight = getMainAmbientLight(parent.parent)
   const scene = addSceneToPool();
-  //scene.background = new THREE.Color('red');
-
   const portal = portalBox(boxWidth, boxHeight, 0, scene);
   const boxSize = getGeometrySize(portal.box.geometry);
 
@@ -1437,9 +1604,7 @@ export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl
       const sceneSize = box.getSize(new THREE.Vector3());
 
       gltf.scene.traverse( function( object ) {
-
-          object.layers.set( 1 );
-
+          object.layers.set( scene.userData.layer_index );
       } );
 
       let axis = 'y';
@@ -1458,11 +1623,14 @@ export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl
       gltf.scene.scale.set(gltf.scene.scale.x*ratio, gltf.scene.scale.y*ratio, gltf.scene.scale.z*ratio);
       gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z-boxSize.depth-(sceneSize.z*ratio))
 
-      //portal.box.add( gltf.scene );
-      scene.add( gltf.scene );
-      portal.box.add(scene);
+      portal.box.add(gltf.scene);
 
-      parent.add(portal.box);
+      if(listConfig != undefined){
+        portal.box.name = name;
+        createListItem(parent, listConfig.width, listConfig.height, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+      }else{
+        parent.add(portal.box);
+      }
 
     },
     // called while loading is progressing
@@ -1475,6 +1643,7 @@ export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl
     function ( error ) {
 
       console.log( 'An error happened' );
+      console.log(error)
 
     }
   );
