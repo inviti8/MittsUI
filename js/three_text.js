@@ -25,6 +25,7 @@ let portalMeshes = [];
 //Need pools for scenes to manage portal content
 const SCENE_MAX = 32;
 let scenePool = [];
+let cameraPool = [];
 
 export function createMainSceneLighting(scene){
   const ambientLight = new THREE.AmbientLight(0x404040);
@@ -93,6 +94,26 @@ function addSceneToPool(){
 function removeSceneFromPool(scene){
   index = scenePool.indexOf(scene);
   scenePool.splice(index, 1);
+}
+
+function addCameraToPool(scene){
+  
+  if (cameraPool.length >= SCENE_MAX)
+    return;
+
+  const mainCam = getMainCam(scene);
+  const camera = mainCam.clone();
+  mainCam.add(camera);
+  cameraPool.push(camera);
+  const layer_index = cameraPool.indexOf(camera)+1;
+  camera.userData.layer_index = layer_index;
+
+  return camera
+}
+
+function removeCameraFromPool(camera){
+  index = cameraPool.indexOf(camera);
+  cameraPool.splice(index, 1);
 }
 
 function computeScreenSpaceBoundingBox(boundingBox, portal, camera) {
@@ -678,6 +699,7 @@ function handlePortalScene(portal, mainScene, mainCam, activate){
     mainCam.layers.set(0);
     mainScene.add(mainCam);
     mainScene.add(portal.box.parent);
+
   }
 }
 
@@ -775,9 +797,10 @@ function setToggleUserData(toggle, width, height, padding, horizontal=true){
 }
 
 function setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh){
+  let extraSpace = padding*0.5;
   mergedMesh.userData.initialPositionY = boxSize.height/2 - geomSize.height/2;
-  mergedMesh.userData.maxScroll = geomSize.height/2 - boxSize.height/2;
-  mergedMesh.userData.minScroll = mergedMesh.userData.initialPositionY+mergedMesh.userData.maxScroll+padding;
+  mergedMesh.userData.maxScroll = geomSize.height/2 - boxSize.height/2 - (padding+extraSpace);
+  mergedMesh.userData.minScroll = mergedMesh.userData.initialPositionY+mergedMesh.userData.maxScroll+(padding-extraSpace);
   mergedMesh.userData.padding = padding;
   mergedMesh.userData.settleThreshold = geomSize.height/50;
 }
