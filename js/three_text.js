@@ -1387,27 +1387,51 @@ function constructMultiTextMerged(obj, text, font, material, textProps, meshProp
 }
 
 function selectionTextBox(parent, boxWidth, boxHeight, name, text, font, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
-  const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
+  const Box = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
 
   let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
   if(textProps.clipped){
-    mat = clipMaterial([txtBox.clipTop, txtBox.clipBottom, txtBox.clipLeft, txtBox.clipRight]);
+    mat = clipMaterial([Box.clipTop, Box.clipBottom, Box.clipLeft, Box.clipRight]);
   }
 
-  const promptGeometry = createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, textProps, meshProps, animProps);
+  const promptGeometry = createMergedTextBoxGeometry(Box, font, boxWidth, boxHeight, text, textProps, meshProps, animProps);
   const promptMesh = new THREE.Mesh(promptGeometry, mat);
-  const boxSize = getGeometrySize(txtBox.box.geometry);
+  promptMesh.layers.set(0);
+  const boxSize = getGeometrySize(Box.box.geometry);
   const geomSize = getGeometrySize(promptGeometry);
   const parentSize = getGeometrySize(parent.geometry);
   setMergedMeshUserData(boxSize, geomSize, textProps.padding, promptMesh);
 
-  txtBox.box.add(promptMesh);
+  Box.box.add(promptMesh);
   promptMesh.position.set(promptMesh.position.x, promptMesh.position.y-textProps.padding, promptMesh.position.z);
-  parent.add(txtBox.box);
-  txtBox.box.position.set(txtBox.box.position.x, txtBox.box.position.y, parentSize.depth/2+boxSize.depth/2);
-  adjustBoxScaleRatio(txtBox.box, parent);
+  parent.add(Box.box);
+  Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
+  adjustBoxScaleRatio(Box.box, parent);
 
-  return {promptMesh, txtBox}
+  return {promptMesh, Box}
+}
+
+function selectionTextPortal(parent, boxWidth, boxHeight, name, text, font, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  const scene = addSceneToPool();
+  const Box = portalBox(boxWidth, boxHeight, 0, scene);
+
+  let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+
+  const promptGeometry = createMergedTextBoxGeometry(Box, font, boxWidth, boxHeight, text, textProps, meshProps, animProps);
+  const promptMesh = new THREE.Mesh(promptGeometry, mat);
+  promptMesh.layers.set( scene.userData.layer_index );
+  const boxSize = getGeometrySize(Box.box.geometry);
+  const geomSize = getGeometrySize(promptGeometry);
+  const parentSize = getGeometrySize(parent.geometry);
+  setMergedMeshUserData(boxSize, geomSize, textProps.padding, promptMesh);
+
+  Box.box.add(promptMesh);
+  promptMesh.position.set(promptMesh.position.x, promptMesh.position.y-textProps.padding, promptMesh.position.z);
+  parent.add(Box.box);
+  Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
+  adjustBoxScaleRatio(Box.box, parent);
+
+  return {promptMesh, Box}
 }
 
 function selectionText(parent, boxWidth, boxHeight, name, text, font, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined){
@@ -1436,28 +1460,42 @@ function selectionText(parent, boxWidth, boxHeight, name, text, font, clipped=tr
   return {promptMesh, txtBox}
 }
 
+function handleTextInputSetup(inputProps, textProps, meshProps, font){
+  inputPrompts.push(inputProps.promptMesh);
+  const tProps = {'txtBox': inputProps.Box, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': meshProps };
+  inputProps.promptMesh.userData.textProps = tProps;
+  inputProps.Box.box.userData.mouseOverParent = true;
+  mouseOverable.push(inputProps.Box.box);
+  mouseOverUserData(inputProps.promptMesh);
+}
+
 export function createTextInput(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
     let inputProps = selectionTextBox(parent, boxWidth, boxHeight, name, text, font, textProps, meshProps, animProps, onCreated);
-    inputPrompts.push(inputProps.promptMesh);
     mouseOverable.push(inputProps.promptMesh);
-    const tProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': meshProps };
-    inputProps.promptMesh.userData.textProps = tProps;
-    inputProps.txtBox.box.userData.mouseOverParent = true;
-    mouseOverable.push(inputProps.txtBox.box);
-    mouseOverUserData(inputProps.promptMesh);
+    handleTextInputSetup(inputProps, textProps, meshProps, font);
   });
 };
 
 export function createScrollableTextInput(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
     let inputProps = selectionTextBox(parent, boxWidth, boxHeight, name, text, font, textProps, meshProps, animProps, onCreated);
-    inputPrompts.push(inputProps.promptMesh);
-    const tProps = {'txtBox': inputProps.txtBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'draggable': true, 'meshProps': meshProps };
-    inputProps.promptMesh.userData.textProps = tProps;
-    inputProps.promptMesh.userData.draggable = true;
-    inputProps.txtBox.box.userData.mouseOverParent = false;
-    mouseOverUserData(inputProps.promptMesh);
+    handleTextInputSetup(inputProps, textProps, meshProps, font);
+  });
+};
+
+export function createTextInputPortal(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined) {
+  loader.load(textProps.font, (font) => {
+    let inputProps = selectionTextPortal(parent, boxWidth, boxHeight, name, text, font, textProps, meshProps, animProps, onCreated);
+    mouseOverable.push(inputProps.promptMesh);
+    handleTextInputSetup(inputProps, textProps, meshProps, font);
+  });
+};
+
+export function createScrollableTextInputPortal(parent, boxWidth, boxHeight, name, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined) {
+  loader.load(textProps.font, (font) => {
+    let inputProps = selectionTextPortal(parent, boxWidth, boxHeight, name, text, font, textProps, meshProps, animProps, onCreated);
+    handleTextInputSetup(inputProps, textProps, meshProps, font);
   });
 };
 
