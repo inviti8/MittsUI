@@ -20,9 +20,10 @@ let selectorElems = [];
 let toggles = [];
 let clippedMeshes = [];//Everything that is clipped locally needs to have the tranform matrixes updated in render
 let stencilRefs = [];//For assigning a unique stencil ref to each clipped material
-let portalMeshes = [];
+let meshViews = [];
+let portals = [];
 
-//Need pools for scenes to manage portal content
+//Need pools for scenes to manage meshView content
 const SCENE_MAX = 32;
 let scenePool = [];
 let cameraPool = [];
@@ -31,9 +32,8 @@ export function createMainSceneLighting(scene){
   const ambientLight = new THREE.AmbientLight(0x404040);
   ambientLight.name = 'MAIN_AMBIENT_LIGHT'
   scene.add(ambientLight);
-  ambientLight.layers.set
 
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
   directionalLight.name = 'MAIN_DIRECTIONAL_LIGHT'
   directionalLight.position.set(1, 1, 1);
   scene.add(directionalLight);
@@ -116,9 +116,9 @@ function removeCameraFromPool(camera){
   cameraPool.splice(index, 1);
 }
 
-function computeScreenSpaceBoundingBox(boundingBox, portal, camera) {
+function computeScreenSpaceBoundingBox(boundingBox, meshView, camera) {
 
-  const positionAttribute = portal.box.geometry.getAttribute( 'position' );
+  const positionAttribute = meshView.box.geometry.getAttribute( 'position' );
   const vertex = new THREE.Vector3();
   let min = new THREE.Vector3(1, 1, 1);
   let max = new THREE.Vector3(-1, -1, -1);
@@ -127,8 +127,8 @@ function computeScreenSpaceBoundingBox(boundingBox, portal, camera) {
 
   for ( let vertexIndex = 0; vertexIndex < positionAttribute.count; vertexIndex ++ ) {
 
-    let vertexWorldCoord = vertex.copy(vertex.fromBufferAttribute( positionAttribute, vertexIndex )).applyMatrix4(portal.box.matrixWorld);
-    vertexWorldCoord.y -= portal.height;
+    let vertexWorldCoord = vertex.copy(vertex.fromBufferAttribute( positionAttribute, vertexIndex )).applyMatrix4(meshView.box.matrixWorld);
+    vertexWorldCoord.y -= meshView.height;
     let vertexScreenSpace = vertexWorldCoord.project(camera);
 
     boundingBox.min.min(vertexScreenSpace);
@@ -153,6 +153,10 @@ function normalizedToPixels(boundingBox) {
   const y = (1 + boundingBox.max.y) * renderHeightHalf;
   const w = (boundingBox.max.x - boundingBox.min.x) * renderWidthHalf;
   const h = (boundingBox.max.y - boundingBox.min.y) * renderHeightHalf;
+  // const x = (boundingBox.min.x + 1) * renderWidthHalf;
+  // const y = (1 - boundingBox.max.y) * renderHeightHalf;
+  // const w = (boundingBox.max.x - boundingBox.min.x) * renderWidthHalf;
+  // const h = (boundingBox.max.y - boundingBox.min.y) * renderHeightHalf;
 
   return {'x': x, 'y': y, 'w': w, 'h': h}
 }
@@ -500,6 +504,16 @@ function updateToggleState(elem){
 
 }
 
+function phongStenciledMaterial(stencilRef){
+  const mat = new THREE.MeshPhongMaterial();
+  mat.color.set(Math.random() * 0xff00000 - 0xff00000);
+  mat.stencilRef = stencilRef;
+  mat.stencilWrite = true;
+  mat.stencilFunc = THREE.EqualStencilFunc;
+
+  return mat
+}
+
 function baseClipMaterial(){
   let stencilRef = stencilRefs.length;
   const mat = new THREE.MeshBasicMaterial();
@@ -509,6 +523,7 @@ function baseClipMaterial(){
   mat.stencilFail = THREE.ReplaceStencilOp;
   mat.stencilZFail = THREE.ReplaceStencilOp;
   mat.stencilZPass = THREE.ReplaceStencilOp;
+
 
   stencilRefs.push(stencilRefs.length+1);
 
@@ -530,6 +545,20 @@ export function transparentMaterial(){
   const mat = new THREE.MeshBasicMaterial();
   mat.transparent = true;
   mat.opacity = 0;
+
+  return mat
+}
+
+export function stencilMaterial(){
+  stencilRefs.push(stencilRefs.length+1);
+  let stencilRef = stencilRefs.length;
+
+  const mat = new THREE.MeshPhongMaterial({ color: 'white' });
+  mat.depthWrite = false;
+  mat.stencilWrite = true;
+  mat.stencilRef = stencilRef;
+  mat.stencilFunc = THREE.AlwaysStencilFunc;
+  mat.stencilZPass = THREE.ReplaceStencilOp;
 
   return mat
 }
@@ -598,12 +627,20 @@ export function addToClippedMeshes(obj){
   clippedMeshes.push(obj);
 };
 
-export function getPortalMeshes(){
-  return portalMeshes;
+export function getMeshViews(){
+  return meshViews;
 };
 
-export function addToPortalMeshes(obj){
-  portalMeshes.push(obj);
+export function addToMeshViews(obj){
+  meshViews.push(obj);
+};
+
+export function getPortals(){
+  return portals;
+};
+
+export function addToPortals(obj){
+  portals.push(obj);
 };
 
 export function getScenePool(){
@@ -624,8 +661,8 @@ export function updateTextBoxClipping(textBox){
 }
 
 export function textBox(width, height, padding, clipped=true){
-
-  const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
+  const mat = phongStenciledMaterial(0);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.01), mat);
   box.userData.topClipVector = new THREE.Vector3( 0, -1, 0 );
   box.userData.bottomClipVector = new THREE.Vector3( 0, 1, 0 );
   box.userData.rightClipVector = new THREE.Vector3( -1, 0, 0 );
@@ -651,21 +688,35 @@ export function textBox(width, height, padding, clipped=true){
 
 };
 
-export function portalBox(width, height, padding, scene){
+export function meshViewBox(width, height, padding, scene){
   const box = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial() );
   const boundingBox = new THREE.Box2();
 
-  let result = { 'box': box, 'width': width, 'height': height, 'boundingBox': boundingBox, 'scene': scene };
+  let result = { 'box': box, 'width': width, 'height': height, 'boundingBox': boundingBox, 'scene': scene, 'padding': padding  };
 
-  portalMeshes.push(result);
+  meshViews.push(result);
+
+
+  return result
+};
+
+export function portalBox(width, height, padding, scene){
+  const mat = stencilMaterial();
+  let stencilRef = stencilRefs.length;
+  mat.stencilWrite = true;
+  const box = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat );
+
+  let result = { 'box': box, 'width': width, 'height': height, 'stencilRef': stencilRef, 'scene': scene, 'padding': padding   };
+
+  portals.push(result);
 
 
   return result
 };
 
 
-//Manage lighting, to be put into portal scene, or to be put back for the main scene
-function handlePortalLighting(portal, mainScene, activate){
+//Manage lighting, to be put into objec scene, or to be put back for the main scene
+function handleSceneLightSwap(objec, mainScene, activate){
   const ambientLight = getMainAmbientLight(mainScene);
   const directionalLight = getMainDirectionalLight(mainScene);
 
@@ -673,10 +724,10 @@ function handlePortalLighting(portal, mainScene, activate){
     return;
 
   if(activate){
-    portal.scene.add(ambientLight);
-    ambientLight.layers.set(portal.box.layers.mask);
-    portal.scene.add(directionalLight);
-    directionalLight.layers.set(portal.box.layers.mask);
+    objec.scene.add(ambientLight);
+    ambientLight.layers.set(objec.box.layers.mask);
+    objec.scene.add(directionalLight);
+    directionalLight.layers.set(objec.box.layers.mask);
 
   }else{
     mainScene.add(ambientLight);
@@ -686,32 +737,33 @@ function handlePortalLighting(portal, mainScene, activate){
   }
 }
 
-//Manage putting portal and main camera on appropriate layers and scenes
-function handlePortalScene(portal, mainScene, mainCam, activate){
-  if(portal.box.parent == undefined || portal.scene == undefined)
+//Manage putting meshView and main camera on appropriate layers and scenes
+function handleMeshViewScene(meshView, mainScene, mainCam, activate){
+  if(meshView.box.parent == undefined || meshView.scene == undefined)
     return;
 
   if(activate){
-    portal.scene.add(mainCam);
-    portal.scene.add(portal.box.parent);
-    mainCam.layers.set(portal.box.layers.mask);
+    meshView.scene.add(mainCam);
+    meshView.scene.add(meshView.box.parent);
+    mainCam.layers.set(meshView.box.layers.mask);
   }else{
     mainCam.layers.set(0);
     mainScene.add(mainCam);
-    mainScene.add(portal.box.parent);
+    mainScene.add(meshView.box.parent);
 
   }
 }
 
-export function renderPortal(portal, mainScene, mainCam, renderer){
-  computeScreenSpaceBoundingBox(portal.boundingBox, portal, mainCam);
+export function renderMeshView(meshView, mainScene, mainCam, renderer){
+  computeScreenSpaceBoundingBox(meshView.boundingBox, meshView, mainCam);
 
-  let n = normalizedToPixels(portal.boundingBox);
+  let n = normalizedToPixels(meshView.boundingBox);
 
   renderer.setViewport(0, 0, window.innerWidth, 
   window.innerHeight);
+  //renderer.autoClear = false;
   renderer.render(mainScene, mainCam);
-  renderer.clearDepth();
+  //renderer.clearDepth();
   renderer.setScissorTest(true);
   renderer.setScissor(
       n.x,
@@ -725,11 +777,12 @@ export function renderPortal(portal, mainScene, mainCam, renderer){
       window.innerWidth,
       window.innerHeight
   );
-  handlePortalLighting(portal, mainScene, true);
-  handlePortalScene(portal, mainScene, mainCam, true);
-  renderer.render(portal.scene, mainCam);
-  handlePortalScene(portal, mainScene, mainCam, false);
-  handlePortalLighting(portal, mainScene, false);
+  
+  handleSceneLightSwap(meshView, mainScene, true);
+  handleMeshViewScene(meshView, mainScene, mainCam, true);
+  renderer.render(meshView.scene, mainCam);
+  handleMeshViewScene(meshView, mainScene, mainCam, false);
+  handleSceneLightSwap(meshView, mainScene, false);
   renderer.setScissorTest(false);
 }
 
@@ -834,8 +887,9 @@ function adjustBoxScaleRatio(box, parent){
 }
 
 export function createMergedTextBoxGeometry(txtBox, font, boxWidth, boxHeight, text, textProps=undefined, meshProps=undefined, animProps=undefined) {
-    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - textProps.padding);
-    let yPosition = txtBox.box.geometry.parameters.height / 2 - textProps.padding;
+    let extraSpace = txtBox.padding*0.5;
+    let lineWidth = -(txtBox.box.geometry.parameters.width / 2 - (textProps.padding*2));
+    let yPosition = txtBox.box.geometry.parameters.height / 2 - (textProps.padding*2);
     const boxSize = getGeometrySize(txtBox.box.geometry);
     const letterGeometries = [];
 
@@ -970,9 +1024,11 @@ export function createStaticTextPortal(parent, boxWidth, boxHeight, name, text, 
   loader.load(textProps.font, (font) => {
     const scene = addSceneToPool();
     const portal = portalBox(boxWidth, boxHeight, 0, scene);
-    //const txtBox = textBox(boxWidth, boxHeight, textProps.padding, textProps.clipped);
 
-    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    mat.stencilWrite = true;
+    mat.stencilRef = portal.stencilRef;
+    mat.stencilFunc = THREE.EqualStencilFunc;
 
     // Merge the individual letter geometries into a single buffer geometry
     let mergedGeometry = createMergedTextBoxGeometry(portal, font, boxWidth, boxHeight, text, textProps, meshProps, animProps);
@@ -1077,7 +1133,10 @@ export function createStaticScrollableTextPortal(parent, boxWidth, boxHeight, na
     const scene = addSceneToPool();
     const portal = portalBox(boxWidth, boxHeight, 0, scene);
 
-    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    mat.stencilWrite = true;
+    mat.stencilRef = portal.stencilRef;
+    mat.stencilFunc = THREE.EqualStencilFunc;
 
     // Merge the individual letter geometries into a single buffer geometry
     let mergedGeometry = createMergedTextBoxGeometry(portal, font, boxWidth, boxHeight, text, textProps, meshProps, animProps);
@@ -1085,15 +1144,13 @@ export function createStaticScrollableTextPortal(parent, boxWidth, boxHeight, na
     // Create a mesh from the merged geometry
     const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
     if(animProps!=undefined){
-      mergedMesh.material.transparent=true;
-      mergedMesh.material.opacity=0;
+      mat.transparent=true;
+      mat.opacity=0;
     }
     const boxSize = getGeometrySize(portal.box.geometry);
     const geomSize = getGeometrySize(mergedGeometry);
     mergedMesh.position.set(0, -textProps.padding, 0);
-    mergedMesh.layers.set( scene.userData.layer_index );
     
-
     if(listConfig != undefined){
       portal.box.name = name;
       createListItem(parent, listConfig.width, listConfig.height, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
@@ -1210,9 +1267,12 @@ export function createMultiScrollableTextPortal(parent, boxWidth, boxHeight, nam
     const scene = addSceneToPool();
     const portal = portalBox(boxWidth, boxHeight, 0, scene);
 
-    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    mat.stencilWrite = true;
+    mat.stencilRef = portal.stencilRef;
+    mat.stencilFunc = THREE.EqualStencilFunc;
 
-    const mergedMesh = constructMultiTextMerged(portal, text, font, mat, textProps, meshProps, animProps, scene);
+    const mergedMesh = constructMultiTextMerged(portal, text, font, mat, textProps, meshProps, animProps);
     portal.box.add(mergedMesh);
 
     if(listConfig != undefined){
@@ -1415,11 +1475,13 @@ function selectionTextPortal(parent, boxWidth, boxHeight, name, text, font, text
   const scene = addSceneToPool();
   const Box = portalBox(boxWidth, boxHeight, 0, scene);
 
-  let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+  let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+  mat.stencilWrite = true;
+  mat.stencilRef = Box.stencilRef;
+  mat.stencilFunc = THREE.EqualStencilFunc;
 
   const promptGeometry = createMergedTextBoxGeometry(Box, font, boxWidth, boxHeight, text, textProps, meshProps, animProps);
   const promptMesh = new THREE.Mesh(promptGeometry, mat);
-  promptMesh.layers.set( scene.userData.layer_index );
   const boxSize = getGeometrySize(Box.box.geometry);
   const geomSize = getGeometrySize(promptGeometry);
   const parentSize = getGeometrySize(parent.geometry);
@@ -1649,10 +1711,12 @@ export function createGLTFModel(parent, boxWidth, boxHeight, name, gltfUrl, text
   );
 };
 
+
 export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
   const scene = addSceneToPool();
   const portal = portalBox(boxWidth, boxHeight, 0, scene);
   const boxSize = getGeometrySize(portal.box.geometry);
+  const parentSize = getGeometrySize(parent.geometry);
 
   // Instantiate a loader
   gltfLoader.load(
@@ -1660,12 +1724,15 @@ export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl
     gltfUrl,
     // called when the resource is loaded
     function ( gltf ) {
-      const test = new THREE.Mesh(new THREE.BoxGeometry(boxWidth/2, boxHeight/2, boxHeight/2), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
       const box = new THREE.Box3().setFromObject( gltf.scene ); 
       const sceneSize = box.getSize(new THREE.Vector3());
 
       gltf.scene.traverse( function( object ) {
-          object.layers.set( scene.userData.layer_index );
+          if(object.isMesh){
+            object.material.stencilWrite = true;
+            object.material.stencilRef = portal.stencilRef;
+            object.material.stencilFunc = THREE.EqualStencilFunc;
+          }
       } );
 
       let axis = 'y';
@@ -1683,7 +1750,7 @@ export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl
 
       gltf.scene.scale.set(gltf.scene.scale.x*ratio, gltf.scene.scale.y*ratio, gltf.scene.scale.z*ratio);
       gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z-boxSize.depth-(sceneSize.z*ratio))
-
+      gltf.scene.renderOrder = 2;
       portal.box.add(gltf.scene);
 
       if(listConfig != undefined){
@@ -1691,6 +1758,7 @@ export function createGLTFModelPortal(parent, boxWidth, boxHeight, name, gltfUrl
         createListItem(parent, listConfig.width, listConfig.height, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
       }else{
         parent.add(portal.box);
+        portal.box.position.set(portal.box.position.x, portal.box.position.y, portal.box.position.z+parentSize.depth)
       }
 
     },
@@ -1768,7 +1836,7 @@ export function createListItem( parent, boxWidth, boxHeight, content, textProps=
       }
 
       elemBox.box.position.set(elemBox.box.position.x, (parent.geometry.parameters.height-spacing)/2-elemBoxSize.height/2-((elemBoxSize.height+spacing)*index), elemBox.box.position.z+parentSize.depth)
-
+      console.log(elemBox.box)
     });
   }
 
@@ -1827,6 +1895,7 @@ export function createImageContentList( parent, boxWidth, boxHeight, author, con
   parent.userData.listElements = [];
 
   contentArr.forEach((imgUrl, index) =>{
+    console.log(imgUrl);
     let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
     createImageBox(parent, boxWidth, boxHeight, author, imgUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
@@ -1838,8 +1907,21 @@ export function createGLTFContentList( parent, boxWidth, boxHeight, author, cont
   parent.userData.listElements = [];
 
   contentArr.forEach((gltfUrl, index) =>{
+    console.log(gltfUrl)
     let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
     createGLTFModel(parent, boxWidth, boxHeight, author, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+  });
+
+};
+
+export function createGLTFContentPortalList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+  const listBoxSize = getGeometrySize(parent.geometry);
+  parent.userData.listElements = [];
+
+  contentArr.forEach((gltfUrl, index) =>{
+    console.log(gltfUrl)
+    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
+    createGLTFModelPortal(parent, boxWidth, boxHeight, author, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
