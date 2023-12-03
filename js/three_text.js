@@ -29,10 +29,10 @@ let scenePool = [];
 let cameraPool = [];
 
 //CUSTOM GEOMOETRIES
-function RoundedPlaneGeometry( w, h, r, s ) { // width, height, radiusCorner, smoothness
+function RoundedPlaneGeometry( width, height, radius, smoothness ) {
     
     const pi2 = Math.PI * 2;
-    const n = ( s + 1 ) * 4; // number of segments    
+    const n = ( smoothness + 1 ) * 4; // number of segments    
     let indices = [];
     let positions = [];
   let uvs = [];   
@@ -48,6 +48,7 @@ function RoundedPlaneGeometry( w, h, r, s ) { // width, height, radiusCorner, sm
     geometry.setIndex( new THREE.BufferAttribute( new Uint32Array( indices ), 1 ) );
   geometry.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array( positions ), 3 ) );
   geometry.setAttribute( 'uv', new THREE.BufferAttribute( new Float32Array( uvs ), 2 ) );
+  geometry.center();
     
     return geometry;
     
@@ -56,44 +57,43 @@ function RoundedPlaneGeometry( w, h, r, s ) { // width, height, radiusCorner, sm
         qu = Math.trunc( 4 * j / n ) + 1 ;      // quadrant  qu: 1..4         
         sgx = ( qu === 1 || qu === 4 ? 1 : -1 ) // signum left/right
         sgy =  qu < 3 ? 1 : -1;                 // signum  top / bottom
-        x = sgx * ( w / 2 - r ) + r * Math.cos( pi2 * ( j - qu + 1 ) / ( n - 4 ) ); // corner center + circle
-        y = sgy * ( h / 2 - r ) + r * Math.sin( pi2 * ( j - qu + 1 ) / ( n - 4 ) );   
+        x = sgx * ( width / 2 - radius ) + radius * Math.cos( pi2 * ( j - qu + 1 ) / ( n - 4 ) ); // corner center + circle
+        y = sgy * ( height / 2 - radius ) + radius * Math.sin( pi2 * ( j - qu + 1 ) / ( n - 4 ) );   
  
         positions.push( x, y, 0 );       
-        uvs.push( 0.5 + x / w, 0.5 + y / h );       
+        uvs.push( 0.5 + x / width, 0.5 + y / height );       
         
     }
     
 }
 
-function RoundedBoxGeometry(width, height, depth, radius, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments){
+function RoundedBoxGeometry(width, height, depth, radius, smoothness, zOffset=1){
   const shape = new THREE.Shape();
-
-  shape.moveTo(-width / 2, -height / 2 + radius);
-  shape.lineTo(-width / 2, height / 2 - radius);
-  shape.absarc(-width / 2 + radius, height / 2 - radius, radius, 1 * Math.PI, 0.5 * Math.PI, true);
-  shape.lineTo(width / 2 - radius, height / 2);
-  shape.absarc(width / 2 - radius, height / 2 - radius, radius, 0.5 * Math.PI, 0 * Math.PI, true);
-  shape.lineTo(width / 2, -height / 2 + radius);
-  shape.absarc(width / 2 - radius, -height / 2 + radius, radius, 2 * Math.PI, 1.5 * Math.PI, true);
-  shape.lineTo(-width / 2 + radius, -height / 2);
-  shape.absarc(-width / 2 + radius, -height / 2 + radius, radius, 1.5 * Math.PI, 1 * Math.PI, true);
+  let eps = 0.00001;
+  let _radius = radius - eps;
+  shape.absarc( eps, eps, eps, -Math.PI / 2, -Math.PI, true );
+  shape.absarc( eps, height -  radius * 2, eps, Math.PI, Math.PI / 2, true );
+  shape.absarc( width - radius * 2, height -  radius * 2, eps, Math.PI / 2, 0, true );
+  shape.absarc( width - radius * 2, eps, eps, 0, -Math.PI / 2, true );
 
   const extrudeSettings = {
-    steps: 1,
     depth: depth,
-    bevelEnabled: bevelEnabled,
-    bevelThickness: bevelThickness,
-    bevelSize: bevelSize,
-    bevelOffset: bevelOffset,
-    bevelSegments: bevelSegments
+    bevelEnabled: true,
+    bevelSegments: smoothness * 2,
+    steps: 1,
+    bevelSize: _radius,
+    bevelThickness: zOffset*radius,
+    curveSegments: smoothness
   };
 
   const geometry = new THREE.ExtrudeGeometry( shape, extrudeSettings );
-  let merged = BufferGeometryUtils.mergeVertices(geometry);
-  merged.computeVertexNormals();
+  geometry.center();
+  BufferGeometryUtils.mergeVertices(geometry);
+  geometry.computeVertexNormals();
 
-  return merged
+
+
+  return geometry
 }
 
 
@@ -267,10 +267,10 @@ export function infoProperties(title, author){
 };
 
 function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, delayIdx=0, onComplete=undefined){
-  const top = box.geometry.parameters.height/2+10;
-  const bottom = top-box.geometry.parameters.height-10;
-  const right = box.geometry.parameters.width;
-  const left = -box.geometry.parameters.width;
+  const top = box.userData.height/2+10;
+  const bottom = top-box.userData.height-10;
+  const right = box.userData.width;
+  const left = -box.userData.width;
   let props = {};
 
   switch (anim) {
@@ -431,8 +431,8 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
 
 function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
   let delayIdx=0;
-  const top = box.geometry.parameters.height/2+5;
-  const bottom = top-box.geometry.parameters.height-5;
+  const top = box.userData.height/2+5;
+  const bottom = top-box.userData.height-5;
 
   txtArr.forEach((txt, i) => {
     if(txt.position.y>bottom){
@@ -572,6 +572,7 @@ function updateToggleState(elem){
 
 }
 
+//MATERIAL CREATION
 function phongStenciledMaterial(stencilRef){
   const mat = new THREE.MeshPhongMaterial();
   mat.color.set(Math.random() * 0xff00000 - 0xff00000);
@@ -715,7 +716,7 @@ export function getScenePool(){
   return scenePool;
 };
 
-export function boxProperties(name, parent, color, width, height, depth, smoothness, radius, bevelEnabled = true, bevelThickness = 1, bevelSize = 1, bevelOffset = 0, bevelSegments = 3){
+export function boxProperties(name, parent, color, width, height, depth, smoothness, radius, zOffset = 1){
   return {
     'name': name,
     'parent': parent,
@@ -725,37 +726,22 @@ export function boxProperties(name, parent, color, width, height, depth, smoothn
     'depth': depth,
     'smoothness': smoothness,
     'radius': radius,
-    'bevelEnabled': bevelEnabled,
-    'bevelThickness': bevelThickness,
-    'bevelSize': bevelSize,
-    'bevelOffset': bevelOffset,
-    'bevelSegments': bevelSegments
+    'zOffset': zOffset
   }
 };
 
 export function contentBox(boxProps, padding, clipped=true){
+  clipped = false;
   const mat = phongStenciledMaterial(0);
-  const box = new THREE.Mesh(new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.segments,), mat);
-  box.userData.topClipVector = new THREE.Vector3( 0, -1, 0 );
-  box.userData.bottomClipVector = new THREE.Vector3( 0, 1, 0 );
-  box.userData.rightClipVector = new THREE.Vector3( -1, 0, 0 );
-  box.userData.leftClipVector = new THREE.Vector3( 1, 0, 0 );
+  mat.color.set(boxProps.color);
+  const box = new THREE.Mesh(RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset), mat);
+  box.userData.width = boxProps.width;
+  box.userData.height = boxProps.height;
+  box.userData.depth = boxProps.depth;
+  box.userData.padding = padding;
 
-  let result = { 'box': box };
+  let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'padding': padding };
 
-  if(clipped){
-    const clipTop = new THREE.Plane( box.userData.topClipVector, height/2);
-    const clipBottom = new THREE.Plane( box.userData.bottomClipVector, height/2);
-    const clipRight = new THREE.Plane( box.userData.rightClipVector, width/2 );
-    const clipLeft = new THREE.Plane( box.userData.leftClipVector, width/2);
-
-    clipTop.applyMatrix4(box.matrixWorld);
-    clipBottom.applyMatrix4(box.matrixWorld);
-    clipRight.applyMatrix4(box.matrixWorld);
-    clipLeft.applyMatrix4(box.matrixWorld);
-
-    result = { 'box': box, 'clipTop': clipTop, 'clipBottom': clipBottom, 'clipLeft': clipLeft, 'clipRight': clipRight, 'padding': padding };
-  }
 
   return result
 
@@ -763,6 +749,10 @@ export function contentBox(boxProps, padding, clipped=true){
 
 export function meshViewBox(boxProps, padding, scene){
   const box = new THREE.Mesh(new THREE.PlaneGeometry(boxProps.width, boxProps.height), new THREE.MeshBasicMaterial() );
+  box.userData.width = boxProps.width;
+  box.userData.height = boxProps.height;
+  box.userData.depth = boxProps.depth;
+  box.userData.padding = padding;
   const boundingBox = new THREE.Box2();
 
   let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'boundingBox': boundingBox, 'scene': scene, 'padding': padding  };
@@ -773,14 +763,64 @@ export function meshViewBox(boxProps, padding, scene){
   return result
 };
 
+export function roundedBox(boxProps, padding){
+  const mat = new THREE.MeshPhongMaterial();
+  mat.color.set(boxProps.color);
+  mat.depthWrite = false;
+  const box = new THREE.Mesh(RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset), mat );
+  box.userData.width = boxProps.width;
+  box.userData.height = boxProps.height;
+  box.userData.depth = boxProps.depth;
+  box.userData.padding = padding;
+
+  return box
+};
+
 export function portalBox(boxProps, padding){
   const mat = stencilMaterial();
   let stencilRef = stencilRefs.length;
   mat.stencilWrite = true;
-  //const box = new THREE.Mesh(new THREE.PlaneGeometry(boxProps.width, boxProps.height), mat );
-  const box = new THREE.Mesh(RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.bevelEnabled, boxProps.bevelThickness, boxProps.bevelThickness, boxProps.bevelSize, boxProps.bevelSize, boxProps.bevelOffset, boxProps.bevelSegments), mat );
+  const box = new THREE.Mesh(RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset), mat );
+  box.userData.width = boxProps.width;
+  box.userData.height = boxProps.height;
+  box.userData.depth = boxProps.depth;
+  box.userData.padding = padding;
 
   let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'stencilRef': stencilRef, 'padding': padding  };
+
+  portals.push(result);
+
+
+  return result
+};
+
+export function portalWindow(boxProps, padding){
+  const mat = stencilMaterial();
+  let stencilRef = stencilRefs.length;
+  mat.stencilWrite = true;
+  const box = new THREE.Mesh(RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness ), mat );
+  box.userData.width = boxProps.width;
+  box.userData.height = boxProps.height;
+  box.userData.depth = boxProps.depth;
+  box.userData.padding = padding;
+
+  let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'stencilRef': stencilRef, 'padding': padding  };
+
+  portals.push(result);
+
+
+  return result
+};
+
+export function curvedBox(boxProps, padding){
+  const mat = new THREE.MeshPhongMaterial();
+  const box = new THREE.Mesh(RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness ), mat );
+  box.userData.width = boxProps.width;
+  box.userData.height = boxProps.height;
+  box.userData.depth = boxProps.depth;
+  box.userData.padding = padding;
+
+  let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'padding': padding  };
 
   portals.push(result);
 
@@ -983,6 +1023,7 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
 
         // Calculate the width of the letter geometry
         let { width } = getGeometrySize(geometry);
+
         width+=textProps.letterSpacing;
 
         // Check if the letter is within the bounds of the cBox mesh
@@ -1000,6 +1041,7 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
         yPosition -= textProps.lineSpacing; // Move to the next line
       }
     }
+
 
     // Merge the individual letter geometries into a single buffer geometry
     return BufferGeometryUtils.mergeGeometries(letterGeometries);
@@ -1091,7 +1133,7 @@ export function createStaticTextBox(boxProps, text, textProps=undefined, meshPro
 export function createStaticTextPortal(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
-    const portal = portalBox(boxProps, 0);
+    const portal = portalWindow(boxProps, 0);
 
     let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
     mat.stencilWrite = true;
@@ -1190,7 +1232,7 @@ export function createStaticScrollableTextBox(boxProps, text, textProps=undefine
 export function createStaticScrollableTextPortal(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
-    const portal = portalBox(boxProps, 0);
+    const portal = portalWindow(boxProps, 0);
 
     let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
     mat.stencilWrite = true;
@@ -1244,8 +1286,6 @@ export function createMultiTextBox(boxProps, text, textProps=undefined, meshProp
   // Load the font
   loader.load(textProps.font, (font) => {
     const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
-    let lineWidth = -(cBox.box.geometry.parameters.width / 2 - textProps.padding);
-    let yPosition = cBox.box.position.y+cBox.box.geometry.parameters.height / 2 - textProps.padding*2;
     const boxSize = getGeometrySize(cBox.box.geometry);
     const letterGeometries = [];
     const letterMeshes = [];
@@ -1285,9 +1325,9 @@ export function createMultiTextBox(boxProps, text, textProps=undefined, meshProp
 export function createMultiTextPortal(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
-    const portal = portalBox(boxProps.width, boxProps.height, textProps.padding);
-    let lineWidth = -(portal.box.geometry.parameters.width / 2 - textProps.padding);
-    let yPosition = portal.box.position.y+portal.box.geometry.parameters.height / 2 - textProps.padding*2;
+    const portal = portalWindow(boxProps, textProps.padding);
+    let lineWidth = -(portal.box.userData.width / 2 - textProps.padding);
+    let yPosition = portal.box.position.y+portal.box.userData.height / 2 - textProps.padding*2;
     const boxSize = getGeometrySize(portal.box.geometry);
     const letterGeometries = [];
     const letterMeshes = [];
@@ -1329,9 +1369,7 @@ export function createMultiScrollableTextBox(boxProps, text, textProps=undefined
     const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
 
     let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    if(textProps.clipped){
-      mat = clipMaterial([cBox.clipTop, cBox.clipBottom, cBox.clipLeft, cBox.clipRight]);
-    }
+
 
     const mergedMesh = constructMultiTextMerged(cBox, text, font, mat, textProps, meshProps, animProps);
     cBox.box.add(mergedMesh);
@@ -1365,7 +1403,7 @@ export function createMultiScrollableTextBox(boxProps, text, textProps=undefined
 export function createMultiScrollableTextPortal(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined,  listConfig=undefined, onCreated=undefined) {
   // Load the font
   loader.load(textProps.font, (font) => {
-    const portal = portalBox(boxProps, 0);
+    const portal = portalWindow(boxProps, 0);
 
     let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
     mat.stencilWrite = true;
@@ -1403,8 +1441,8 @@ export function createMultiScrollableTextPortal(boxProps, text, textProps=undefi
 };
 
 function constructMultiMergedGeometry(obj, text, font, material, textProps, meshProps, animProps, scene = undefined){
-  let lineWidth = -(obj.box.geometry.parameters.width / 2 - textProps.padding*2);
-  let yPosition = obj.box.geometry.parameters.height / 2 - textProps.padding*2;
+  let lineWidth = -(obj.box.userData.width / 2 - textProps.padding*2);
+  let yPosition = obj.box.userData.height / 2 - textProps.padding*2;
   const boxSize = getGeometrySize(obj.box.geometry);
   const letterGeometries = [];
   const letterMeshes = [];
@@ -1438,7 +1476,7 @@ function constructMultiMergedGeometry(obj, text, font, material, textProps, mesh
         width+=textProps.letterSpacing;
 
         // Check if the letter is within the bounds of the cBox mesh
-        if (width <= obj.box.geometry.parameters.width / 2 - textProps.padding) {
+        if (width <= obj.box.userData.width / 2 - textProps.padding) {
           obj.box.add(letterMesh);
           letterMeshes.push(letterMesh);
           letterGeometries.push(geometry);
@@ -1449,8 +1487,8 @@ function constructMultiMergedGeometry(obj, text, font, material, textProps, mesh
       }
 
       // Check if lineWidth exceeds cBox width - padding
-      if (lineWidth > obj.box.geometry.parameters.width / 2 - textProps.padding) {
-        lineWidth = -(obj.box.geometry.parameters.width / 2) + textProps.padding; // Reset x position to the upper-left corner
+      if (lineWidth > obj.box.userData.width / 2 - textProps.padding) {
+        lineWidth = -(obj.box.userData.width / 2) + textProps.padding; // Reset x position to the upper-left corner
         yPosition -= textProps.lineSpacing; // Move to the next line
       }
   }
@@ -1458,11 +1496,12 @@ function constructMultiMergedGeometry(obj, text, font, material, textProps, mesh
 }
 
 function constructMultiMergedScrollableGeometry(obj, text, font, material, textProps, meshProps, animProps, scene = undefined){
-  let lineWidth = -(obj.box.geometry.parameters.width / 2 - textProps.padding);
-  let yPosition = obj.box.geometry.parameters.height / 2 - textProps.padding;
+  let lineWidth = -(obj.box.userData.width / 2 - textProps.padding);
+  let yPosition = obj.box.userData.height / 2 - textProps.padding;
   const letterGeometries = [];
   const letterMeshes = [];
   const cubes = [];
+
 
   for (let i = 0; i < text.length; i++) {
       const character = text[i];
@@ -1484,7 +1523,6 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
         letterMesh.position.set(lineWidth, yPosition, 0);
 
         if(scene != undefined){
-          //console.log(cube)
           letterMesh.layers.set(scene.userData.layer_index);
         }
 
@@ -1498,7 +1536,7 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
         width+=textProps.letterSpacing;
 
         // Check if the letter is within the bounds of the cBox mesh
-        if (width <= obj.box.geometry.parameters.width / 2 - textProps.padding) {
+        if (width <= obj.box.userData.width / 2 - textProps.padding) {
           letterMeshes.push(letterMesh);
           letterGeometries.push(geometry);
           cubes.push(cube);
@@ -1508,11 +1546,12 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
       }
 
       // Check if lineWidth exceeds cBox width - padding
-      if (lineWidth > obj.box.geometry.parameters.width / 2 - textProps.padding) {
-        lineWidth = -(obj.box.geometry.parameters.width / 2) + textProps.padding; // Reset x position to the upper-left corner
+      if (lineWidth > obj.box.userData.width / 2 - textProps.padding) {
+        lineWidth = -(obj.box.userData.width / 2) + textProps.padding; // Reset x position to the upper-left corner
         yPosition -= textProps.lineSpacing; // Move to the next line
       }
     }
+
 
     const mergedGeometry = BufferGeometryUtils.mergeGeometries(cubes);
 
@@ -1522,7 +1561,6 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
 
 function constructMultiTextMerged(obj, text, font, material, textProps, meshProps, animProps, scene = undefined){
     const merged = constructMultiMergedScrollableGeometry(obj, text, font, material, textProps, meshProps, animProps, scene);
-
     const mergedMesh = new THREE.Mesh(merged.geometry, transparentMaterial());
     if(scene != undefined){
       mergedMesh.layers.set(scene.userData.layer_index);
@@ -1573,7 +1611,7 @@ function selectionTextBox(boxProps, text, font, textProps=undefined, meshProps=u
 }
 
 function selectionTextPortal(boxProps, text, font, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
-  const Box = portalBox(boxProps, 0);
+  const Box = portalWindow(boxProps, 0);
 
   let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
   mat.stencilWrite = true;
@@ -1739,7 +1777,7 @@ export function createVerticalToggle(boxProps, text, textProps=undefined, meshPr
 
 export function createImageBox(boxProps, imgUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
 
-  const cBox = contentBox(boxProps, 0, false);
+  const cBox = curvedBox(boxProps, 0, false);
   const boxSize = getGeometrySize(cBox.box.geometry);
   const map = new THREE.TextureLoader().load( imgUrl );
   const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
@@ -1756,8 +1794,8 @@ export function createImageBox(boxProps, imgUrl, textProps=undefined, meshProps=
 
 export function createImagePortal(boxProps, imgUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
 
-  const portal = portalBox(boxProps, 0);
-  const cBox = contentBox(boxProps, 0, false);
+  const portal = portalWindow(boxProps, 0);
+  const cBox = curvedBox(boxProps, 0, false);
   const boxSize = getGeometrySize(cBox.box.geometry);
   const map = new THREE.TextureLoader().load( imgUrl );
   const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
@@ -1838,7 +1876,7 @@ export function createGLTFModel(boxProps, gltfUrl, textProps=undefined, meshProp
 
 
 export function createGLTFModelPortal(boxProps, gltfUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
-  const portal = portalBox(boxProps, 0);
+  const portal = portalWindow(boxProps, 0);
   const boxSize = getGeometrySize(portal.box.geometry);
   const parentSize = getGeometrySize(boxProps.parent.geometry);
 
@@ -1882,7 +1920,7 @@ export function createGLTFModelPortal(boxProps, gltfUrl, textProps=undefined, me
         createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
       }else{
         boxProps.parent.add(portal.box);
-        portal.box.position.set(portal.box.position.x, portal.box.position.y, portal.box.position.z+parentSize.depth)
+        portal.box.position.set(portal.box.position.x, portal.box.position.y, portal.box.position.z+(parentSize.depth/2))
       }
 
     },
@@ -1909,7 +1947,7 @@ export function createListItem( boxProps, content, textProps=undefined, meshProp
   elemBox.box.userData.elemIndex = index;
   const elemBoxSize = getGeometrySize(elemBox.box.geometry);
   elemBox.box.add(content);
-  content.position.set(0, 0, elemBoxSize.depth);
+  content.position.set(0, 0, elemBoxSize.depth/2+0.01);
 
   if(infoProps.title.length>0 || infoProps.author.length>0 || useTimeStamp){
 
@@ -1925,7 +1963,7 @@ export function createListItem( boxProps, content, textProps=undefined, meshProp
           const textMeshSize = getGeometrySize(textMesh.geometry);
           elemBox.box.add(textMesh);
 
-          textMesh.position.set(0, (elemBoxSize.height/2)-(textMeshSize.height/2)-textProps.padding, elemBoxSize.depth+textMeshSize.depth/2);
+          textMesh.position.set(0, (elemBoxSize.height/2)-(textMeshSize.height/2)-(textProps.padding*2), (elemBoxSize.depth/2)+textMeshSize.depth/2);
           elemBox.box.userData.title = textMesh;
 
       }
@@ -1938,7 +1976,7 @@ export function createListItem( boxProps, content, textProps=undefined, meshProp
         const textMeshSize = getGeometrySize(textMesh.geometry);
         elemBox.box.add(textMesh);
 
-        textMesh.position.set(-(elemBoxSize.width/2-textProps.padding)+(textMeshSize.width/2)+textProps.padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+textProps.padding, elemBoxSize.depth+textMeshSize.depth/2);
+        textMesh.position.set(-(elemBoxSize.width/2-textProps.padding)+(textMeshSize.width/2)+textProps.padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+(textProps.padding*2), (elemBoxSize.depth/2)+textMeshSize.depth/2);
         elemBox.box.userData.author = textMesh;
 
       }
@@ -1950,16 +1988,16 @@ export function createListItem( boxProps, content, textProps=undefined, meshProp
       const textMesh = new THREE.Mesh(geometry, mat);
       const textMeshSize = getGeometrySize(textMesh.geometry);
       elemBox.box.add(textMesh);
-      textMesh.position.set(-(elemBoxSize.width/2-textProps.padding)+(textMeshSize.width/2)+textProps.padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+textProps.padding, elemBoxSize.depth+textMeshSize.depth/2);
+      textMesh.position.set(-(elemBoxSize.width/2-textProps.padding)+(textMeshSize.width/2)+textProps.padding, -(elemBoxSize.height/2)+(textMeshSize.height/2)+(textProps.padding*2), (elemBoxSize.depth/2)+textMeshSize.depth/2);
 
       boxProps.parent.add(elemBox.box);
 
       elemBox.box.userData.date = textMesh;
       if( 'author' in elemBox.box.userData && elemBox.box.userData.author != undefined){
-        elemBox.box.userData.author.position.set(elemBox.box.userData.author.position.x, elemBox.box.userData.author.position.y+textMeshSize.height+textProps.padding, elemBox.box.userData.author.position.z)
+        elemBox.box.userData.author.position.set(elemBox.box.userData.author.position.x, elemBox.box.userData.author.position.y+textMeshSize.height+(textProps.padding*2), elemBox.box.userData.author.position.z)
       }
 
-      elemBox.box.position.set(elemBox.box.position.x, (boxProps.parent.geometry.parameters.height-spacing)/2-elemBoxSize.height/2-((elemBoxSize.height+spacing)*index), elemBox.box.position.z+parentSize.depth)
+      elemBox.box.position.set(elemBox.box.position.x, (boxProps.parent.userData.height-spacing)/2-elemBoxSize.height/2-((elemBoxSize.height+spacing)*index), elemBox.box.position.z+parentSize.depth)
       console.log(elemBox.box)
     });
   }
@@ -2092,14 +2130,15 @@ export function createGLTFContentList( parent, boxWidth, boxHeight, author, cont
 
 };
 
-export function createGLTFContentPortalList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
-  const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+export function createGLTFContentPortalList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+  const listBoxSize = getGeometrySize(listConfig.boxProps.parent.geometry);
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((gltfUrl, index) =>{
     console.log(gltfUrl)
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
-    createGLTFModelPortal(parent, boxWidth, boxHeight, author, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    console.log(index)
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
+    createGLTFModelPortal(lConfig.boxProps, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
