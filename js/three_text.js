@@ -28,6 +28,16 @@ const SCENE_MAX = 32;
 let scenePool = [];
 let cameraPool = [];
 
+//Interaction variables
+let mouseDown = false;
+let isDragging = false;
+let lastDragged = undefined;
+let previousMouseY = 0;
+let moveDir = 1;
+let dragDistY = 0;
+let lastClick = 0;
+let mouseOver = [];
+
 //CUSTOM GEOMOETRIES
 function RoundedPlaneGeometry( width, height, radius, smoothness ) {
     
@@ -1021,8 +1031,10 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
         const geometry = createTextGeometry(character, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
         geometry.translate(lineWidth, yPosition, boxSize.depth+textProps.zOffset);
 
+
         // Calculate the width of the letter geometry
         let { width } = getGeometrySize(geometry);
+
 
         width+=textProps.letterSpacing;
 
@@ -1041,6 +1053,9 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
         yPosition -= textProps.lineSpacing; // Move to the next line
       }
     }
+
+    console.log("LETTER GEOMETRIES")
+    console.log(letterGeometries)
 
 
     // Merge the individual letter geometries into a single buffer geometry
@@ -1662,7 +1677,7 @@ function selectionText(boxProps, text, font, clipped=true, letterSpacing=1, line
 
 function handleTextInputSetup(inputProps, textProps, meshProps, font){
   inputPrompts.push(inputProps.promptMesh);
-  const tProps = {'cBox': inputProps.Box, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': meshProps };
+  const tProps = {'cBox': inputProps.Box, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'zOffset':textProps.zOffset, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': meshProps };
   inputProps.promptMesh.userData.textProps = tProps;
   inputProps.Box.box.userData.mouseOverParent = true;
   mouseOverable.push(inputProps.Box.box);
@@ -2151,4 +2166,187 @@ export function addTranslationControl(elem, camera, renderer){
 
 
 };
+
+//INTERACTION HANDLERS
+export function mouseDownHandler(raycaster){
+  mouseDown = true;
+  isDragging = true;
+  previousMouseY = event.clientY;
+
+  const intersectsDraggable = raycaster.intersectObjects(draggable);
+  const intersectsClickable = raycaster.intersectObjects(clickable);
+  const intersectsToggle = raycaster.intersectObjects(toggles);
+
+  if ( intersectsDraggable.length > 0 ) {
+    lastDragged = intersectsDraggable[0].object;
+  }
+
+  if ( intersectsClickable.length > 0 ) {
+    console.log("Clickable")
+    let obj = intersectsClickable[0].object;
+
+    if(!clickable.includes(obj))
+      return;
+
+    clickAnimation(obj);
+
+  }
+
+  if ( intersectsToggle.length > 0 ) {
+    let obj = intersectsToggle[0].object;
+    toggleAnimation(obj);
+  }
+}
+
+export function mouseUpHandler(){
+  mouseDown = false;
+  isDragging = false;
+}
+
+export function mouseMoveHandler(raycaster, event){
+  if (lastDragged != undefined && lastDragged.userData.draggable && mouseDown && isDragging) {
+    const deltaY = event.clientY - previousMouseY;
+    const dragPosition = lastDragged.position.clone();
+    dragDistY = deltaY;
+
+    if(deltaY<0){
+      moveDir=1
+    }else{
+      moveDir=-1;
+    }
+    // Limit scrolling
+    dragPosition.y = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll+lastDragged.userData.padding, dragPosition.y - deltaY * 0.01));
+    lastDragged.position.copy(dragPosition);
+    previousMouseY = event.clientY;
+  }
+
+  const intersectsMouseOverable = raycaster.intersectObjects(mouseOverable);
+  const intersectsselectorElems = raycaster.intersectObjects(selectorElems);
+  let canMouseOver = true;
+
+  if(intersectsMouseOverable.length > 0){
+
+    let elem = intersectsMouseOverable[0].object;
+
+    if(elem.userData.mouseOverParent != undefined){
+      canMouseOver = false;
+    }
+
+    if(!mouseOver.includes(elem) && canMouseOver){
+      elem.userData.mouseOver = true;
+      mouseOver.push(elem);
+      mouseOverAnimation(elem);
+    }
+
+  }else if(intersectsselectorElems.length > 0){
+
+    let e = intersectsselectorElems[0].object;
+    // console.log("elem")
+    if(e.parent.userData.selectors != undefined && !e.parent.userData.open){
+      selectorAnimation(e.parent);
+    }
+
+  }else{
+
+    mouseOver.forEach((elem, idx) => {
+      if(elem.userData.mouseOver && canMouseOver){
+        elem.userData.mouseOver = false;
+        mouseOverAnimation(elem);
+        mouseOver.splice(mouseOver.indexOf(elem));
+      }
+    });
+
+    selectorElems.forEach((elem, idx) => {
+      if(elem.parent.userData.selectors != undefined && elem.parent.userData.open){
+        selectorAnimation(elem.parent, 'CLOSE');
+      }
+    });
+  }
+}
+
+export function doubleClickHandler(raycaster){
+  raycaster.layers.set(0);
+  const intersectsInputPrompt = raycaster.intersectObjects(inputPrompts);
+
+  if(intersectsInputPrompt.length > 0){
+
+    let clicked = intersectsInputPrompt[0].object;
+    let userData = clicked.userData;
+    const textProps = clicked.userData.textProps;
+
+    // Initialize variables for typing
+    let currentText = '';
+    let boxSize = getGeometrySize(textProps.cBox.box.geometry);
+    let pos = new THREE.Vector3().copy(clicked.position);
+    const textGeometry = createTextGeometry(currentText, textProps.font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
+    let mat = clicked.material;
+    let padding = textProps.padding;
+
+    let typingTextMesh = textProps.textMesh;
+
+    if(typingTextMesh==undefined){
+      typingTextMesh = new THREE.Mesh(textGeometry, mat);
+      typingTextMesh.layers.set( i );
+      typingTextMesh.userData = userData;
+      typingTextMesh.userData.textProps = textProps;
+      typingTextMesh.position.copy(pos); // Adjust position in the scene
+      textProps.cBox.box.add(typingTextMesh);
+      textProps.cBox.box.userData.inputText = typingTextMesh;
+    }
+
+
+    let geomSize = getGeometrySize(typingTextMesh.geometry);
+    if(!textProps.draggable){
+      inputPrompts.push(typingTextMesh);
+      mouseOverable.push(typingTextMesh);
+      clickable.push(typingTextMesh);
+    }
+
+    let yPosition = boxSize.height / 2 - padding;
+
+    // Listen for keyboard input
+    window.addEventListener('keydown', (event) => {
+      if(clicked!=undefined){
+        clicked.geometry.dispose();
+        //textProps.cBox.box.remove(clicked);
+        clicked=undefined;
+      }
+        if (event.key === 'Enter') {
+          // Handle the entered text (e.g., send it to a server)
+          console.log('Entered text:', currentText);
+          geomSize = getGeometrySize(typingTextMesh.geometry);
+          yPosition=boxSize.height-boxSize.height;
+          typingTextMesh.position.set(typingTextMesh.position.x, yPosition, typingTextMesh.position.z);
+          if(textProps.draggable){
+            draggable.push(typingTextMesh);
+          }
+
+          onsole.log(typingTextMesh.position.y);
+
+        } else if (event.key === 'Backspace') {
+            // Handle backspace
+            currentText = currentText.slice(0, -1);
+        } else if (event.key === 'Shift' || event.key === 'Control' || event.key === 'Capslock') {
+
+        } else if (event.key === 'ArrowDown' ) {
+
+        } else if (event.key === 'ArrowUp' ) {
+
+        } else {
+          if(event.shiftKey || event.capslock){
+            currentText += event.key.toUpperCase();
+          }else{
+            currentText += event.key;
+            geomSize = getGeometrySize(typingTextMesh.geometry);
+            yPosition=geomSize.height-padding;
+            typingTextMesh.position.set(typingTextMesh.position.x, yPosition, typingTextMesh.position.z);
+          }
+        }
+        typingTextMesh.scale.copy(typingTextMesh.userData.defaultScale);
+        typingTextMesh.geometry.dispose(); // Clear the previous text
+        typingTextMesh.geometry = createMergedTextBoxGeometry(textProps.cBox, textProps.font, boxSize.Width, boxSize.height, currentText, textProps);
+
+        });
+    }
+}
 
