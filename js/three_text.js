@@ -1012,7 +1012,7 @@ function adjustBoxScaleRatio(box, parent){
 
 export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, text, textProps=undefined, meshProps=undefined, animProps=undefined) {
     let extraSpace = cBox.padding*0.5;
-    let lineWidth = -(cBox.width / 2 - (textProps.padding*2));
+    let lineWidth = -(cBox.width / 2 - (textProps.padding));
     let yPosition = cBox.height / 2 - (textProps.padding*2);
     const boxSize = getGeometrySize(cBox.box.geometry);
     const letterGeometries = [];
@@ -2019,128 +2019,126 @@ export function createListItem( boxProps, content, textProps=undefined, meshProp
 
 };
 
-export function createStaticTextList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createStaticTextList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createStaticTextBox(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createStaticTextBox(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createStaticTextPortalList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createStaticTextPortalList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createStaticTextPortal(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createStaticTextPortal(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createStaticScrollableTextList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createStaticScrollableTextList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createStaticScrollableTextBox(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createStaticScrollableTextBox(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createStaticScrollableTextPortalList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createStaticScrollableTextPortalList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createStaticScrollableTextPortal(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createStaticScrollableTextPortal(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createMultiTextList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createMultiTextList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    console.log(text+ " "+index)
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createMultiTextBox(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createMultiTextBox(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createMultiTextPortalList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createMultiTextPortalList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    console.log(text+ " "+index)
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createMultiTextPortal(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createMultiTextPortal(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createMultiScrollableTextList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createMultiScrollableTextList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createMultiScrollableTextBox(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createMultiScrollableTextBox(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createMultiScrollableTextPortalList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createMultiScrollableTextPortalList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createMultiScrollableTextPortal(parent, boxWidth, boxHeight, author, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
+    createMultiScrollableTextPortal(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createImageContentList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createImageContentList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((imgUrl, index) =>{
     console.log(imgUrl);
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
-    createImageBox(parent, boxWidth, boxHeight, author, imgUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
+    createImageBox(lConfig.boxProps, imgUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createImagePortalList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createImagePortalList(boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((imgUrl, index) =>{
     console.log(imgUrl);
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
-    createImagePortal(parent, boxWidth, boxHeight, author, imgUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
+    createImagePortal(lConfig.boxProps, imgUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
 
-export function createGLTFContentList( parent, boxWidth, boxHeight, author, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
+export function createGLTFContentList( boxProps, contentArr, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined ) {
   const listBoxSize = getGeometrySize(parent.geometry);
-  parent.userData.listElements = [];
+  listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((gltfUrl, index) =>{
     console.log(gltfUrl)
-    let lConfig = listItemConfig(listConfig.width, listConfig.height, listConfig.depth, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
-    createGLTFModel(parent, boxWidth, boxHeight, author, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
+    createGLTFModel(lConfig.boxProps, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
 };
@@ -2150,8 +2148,6 @@ export function createGLTFContentPortalList( boxProps, contentArr, textProps=und
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((gltfUrl, index) =>{
-    console.log(gltfUrl)
-    console.log(index)
     let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
     createGLTFModelPortal(lConfig.boxProps, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
