@@ -245,7 +245,7 @@ function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-export function listItemConfig(boxProps, textProps=undefined, meshProps=undefined, animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, index=0){
+export function listItemConfig(boxProps, textProps=undefined, meshProps=undefined, animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, childInset=0.9, index=0){
   return {
     'boxProps': boxProps,
     'textProps': textProps,
@@ -254,6 +254,7 @@ export function listItemConfig(boxProps, textProps=undefined, meshProps=undefine
     'infoProps': infoProps,
     'useTimeStamp': true,
     'spacing': spacing,
+    'childInset': childInset,
     'index': index
   }
 }
@@ -547,18 +548,17 @@ export function getGeometrySize(geometry) {
   return { width, height, depth };
 };
 
-
-export function textProperties(font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1) {
+export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties()) {
   return {
     font: font,
-    clipped: clipped,
     letterSpacing: letterSpacing,
     lineSpacing: lineSpacing,
     wordSpacing: wordSpacing,
     padding: padding,
     size: size,
     height: height,
-    zOffset: zOffset
+    zOffset: zOffset,
+    matProps: matProps
   }
 };
 
@@ -583,42 +583,124 @@ function updateToggleState(elem){
 }
 
 //MATERIAL CREATION
-function phongStenciledMaterial(stencilRef){
-  const mat = new THREE.MeshPhongMaterial();
-  mat.color.set(Math.random() * 0xff00000 - 0xff00000);
-  mat.stencilRef = stencilRef;
-  mat.stencilWrite = true;
-  mat.stencilFunc = THREE.EqualStencilFunc;
+//useCase='SIMPLE','STENCIL','STENCIL_CHILD'
+export function materialProperties(type='BASIC', color='white', transparent=false, opacity=1, side=THREE.FrontSide, useCase='SIMPLE'){
+  return {
+    type: type,
+    color: color,
+    transparent: transparent,
+    opacity: opacity,
+    side: side,
+    useCase: useCase
+  }
+};
+
+export function basicMatProperties(color='white'){
+  return materialProperties('BASIC', color, false, 1, THREE.FrontSide, 'SIMPLE');
+};
+
+export function basicStencilMatProperties(color='white'){
+  return materialProperties('BASIC', color, false, 1, THREE.FrontSide, 'STENCIL');
+};
+
+export function basicStencilChildMatProperties(color='white'){
+  return materialProperties('BASIC', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
+};
+
+export function phongMatProperties(color='white'){
+  return materialProperties('PHONG', color, false, 1, THREE.FrontSide, 'SIMPLE');
+};
+
+export function phongStencilMatProperties(color='white'){
+  return materialProperties('PHONG', color, false, 1, THREE.FrontSide, 'STENCIL');
+};
+
+export function phongStencilChildMatProperties(color='white'){
+  return materialProperties('PHONG', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
+};
+
+export function lambertMatProperties(color='white'){
+  return materialProperties('LAMBERT', color, false, 1, THREE.FrontSide, 'SIMPLE');
+};
+
+export function lambertStencilMatProperties(color='white'){
+  return materialProperties('LAMBERT', color, false, 1, THREE.FrontSide, 'STENCIL');
+};
+
+export function lambertStencilChildMatProperties(color='white'){
+  return materialProperties('LAMBERT', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
+};
+
+export function standardMatProperties(color='white'){
+  return materialProperties('STANDARD', color, false, 1, THREE.FrontSide, 'SIMPLE');
+};
+
+export function standardMatStencilProperties(color='white'){
+  return materialProperties('STANDARD', color, false, 1, THREE.FrontSide, 'STENCIL');
+};
+
+export function standardMatStencilChildProperties(color='white'){
+  return materialProperties('STANDARD', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
+};
+
+export function toonMatProperties(color='white'){
+  return materialProperties('TOON', color, false, 1, THREE.FrontSide, 'SIMPLE');
+};
+
+export function toonMatStencilProperties(color='white'){
+  return materialProperties('TOON', color, false, 1, THREE.FrontSide, 'STENCIL');
+};
+
+export function toonMatStencilChildProperties(color='white'){
+  return materialProperties('TOON', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
+};
+
+export function getBaseMaterial(color='white', type='BASIC', side=THREE.FrontSide){
+  let mat = undefined;
+  switch (type) {
+    case 'BASIC':
+      mat = new THREE.MeshBasicMaterial({ color: color, side: side });
+      
+    case 'PHONG':
+      mat = new THREE.MeshPhongMaterial({ color: color, side: side });
+
+    case 'LAMBERT':
+      mat = new THREE.MeshLambertMaterial({ color: color, side: side });
+
+    case 'STANDARD':
+      mat = new THREE.MeshStandardMaterial({ color: color, side: side });
+
+    case 'TOON':
+      mat = new THREE.MeshToonMaterial({ color: color, side: side });
+
+    default:
+      mat = new THREE.MeshBasicMaterial({ color: color, side: side });
+
+  }
 
   return mat
-}
+};
 
-function baseClipMaterial(){
-  let stencilRef = stencilRefs.length;
-  const mat = new THREE.MeshBasicMaterial();
-  mat.color.set(Math.random() * 0xff00000 - 0xff00000);
-  mat.stencilRef = stencilRef;
-  mat.stencilFunc = THREE.NotEqualStencilFunc;
-  mat.stencilFail = THREE.ReplaceStencilOp;
-  mat.stencilZFail = THREE.ReplaceStencilOp;
-  mat.stencilZPass = THREE.ReplaceStencilOp;
-
-
+export function getStencilRef(){
   stencilRefs.push(stencilRefs.length+1);
+  let stencilRef = stencilRefs.length;
 
-  return mat
+  return stencilRef
 }
 
-export function clipMaterial(clippingPlanes){
-  let mat = baseClipMaterial();
-  mat.side = THREE.FrontSide;
-  mat.clippingPlanes = clippingPlanes;
-  mat.stencilFail = THREE.DecrementWrapStencilOp;
-  mat.stencilZFail = THREE.DecrementWrapStencilOp;
-  mat.stencilZPass = THREE.DecrementWrapStencilOp;
+export function getMaterial(props, stencilRef=0){
+  const mat = getBaseMaterial(props.color, props.type, props.side);
+  mat.transparent = props.transparent;
+  mat.opacity = props.opacity;
+
+  if(props.useCase == 'STENCIL'){
+    setupStencilMaterial(mat, stencilRef);
+  }else if(props.useCase == 'STENCIL_CHILD'){
+    setupStencilChildMaterial(mat, stencilRef);
+  }
 
   return mat
-}
+};
 
 export function transparentMaterial(){
   const mat = new THREE.MeshBasicMaterial();
@@ -626,18 +708,65 @@ export function transparentMaterial(){
   mat.opacity = 0;
 
   return mat
-}
+};
 
-export function stencilMaterial(){
-  stencilRefs.push(stencilRefs.length+1);
-  let stencilRef = stencilRefs.length;
+export function setupClipMaterial(mat, clippingPlanes){
+  mat.clippingPlanes = clippingPlanes;
+  mat.stencilFail = THREE.DecrementWrapStencilOp;
+  mat.stencilZFail = THREE.DecrementWrapStencilOp;
+  mat.stencilZPass = THREE.DecrementWrapStencilOp;
+};
 
-  const mat = new THREE.MeshPhongMaterial({ color: 'white' });
+export function setupStencilMaterial(mat, stencilRef){
   mat.depthWrite = false;
   mat.stencilWrite = true;
   mat.stencilRef = stencilRef;
   mat.stencilFunc = THREE.AlwaysStencilFunc;
   mat.stencilZPass = THREE.ReplaceStencilOp;
+};
+
+export function setupStencilChildMaterial(mat, stencilRef){
+  mat.depthWrite = false;
+  mat.stencilWrite = true;
+  mat.stencilRef = stencilRef;
+  mat.stencilFunc = THREE.EqualStencilFunc;
+};
+
+export function getStencilMaterial(matProps){
+  let stencilRef = getStencilRef();
+
+  return getMaterial(matProps, stencilRef);
+};
+
+export function stencilMaterial(color = 'white'){
+  let stencilRef = getStencilRef();
+
+  const mat = new THREE.MeshBasicMaterial({ color: color });
+  setupStencilMaterial(mat, stencilRef);
+
+  return mat
+};
+
+export function stencilChildMaterial(stencilRef, color = 'white'){
+  let mat = new THREE.MeshBasicMaterial({color: color});
+  setupStencilChildMaterial(mat, stencilRef);
+
+  return mat
+}
+
+export function stencilPhongMaterial(color = 'white'){
+  stencilRefs.push(stencilRefs.length+1);
+  let stencilRef = stencilRefs.length;
+
+  const mat = new THREE.MeshPhongMaterial({ color: color });
+  setupStencilMaterial(mat, stencilRef);
+
+  return mat
+};
+
+export function stencilChildPhongMaterial(stencilRef, color = 'white'){
+  let mat = new THREE.MeshPhongMaterial({color: color});
+  setupStencilChildMaterial(mat, stencilRef);
 
   return mat
 }
@@ -726,7 +855,7 @@ export function getScenePool(){
   return scenePool;
 };
 
-export function boxProperties(name, parent, color, width, height, depth, smoothness, radius, zOffset = 1){
+export function boxProperties(name, parent, color, width, height, depth, smoothness, radius, zOffset = 1, matProps=materialProperties()){
   return {
     'name': name,
     'parent': parent,
@@ -736,14 +865,16 @@ export function boxProperties(name, parent, color, width, height, depth, smoothn
     'depth': depth,
     'smoothness': smoothness,
     'radius': radius,
-    'zOffset': zOffset
+    'zOffset': zOffset,
+    'matProps': matProps
   }
 };
 
-export function contentBox(boxProps, padding, clipped=true){
-  clipped = false;
-  const mat = phongStenciledMaterial(0);
-  mat.color.set(boxProps.color);
+export function contentBox(boxProps, padding){
+  // const mat = stencilChildMaterial(0);
+  // mat.color.set(boxProps.color);
+  const mat = getMaterial(boxProps.matProps, 0);
+
   const box = new THREE.Mesh(RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset), mat);
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
@@ -787,16 +918,14 @@ export function roundedBox(boxProps, padding){
 };
 
 export function portalBox(boxProps, padding){
-  const mat = stencilMaterial();
-  let stencilRef = stencilRefs.length;
-  mat.stencilWrite = true;
+  const mat = getStencilMaterial(boxProps.matProps);
   const box = new THREE.Mesh(RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset), mat );
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
   box.userData.padding = padding;
 
-  let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'stencilRef': stencilRef, 'padding': padding  };
+  let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'stencilRef': mat.stencilRef, 'padding': padding  };
 
   portals.push(result);
 
@@ -805,16 +934,14 @@ export function portalBox(boxProps, padding){
 };
 
 export function portalWindow(boxProps, padding){
-  const mat = stencilMaterial();
-  let stencilRef = stencilRefs.length;
-  mat.stencilWrite = true;
+  const mat = getStencilMaterial(boxProps.matProps);
   const box = new THREE.Mesh(RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness ), mat );
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
   box.userData.padding = padding;
 
-  let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'stencilRef': stencilRef, 'padding': padding  };
+  let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'stencilRef': mat.stencilRef, 'padding': padding  };
 
   portals.push(result);
 
@@ -938,14 +1065,14 @@ export function toggleBox(width, height, padding=0.1, horizontal=true){
 
 };
 
-export function meshProperties(curveSegments=12, bevelEnabled=false, bevelThickness=0.1, bevelSize=0.1, bevelOffset=0, bevelSegments=3){
+export function textMeshProperties(curveSegments=12, bevelEnabled=false, bevelThickness=0.1, bevelSize=0.1, bevelOffset=0, bevelSegments=3){
   return {
     'curveSegments': curveSegments,
     'bevelEnabled': bevelEnabled,
     'bevelThickness': bevelThickness,
     'bevelSize': bevelSize,
     'bevelOffset': bevelOffset,
-    'bevelSegments': bevelSegments
+    'bevelSegments': bevelSegments,
   }
 }
 
@@ -1026,7 +1153,7 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
       } else {
 
          if(meshProps == undefined){
-          meshProps = meshProperties()
+          meshProps = textMeshProperties()
         }
         const geometry = createTextGeometry(character, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
         geometry.translate(lineWidth, yPosition, boxSize.depth+textProps.zOffset);
@@ -1044,7 +1171,7 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
         }
 
         // Update lineWidth
-        lineWidth += width;
+        lineWidth += width-textProps.padding;
       }
 
       // Check if lineWidth exceeds cBox width - padding
@@ -1054,15 +1181,12 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
       }
     }
 
-    console.log("LETTER GEOMETRIES")
-    console.log(letterGeometries)
-
 
     // Merge the individual letter geometries into a single buffer geometry
     return BufferGeometryUtils.mergeGeometries(letterGeometries);
 }
 
-export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined) {
+export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPath, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined) {
     let lineWidth = 0;
     let yPosition = boxHeight / 2 - padding;
     const letterGeometries = [];
@@ -1076,7 +1200,7 @@ export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPa
       } else {
 
          if(meshProps == undefined){
-          meshProps = meshProperties()
+          meshProps = textMeshProperties()
         }
         const geometry = createTextGeometry(character, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
         geometry.translate(lineWidth, yPosition, 0);
@@ -1103,9 +1227,6 @@ export function createStaticTextBox(boxProps, text, textProps=undefined, meshPro
     const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
 
     let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    if(textProps.clipped){
-      mat = clipMaterial([cBox.clipTop, cBox.clipBottom, cBox.clipLeft, cBox.clipRight]);
-    }
 
     // Merge the individual letter geometries into a single buffer geometry
     let mergedGeometry = createMergedTextBoxGeometry(cBox, font, boxProps.width, boxProps.height, text, textProps, meshProps, animProps);
@@ -1121,7 +1242,7 @@ export function createStaticTextBox(boxProps, text, textProps=undefined, meshPro
 
     if(listConfig != undefined){
       cBox.box.name = boxProps.name;
-      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
     }else{
       boxProps.parent.add(cBox.box);
     }
@@ -1177,7 +1298,7 @@ export function createStaticTextPortal(boxProps, text, textProps=undefined, mesh
     portal.box.add( mergedMesh );
 
     if(listConfig != undefined){
-      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
     }else{
       boxProps.parent.add(portal.box);
     }
@@ -1199,10 +1320,8 @@ export function createStaticScrollableTextBox(boxProps, text, textProps=undefine
   loader.load(textProps.font, (font) => {
     const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
 
-    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    if(textProps.clipped){
-      mat = clipMaterial([cBox.clipTop, cBox.clipBottom, cBox.clipLeft, cBox.clipRight]);
-    }
+    let mat = getMaterial(textProps.matProps, 0);
+
     // Merge the individual letter geometries into a single buffer geometry
     let mergedGeometry = createMergedTextBoxGeometry(cBox, font, boxProps.width, boxProps.height, text, textProps, meshProps, animProps);
 
@@ -1218,7 +1337,7 @@ export function createStaticScrollableTextBox(boxProps, text, textProps=undefine
 
     if(listConfig != undefined){
       cBox.box.name = boxProps.name;
-      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
     }else{
       boxProps.parent.add(cBox.box);
     }
@@ -1248,11 +1367,7 @@ export function createStaticScrollableTextPortal(boxProps, text, textProps=undef
   // Load the font
   loader.load(textProps.font, (font) => {
     const portal = portalWindow(boxProps, 0);
-
-    let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    mat.stencilWrite = true;
-    mat.stencilRef = portal.stencilRef;
-    mat.stencilFunc = THREE.EqualStencilFunc;
+    let mat = getMaterial(textProps.matProps, portal.stencilRef);
 
     // Merge the individual letter geometries into a single buffer geometry
     let mergedGeometry = createMergedTextBoxGeometry(portal, font, boxProps.width, boxProps.height, text, textProps, meshProps, animProps);
@@ -1271,7 +1386,7 @@ export function createStaticScrollableTextPortal(boxProps, text, textProps=undef
     
     if(listConfig != undefined){
       portal.box.name = boxProps.name;
-      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
     }else{
       boxProps.parent.add( portal.box );
     }
@@ -1305,17 +1420,13 @@ export function createMultiTextBox(boxProps, text, textProps=undefined, meshProp
     const letterGeometries = [];
     const letterMeshes = [];
 
-    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    if(textProps.clipped){
-      mat = clipMaterial([cBox.clipTop, cBox.clipBottom, cBox.clipLeft, cBox.clipRight]);
-      clippedMeshes.push(cBox);
-    }
+    let mat = getMaterial(textProps.matProps, 0);
 
     constructMultiMergedGeometry(cBox, text, font, mat, textProps, meshProps, animProps);
 
     if(listConfig != undefined){
       cBox.box.name = name;
-      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
     }else{
       boxProps.parent.add(cBox.box);
     }
@@ -1347,16 +1458,13 @@ export function createMultiTextPortal(boxProps, text, textProps=undefined, meshP
     const letterGeometries = [];
     const letterMeshes = [];
 
-    let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    mat.stencilWrite = true;
-    mat.stencilRef = portal.stencilRef;
-    mat.stencilFunc = THREE.EqualStencilFunc;
+    let mat = getMaterial(textProps.matProps, portal.stencilRef);
 
     constructMultiMergedGeometry(portal, text, font, mat, textProps, meshProps, animProps);
 
     if(listConfig != undefined){
       portal.box.name = name;
-      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
     }else{
       boxProps.parent.add(portal.box);
     }
@@ -1383,7 +1491,7 @@ export function createMultiScrollableTextBox(boxProps, text, textProps=undefined
   loader.load(textProps.font, (font) => {
     const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
 
-    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    let mat = getMaterial(textProps.matProps, 0);
 
 
     const mergedMesh = constructMultiTextMerged(cBox, text, font, mat, textProps, meshProps, animProps);
@@ -1391,7 +1499,7 @@ export function createMultiScrollableTextBox(boxProps, text, textProps=undefined
 
     if(listConfig != undefined){
       cBox.box.name = boxProps.name;
-      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
     }else{
       boxProps.parent.add(cBox.box);
     }
@@ -1420,10 +1528,7 @@ export function createMultiScrollableTextPortal(boxProps, text, textProps=undefi
   loader.load(textProps.font, (font) => {
     const portal = portalWindow(boxProps, 0);
 
-    let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    mat.stencilWrite = true;
-    mat.stencilRef = portal.stencilRef;
-    mat.stencilFunc = THREE.EqualStencilFunc;
+    let mat = getMaterial(textProps.matProps, portal.stencilRef);
 
     const mergedMesh = constructMultiTextMerged(portal, text, font, mat, textProps, meshProps, animProps);
     portal.box.add(mergedMesh);
@@ -1431,7 +1536,7 @@ export function createMultiScrollableTextPortal(boxProps, text, textProps=undefi
 
     if(listConfig != undefined){
       portal.box.name = boxProps.name;
-      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
     }else{
       boxProps.parent.add(portal.box);
     }
@@ -1456,7 +1561,7 @@ export function createMultiScrollableTextPortal(boxProps, text, textProps=undefi
 };
 
 function constructMultiMergedGeometry(obj, text, font, material, textProps, meshProps, animProps, scene = undefined){
-  let lineWidth = -(obj.box.userData.width / 2 - textProps.padding*2);
+  let lineWidth = -(obj.box.userData.width / 2 - textProps.padding);
   let yPosition = obj.box.userData.height / 2 - textProps.padding*2;
   const boxSize = getGeometrySize(obj.box.geometry);
   const letterGeometries = [];
@@ -1472,7 +1577,7 @@ function constructMultiMergedGeometry(obj, text, font, material, textProps, mesh
       } else {
 
          if(meshProps == undefined){
-          meshProps = meshProperties()
+          meshProps = textMeshProperties()
         }
         const geometry = createTextGeometry(character, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
 
@@ -1517,7 +1622,6 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
   const letterMeshes = [];
   const cubes = [];
 
-
   for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
@@ -1527,7 +1631,7 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
       } else {
 
          if(meshProps == undefined){
-          meshProps = meshProperties()
+          meshProps = textMeshProperties()
         }
         const geometry = createTextGeometry(character, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
         const cube = new THREE.BoxGeometry(textProps.size*2, textProps.size*2, textProps.height);
@@ -1604,9 +1708,6 @@ function selectionTextBox(boxProps, text, font, textProps=undefined, meshProps=u
   const Box = contentBox(boxProps, textProps.padding, textProps.clipped);
 
   let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-  if(textProps.clipped){
-    mat = clipMaterial([Box.clipTop, Box.clipBottom, Box.clipLeft, Box.clipRight]);
-  }
 
   const promptGeometry = createMergedTextBoxGeometry(Box, font, boxProps.width, boxProps.height, text, textProps, meshProps, animProps);
   const promptMesh = new THREE.Mesh(promptGeometry, mat);
@@ -1649,9 +1750,9 @@ function selectionTextPortal(boxProps, text, font, textProps=undefined, meshProp
   return {promptMesh, Box}
 }
 
-function selectionText(boxProps, text, font, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined){
+function selectionText(boxProps, text, font, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined){
 
-  const promptGeometry = createMergedTextGeometry(font, boxProps.width, boxProps.height, text, 'fontPath', clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animProps);
+  const promptGeometry = createMergedTextGeometry(font, boxProps.width, boxProps.height, text, 'fontPath', letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animProps);
   promptGeometry.center();
 
   const geomSize = getGeometrySize(promptGeometry);
@@ -1659,9 +1760,7 @@ function selectionText(boxProps, text, font, clipped=true, letterSpacing=1, line
   let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
   const cBox = contentBox(geomSize.width+padding, boxHeight, padding, clipped);
   const boxSize = getGeometrySize(cBox.box.geometry);
-  if(clipped){
-    mat = clipMaterial([cBox.clipTop, cBox.clipBottom, cBox.clipLeft, cBox.clipRight]);
-  }
+
   const promptMesh = new THREE.Mesh(promptGeometry, mat);
 
   setMergedMeshUserData(boxSize, geomSize, padding, promptMesh);
@@ -1677,7 +1776,7 @@ function selectionText(boxProps, text, font, clipped=true, letterSpacing=1, line
 
 function handleTextInputSetup(inputProps, textProps, meshProps, font){
   inputPrompts.push(inputProps.promptMesh);
-  const tProps = {'cBox': inputProps.Box, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'zOffset':textProps.zOffset, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': meshProps };
+  const tProps = {'cBox': inputProps.Box, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'zOffset':textProps.zOffset, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': meshProps };
   inputProps.promptMesh.userData.textProps = tProps;
   inputProps.Box.box.userData.mouseOverParent = true;
   mouseOverable.push(inputProps.Box.box);
@@ -1719,8 +1818,8 @@ export function createListSelector(selectors, boxProps, text, textProps=undefine
     const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
     selectorUserData(cBox.box);
     for (const [selTxt, url] of Object.entries(selectors)) {
-      let inputProps = selectionText(cBox.box, boxProps.width, boxProps.height, boxProps.name, selTxt, font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated);
-      const tProps = {'cBox': inputProps.cBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'clipped': textProps.clipped, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'draggable': true, 'meshProps': meshProps };
+      let inputProps = selectionText(cBox.box, boxProps.width, boxProps.height, boxProps.name, selTxt, font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated);
+      const tProps = {'cBox': inputProps.cBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'draggable': true, 'meshProps': meshProps };
       inputProps.promptMesh.userData.textProps = tProps;
       inputPrompts.push(inputProps.promptMesh);
       mouseOverable.push(inputProps.promptMesh);
@@ -1736,11 +1835,11 @@ export function createListSelector(selectors, boxProps, text, textProps=undefine
   });
 };
 
-function Button(boxProps, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined, mouseOver=true) {
+function Button(boxProps, text, fontPath, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined, mouseOver=true) {
   loader.load(fontPath, (font) => {
-    let txtMesh = selectionText(boxProps, text, font, clipped, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animProps, onCreated);
+    let txtMesh = selectionText(boxProps, text, font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, meshProps, animProps, onCreated);
     inputPrompts.push(txtMesh.promptMesh);
-    const textProps = {'cBox': txtMesh.cBox, 'text': '', 'textMesh': txtMesh.promptMesh, 'font': font, 'size': size, 'height': height, 'clipped': clipped, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': meshProps };
+    const textProps = {'cBox': txtMesh.cBox, 'text': '', 'textMesh': txtMesh.promptMesh, 'font': font, 'size': size, 'height': height, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': meshProps };
     txtMesh.cBox.box.userData.textProps = textProps;
     txtMesh.cBox.box.userData.draggable=false;
     txtMesh.promptMesh.userData.mouseOverParent = true;
@@ -1754,14 +1853,14 @@ function Button(boxProps, text, fontPath, clipped=true, letterSpacing=1, lineSpa
 }
 
 export function createButton(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
-  Button(boxProps, text, textProps.font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, false);
+  Button(boxProps, text, textProps.font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, false);
 };
 
 export function createMouseOverButton(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
-  Button(boxProps, text, textProps.font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, true);
+  Button(boxProps, text, textProps.font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, true);
 };
 
-function createToggle(boxProps, text, fontPath, clipped=true, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true) {
+function createToggle(boxProps, text, fontPath, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true) {
   loader.load(fontPath, (font) => {
 
     let toggle = toggleBox(boxProps.width, boxProps.height, padding, horizontal);
@@ -1782,11 +1881,11 @@ function createToggle(boxProps, text, fontPath, clipped=true, letterSpacing=1, l
 }
 
 export function createHorizontalToggle(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
-  createToggle(boxProps, text, textProps.font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, true);
+  createToggle(boxProps, text, textProps.font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, true);
 };
 
 export function createVerticalToggle(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
-  createToggle(boxProps, text, textProps.font, textProps.clipped, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, false);
+  createToggle(boxProps, text, textProps.font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, false);
 };
 
 
@@ -1800,7 +1899,7 @@ export function createImageBox(boxProps, imgUrl, textProps=undefined, meshProps=
 
   if(listConfig != undefined){
     cBox.box.name = boxProps.name;
-    createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+    createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
   }else{
     boxProps.parent.add(cBox.box);
   }
@@ -1825,7 +1924,7 @@ export function createImagePortal(boxProps, imgUrl, textProps=undefined, meshPro
 
   if(listConfig != undefined){
     portal.box.name = boxProps.name;
-    createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+    createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
   }else{
     boxProps.parent.add(portal.box);
   }
@@ -1868,7 +1967,7 @@ export function createGLTFModel(boxProps, gltfUrl, textProps=undefined, meshProp
 
       if(listConfig != undefined){
         cBox.box.name = boxProps.name;
-        createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+        createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
       }else{
         boxProps.parent.add(cBox.box);
       }
@@ -1932,7 +2031,7 @@ export function createGLTFModelPortal(boxProps, gltfUrl, textProps=undefined, me
 
       if(listConfig != undefined){
         portal.box.name = boxProps.name;
-        createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.index);
+        createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
       }else{
         boxProps.parent.add(portal.box);
         portal.box.position.set(portal.box.position.x, portal.box.position.y, portal.box.position.z+(parentSize.depth/2))
@@ -1955,7 +2054,7 @@ export function createGLTFModelPortal(boxProps, gltfUrl, textProps=undefined, me
   );
 }
 
-export function createListItem( boxProps, content, textProps=undefined, meshProps=undefined, animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, index=0) {
+export function createListItem( boxProps, content, textProps=undefined, meshProps=undefined, animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, childInset=0.9, index=0) {
   const parentSize = getGeometrySize(boxProps.parent.geometry);
   const contentSize = getGeometrySize(content.geometry);
   const elemBox = contentBox(boxProps, 0, false);
@@ -1963,12 +2062,14 @@ export function createListItem( boxProps, content, textProps=undefined, meshProp
   const elemBoxSize = getGeometrySize(elemBox.box.geometry);
   elemBox.box.add(content);
   content.position.set(0, 0, elemBoxSize.depth/2+0.01);
+  content.scale.set(content.scale.x*childInset, content.scale.y*childInset, content.scale.z*childInset);
 
   if(infoProps.title.length>0 || infoProps.author.length>0 || useTimeStamp){
 
     loader.load(textProps.font, (font) => {
 
-      let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+      //let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+      let mat = getMaterial(textProps.matProps, 0);
 
       if(infoProps.title.length>0){
 
@@ -2013,7 +2114,7 @@ export function createListItem( boxProps, content, textProps=undefined, meshProp
       }
 
       elemBox.box.position.set(elemBox.box.position.x, (boxProps.parent.userData.height-spacing)/2-elemBoxSize.height/2-((elemBoxSize.height+spacing)*index), elemBox.box.position.z+parentSize.depth)
-      console.log(elemBox.box)
+
     });
   }
 
@@ -2024,8 +2125,8 @@ export function createStaticTextList( boxProps, contentArr, textProps=undefined,
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createStaticTextBox(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createStaticTextBox(boxProps, text, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2035,8 +2136,8 @@ export function createStaticTextPortalList( boxProps, contentArr, textProps=unde
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createStaticTextPortal(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createStaticTextPortal(boxProps, text, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2046,8 +2147,8 @@ export function createStaticScrollableTextList( boxProps, contentArr, textProps=
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createStaticScrollableTextBox(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createStaticScrollableTextBox(boxProps, text, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2057,8 +2158,8 @@ export function createStaticScrollableTextPortalList( boxProps, contentArr, text
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createStaticScrollableTextPortal(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createStaticScrollableTextPortal(boxProps, text, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2068,8 +2169,8 @@ export function createMultiTextList( boxProps, contentArr, textProps=undefined, 
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createMultiTextBox(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createMultiTextBox(boxProps, text, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2079,8 +2180,8 @@ export function createMultiTextPortalList( boxProps, contentArr, textProps=undef
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createMultiTextPortal(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createMultiTextPortal(boxProps, text, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2090,8 +2191,8 @@ export function createMultiScrollableTextList( boxProps, contentArr, textProps=u
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createMultiScrollableTextBox(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createMultiScrollableTextBox(boxProps, text, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2101,8 +2202,8 @@ export function createMultiScrollableTextPortalList( boxProps, contentArr, textP
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index);
-    createMultiScrollableTextPortal(lConfig.boxProps, text, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createMultiScrollableTextPortal(boxProps, text, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2113,8 +2214,8 @@ export function createImageContentList( boxProps, contentArr, textProps=undefine
 
   contentArr.forEach((imgUrl, index) =>{
     console.log(imgUrl);
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
-    createImageBox(lConfig.boxProps, imgUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
+    createImageBox(boxProps, imgUrl, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2125,8 +2226,8 @@ export function createImagePortalList(boxProps, contentArr, textProps=undefined,
 
   contentArr.forEach((imgUrl, index) =>{
     console.log(imgUrl);
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
-    createImagePortal(lConfig.boxProps, imgUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
+    createImagePortal(boxProps, imgUrl, textProps, meshProps, animProps, lConfig);
   });
 
 };
@@ -2137,7 +2238,7 @@ export function createGLTFContentList( boxProps, contentArr, textProps=undefined
 
   contentArr.forEach((gltfUrl, index) =>{
     console.log(gltfUrl)
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
     createGLTFModel(lConfig.boxProps, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
   });
 
@@ -2148,8 +2249,8 @@ export function createGLTFContentPortalList( boxProps, contentArr, textProps=und
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((gltfUrl, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, index)
-    createGLTFModelPortal(lConfig.boxProps, gltfUrl, lConfig.textProps, lConfig.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
+    createGLTFModelPortal(boxProps, gltfUrl, textProps, meshProps, animProps, lConfig);
   });
 
 };
