@@ -34,8 +34,10 @@ let cameraPool = [];
 let mouseDown = false;
 let isDragging = false;
 let lastDragged = undefined;
+let previousMouseX = 0;
 let previousMouseY = 0;
 let moveDir = 1;
+let dragDistX = 0;
 let dragDistY = 0;
 let lastClick = 0;
 let mouseOver = [];
@@ -564,6 +566,17 @@ export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, pa
   }
 };
 
+export function textMeshProperties(curveSegments=12, bevelEnabled=false, bevelThickness=0.1, bevelSize=0.1, bevelOffset=0, bevelSegments=3){
+  return {
+    'curveSegments': curveSegments,
+    'bevelEnabled': bevelEnabled,
+    'bevelThickness': bevelThickness,
+    'bevelSize': bevelSize,
+    'bevelOffset': bevelOffset,
+    'bevelSegments': bevelSegments,
+  }
+}
+
 export function createTextGeometry(character, font, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments) {
   return new TextGeometry(character, {
     font: font,
@@ -1023,29 +1036,33 @@ export function renderMeshView(meshView, mainScene, mainCam, renderer){
   renderer.setScissorTest(false);
 }
 
-export function toggleBox(boxProps, padding=0.1, horizontal=true){
+export function switchWidgetBox(boxProps, padding=0.1, horizontal=true, handleSize=2){
 
-  let baseWidth=boxProps.width*2;
-  let baseHeight=boxProps.height;
   let baseDepth=boxProps.depth/2;
+  let handleWidth=boxProps.width/handleSize;
+  let handleHeight=boxProps.height;
+  let handleDepth=boxProps.depth*2;
   if(horizontal==false){
-    baseWidth=boxProps.width;
-    baseHeight=boxProps.height*2;
+    handleWidth=boxProps.width;
+    handleHeight=boxProps.height/handleSize;
   }
   
   let handleMat = getMaterial(boxProps.matProps, boxProps.parent.material.stencilRef);
-  handleMat.depthWrite = true;
   let baseMat = getMaterial(boxProps.matProps, boxProps.parent.material.stencilRef);
   let mat = boxProps.parent.material;
   let c = colorsea('#'+baseMat.color.getHexString(), 100).darken(10);
   baseMat.color.set(c.hex());
 
-  let handleGeometry = new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth);
-  let baseGeometry = new THREE.BoxGeometry(baseWidth+padding, baseHeight+padding, boxProps.depth/2);
+  let handleGeometry = new THREE.BoxGeometry(handleWidth, handleHeight, handleDepth);
+  let baseGeometry = new THREE.BoxGeometry(boxProps.width+padding, boxProps.height+padding, boxProps.depth/2);
 
   if(boxProps.complexMesh){
-    handleGeometry = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
-    baseGeometry = RoundedBoxGeometry(baseWidth+padding, baseHeight+padding, boxProps.depth/2, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+    handleGeometry = RoundedBoxGeometry(handleWidth, handleHeight, handleDepth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+    if(boxProps.depth == 0){
+      baseGeometry = RoundedPlaneGeometry(boxProps.width+padding, boxProps.height+padding, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+    }else{
+      baseGeometry = RoundedBoxGeometry(boxProps.width+padding, boxProps.height+padding, boxProps.depth/2, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+    }
   }
 
   const handle = new THREE.Mesh(handleGeometry, handleMat);
@@ -1054,38 +1071,91 @@ export function toggleBox(boxProps, padding=0.1, horizontal=true){
   base.add(handle);
 
   if(horizontal){
-    handle.position.set(-(baseWidth/2-boxProps.width/2)+padding, handle.position.y, handle.position.z+baseDepth);
+    handle.position.set(-(boxProps.width/2-handleWidth/2)+padding, handle.position.y, handle.position.z+baseDepth);
   }else{
-    handle.position.set(handle.position.x, -(baseHeight/2-boxProps.height/2)+padding, handle.position.z+baseDepth);
+    handle.position.set(handle.position.x, handle.position.y+(boxProps.height/2-handleHeight/2)+padding, handle.position.z+baseDepth);
   }
   base.userData.horizontal = horizontal;
 
   let result = { 'handle': handle, 'base': base }
-  setToggleUserData(result, boxProps, padding, horizontal)
 
   return result
 
 };
 
-export function textMeshProperties(curveSegments=12, bevelEnabled=false, bevelThickness=0.1, bevelSize=0.1, bevelOffset=0, bevelSegments=3){
-  return {
-    'curveSegments': curveSegments,
-    'bevelEnabled': bevelEnabled,
-    'bevelThickness': bevelThickness,
-    'bevelSize': bevelSize,
-    'bevelOffset': bevelOffset,
-    'bevelSegments': bevelSegments,
+export function sliderBox(boxProps, padding=0.1, horizontal=true){
+
+  let result = switchWidgetBox(boxProps, padding, horizontal, 8);
+  setSliderUserData(result, boxProps, padding, horizontal);
+
+  return result
+
+};
+
+function setSliderUserData(slider, boxProps, padding, horizontal=true, min=0, max=1){
+  let extraSpace = padding*0.5;
+  let baseDepth=boxProps.depth/2;
+  let handleWidth=boxProps.width/8;
+  let handleHeight=boxProps.height;
+  let handleDepth=boxProps.depth*2;
+  if(horizontal==false){
+    handleWidth=boxProps.width;
+    handleHeight=boxProps.height/8;
   }
+
+  slider.base.userData.type = 'SLIDER';
+  slider.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': baseDepth};
+  slider.base.userData.handle = slider.handle;
+  slider.base.userData.horizontal = horizontal;
+
+  slider.handle.userData.type = 'SLIDER';
+  slider.handle.userData.size = {'width': boxProps.width-padding, 'height': boxProps.height-padding, 'depth': boxProps.depth*2};
+  slider.handle.userData.startPos = new THREE.Vector3().copy(slider.handle.position);
+  slider.handle.userData.horizontal = horizontal;
+  slider.handle.userData.min = min;
+  slider.handle.userData.max = max;
+
+  slider.handle.userData.initialPosition = 0;
+
+  if(horizontal){
+    slider.handle.userData.startPos = new THREE.Vector3(slider.handle.position.x+boxProps.width/2-(padding*2), slider.handle.position.y, slider.handle.position.z+baseDepth);
+    slider.handle.userData.maxScroll = slider.handle.userData.startPos.x + boxProps.width/2 - (padding+extraSpace);
+  slider.handle.userData.minScroll = -boxProps.width+slider.handle.userData.maxScroll+(padding-extraSpace);
+  }else{
+    slider.handle.userData.startPos = new THREE.Vector3(slider.handle.position.x, slider.handle.position.y+(boxProps.height/2)-(padding*2), slider.handle.position.z+baseDepth);
+    slider.handle.userData.maxScroll = slider.handle.userData.startPos.y - boxProps.height/2 + (padding+extraSpace);
+    slider.handle.userData.minScroll = -boxProps.height+slider.handle.userData.maxScroll+(padding-extraSpace);
+  }
+
+  slider.handle.userData.padding = padding;
+  slider.handle.userData.settleThreshold = handleHeight/50;
+  slider.handle.userData.horizontal = horizontal;
+  slider.handle.userData.draggable = true;
+
 }
+
+export function toggleBox(boxProps, padding=0.1, horizontal=true){
+
+  let result = switchWidgetBox(boxProps, padding, horizontal, 2);
+  setToggleUserData(result, boxProps, padding, horizontal);
+
+  return result
+
+};
 
 function setToggleUserData(toggle, boxProps, padding, horizontal=true){
   
-  let baseWidth=boxProps.width*2;
-  let baseHeight=boxProps.height;
   let baseDepth=boxProps.depth/2;
+  let handleWidth=boxProps.width/2;
+  let handleHeight=boxProps.height;
+  let handleDepth=boxProps.depth*2;
+  if(horizontal==false){
+    handleWidth=boxProps.width;
+    handleHeight=boxProps.height/2;
+  }
 
   toggle.base.userData.type = 'TOGGLE';
-  toggle.base.userData.size = {'width': baseWidth, 'height': baseHeight, 'depth': baseDepth};
+  toggle.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': baseDepth};
   toggle.base.userData.handle = toggle.handle;
   toggle.base.userData.horizontal = horizontal;
 
@@ -1097,9 +1167,9 @@ function setToggleUserData(toggle, boxProps, padding, horizontal=true){
   toggle.handle.userData.on = false;
 
   if(horizontal){
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+baseWidth/2-(padding*2), toggle.handle.position.y, toggle.handle.position.z+baseDepth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+boxProps.width/2-(padding*2), toggle.handle.position.y, toggle.handle.position.z+baseDepth);
   }else{
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, (baseHeight-boxProps.height/2)-padding, toggle.handle.position.z+baseDepth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, toggle.handle.position.y+(boxProps.height/2)-(padding*2), toggle.handle.position.z+baseDepth);
   }
 
 }
@@ -1348,6 +1418,7 @@ export function createStaticScrollableTextBox(boxProps, text, textProps=undefine
     adjustBoxScaleRatio(cBox.box, boxProps.parent);
     setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
     mergedMesh.userData.draggable=true;
+    mergedMesh.userData.horizontal=false;
 
     draggable.push(mergedMesh);
     if(animProps!=undefined){
@@ -1397,6 +1468,7 @@ export function createStaticScrollableTextPortal(boxProps, text, textProps=undef
     adjustBoxScaleRatio(portal.box, boxProps.parent);
     setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
     mergedMesh.userData.draggable=true;
+    mergedMesh.userData.horizontal=false;
 
     draggable.push(mergedMesh);
     if(animProps!=undefined){
@@ -1686,6 +1758,7 @@ function constructMultiTextMerged(obj, text, font, material, textProps, meshProp
     mergedMesh.position.set(0, -textProps.padding, 0);
     setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
     mergedMesh.userData.draggable=true;
+    mergedMesh.userData.horizontal=false;
     if(name==''){
       name='text-'+obj.box.id;
     }
@@ -1863,14 +1936,35 @@ function createToggleText(font, boxProps, text, textProps, meshProps=undefined, 
     const geometry = createTextGeometry(boxProps.name, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
     const mergedMesh = new THREE.Mesh(geometry, mat);
 
-    mergedMesh.position.set(-boxProps.width+textProps.padding, boxProps.height/2+textProps.padding, 0);
+    mergedMesh.position.set(-boxProps.width/2+textProps.padding, boxProps.height/2+textProps.padding, 0);
     if(!horizontal){
-      mergedMesh.position.set(-boxProps.width/2+textProps.padding, boxProps.height+textProps.padding, 0);
+      mergedMesh.position.set(-boxProps.width/2+textProps.padding, boxProps.height/2+textProps.padding, 0);
     }
     boxProps.parent.add(mergedMesh);
 
   }
 }
+
+function createSliderBox(boxProps, text, textProps, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true) {
+  loader.load(textProps.font, (font) => {
+    const parentSize = getGeometrySize(boxProps.parent.geometry);
+    let toggle = sliderBox(boxProps, textProps.padding, horizontal);
+    boxProps.parent.add(toggle.base);
+    toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
+    draggable.push(toggle.handle);
+
+    createToggleText(font, boxProps, text, textProps, meshProps, animProps, onCreated, horizontal);
+
+  });
+}
+
+export function createHorizontalSliderBox(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  createSliderBox(boxProps, text, textProps, meshProps, animProps, onCreated, true);
+};
+
+export function createVerticalSliderBox(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  createSliderBox(boxProps, text, textProps, meshProps, animProps, onCreated, false);
+};
 
 function createToggleBox(boxProps, text, textProps, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true) {
   loader.load(textProps.font, (font) => {
@@ -2299,6 +2393,7 @@ export function addTranslationControl(elem, camera, renderer){
 export function mouseDownHandler(raycaster){
   mouseDown = true;
   isDragging = true;
+  previousMouseX = event.clientX;
   previousMouseY = event.clientY;
 
   const intersectsDraggable = raycaster.intersectObjects(draggable);
@@ -2306,6 +2401,7 @@ export function mouseDownHandler(raycaster){
   const intersectsToggle = raycaster.intersectObjects(toggles);
 
   if ( intersectsDraggable.length > 0 ) {
+    console.log('intersects draggable')
     lastDragged = intersectsDraggable[0].object;
   }
 
@@ -2333,19 +2429,35 @@ export function mouseUpHandler(){
 
 export function mouseMoveHandler(raycaster, event){
   if (lastDragged != undefined && lastDragged.userData.draggable && mouseDown && isDragging) {
+    const deltaX = event.clientX - previousMouseX;
     const deltaY = event.clientY - previousMouseY;
     const dragPosition = lastDragged.position.clone();
-    dragDistY = deltaY;
+    if(!lastDragged.userData.horizontal){
+      dragDistY = deltaY;
 
-    if(deltaY<0){
-      moveDir=1
+      if(deltaY<0){
+        moveDir=1
+      }else{
+        moveDir=-1;
+      }
+      // Limit scrolling
+      dragPosition.y = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll+lastDragged.userData.padding, dragPosition.y - deltaY * 0.01));
+      lastDragged.position.copy(dragPosition);
+      previousMouseY = event.clientY;
     }else{
-      moveDir=-1;
+      dragDistX = deltaX;
+
+      if(deltaX<0){
+        moveDir=1
+      }else{
+        moveDir=-1;
+      }
+      // Limit scrolling
+      dragPosition.x = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll-lastDragged.userData.padding, dragPosition.x + deltaX * 0.01));
+      lastDragged.position.copy(dragPosition);
+      previousMouseX = event.clientX;
     }
-    // Limit scrolling
-    dragPosition.y = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll+lastDragged.userData.padding, dragPosition.y - deltaY * 0.01));
-    lastDragged.position.copy(dragPosition);
-    previousMouseY = event.clientY;
+    
   }
 
   const intersectsMouseOverable = raycaster.intersectObjects(mouseOverable);
