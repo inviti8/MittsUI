@@ -6,6 +6,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import * as CameraUtils from 'three/addons/utils/CameraUtils.js';
+import colorsea from 'colorsea'
+
 
 const loader = new FontLoader();
 const gltfLoader = new GLTFLoader();
@@ -732,44 +734,11 @@ export function setupStencilChildMaterial(mat, stencilRef){
   mat.stencilFunc = THREE.EqualStencilFunc;
 };
 
-export function getStencilMaterial(matProps){
+export function stencilMaterial(matProps){
   let stencilRef = getStencilRef();
 
   return getMaterial(matProps, stencilRef);
 };
-
-export function stencilMaterial(color = 'white'){
-  let stencilRef = getStencilRef();
-
-  const mat = new THREE.MeshBasicMaterial({ color: color });
-  setupStencilMaterial(mat, stencilRef);
-
-  return mat
-};
-
-export function stencilChildMaterial(stencilRef, color = 'white'){
-  let mat = new THREE.MeshBasicMaterial({color: color});
-  setupStencilChildMaterial(mat, stencilRef);
-
-  return mat
-}
-
-export function stencilPhongMaterial(color = 'white'){
-  stencilRefs.push(stencilRefs.length+1);
-  let stencilRef = stencilRefs.length;
-
-  const mat = new THREE.MeshPhongMaterial({ color: color });
-  setupStencilMaterial(mat, stencilRef);
-
-  return mat
-};
-
-export function stencilChildPhongMaterial(stencilRef, color = 'white'){
-  let mat = new THREE.MeshPhongMaterial({color: color});
-  setupStencilChildMaterial(mat, stencilRef);
-
-  return mat
-}
 
 export function getDraggable(obj){
   return draggable;
@@ -855,7 +824,7 @@ export function getScenePool(){
   return scenePool;
 };
 
-export function boxProperties(name, parent, color, width, height, depth, smoothness, radius, zOffset = 1, matProps=materialProperties()){
+export function boxProperties(name, parent, color, width, height, depth, smoothness, radius, zOffset = 1, complexMesh=true, matProps=materialProperties()){
   return {
     'name': name,
     'parent': parent,
@@ -866,16 +835,19 @@ export function boxProperties(name, parent, color, width, height, depth, smoothn
     'smoothness': smoothness,
     'radius': radius,
     'zOffset': zOffset,
+    'complexMesh': complexMesh,
     'matProps': matProps
   }
 };
 
 export function contentBox(boxProps, padding){
-  // const mat = stencilChildMaterial(0);
-  // mat.color.set(boxProps.color);
   const mat = getMaterial(boxProps.matProps, 0);
+  let geometry = new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth);
+  if(boxProps.complexMesh){
+    geometry = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+  }
 
-  const box = new THREE.Mesh(RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset), mat);
+  const box = new THREE.Mesh(geometry, mat);
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
@@ -918,8 +890,13 @@ export function roundedBox(boxProps, padding){
 };
 
 export function portalBox(boxProps, padding){
-  const mat = getStencilMaterial(boxProps.matProps);
-  const box = new THREE.Mesh(RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset), mat );
+  const mat = stencilMaterial(boxProps.matProps);
+  let geometry = new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth);
+  if(boxProps.complexMesh){
+    geometry = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+  }
+
+  const box = new THREE.Mesh(geometry, mat );
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
@@ -934,8 +911,13 @@ export function portalBox(boxProps, padding){
 };
 
 export function portalWindow(boxProps, padding){
-  const mat = getStencilMaterial(boxProps.matProps);
-  const box = new THREE.Mesh(RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness ), mat );
+  const mat = stencilMaterial(boxProps.matProps);
+  let geometry = new THREE.PlaneGeometry(boxProps.width, boxProps.height);
+  if(boxProps.complexMesh){
+    geometry = RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness );
+  }
+
+  const box = new THREE.Mesh(geometry, mat );
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
@@ -949,9 +931,13 @@ export function portalWindow(boxProps, padding){
   return result
 };
 
-export function curvedBox(boxProps, padding){
+export function contentWindow(boxProps, padding){
   const mat = new THREE.MeshPhongMaterial();
-  const box = new THREE.Mesh(RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness ), mat );
+  let geometry = new THREE.PlaneGeometry(boxProps.width, boxProps.height);
+  if(boxProps.complexMesh){
+    geometry = RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness );
+  }
+  const box = new THREE.Mesh(geometry, mat );
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
@@ -1037,29 +1023,45 @@ export function renderMeshView(meshView, mainScene, mainCam, renderer){
   renderer.setScissorTest(false);
 }
 
-export function toggleBox(width, height, padding=0.1, horizontal=true){
+export function toggleBox(boxProps, padding=0.1, horizontal=true){
 
-  let baseWidth=width*2;
-  let baseHeight=height;
+  let baseWidth=boxProps.width*2;
+  let baseHeight=boxProps.height;
+  let baseDepth=boxProps.depth/2;
   if(horizontal==false){
-    baseWidth=width;
-    baseHeight=height*2;
+    baseWidth=boxProps.width;
+    baseHeight=boxProps.height*2;
   }
-  const handle = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
-  const base = new THREE.Mesh(new THREE.BoxGeometry(baseWidth+padding, baseHeight+padding, 0.01), new THREE.MeshBasicMaterial({ color: Math.random() * 0xff00000 - 0xff00000 }));
-  let baseSize = getGeometrySize(base.geometry);
-  let handleSize = getGeometrySize(handle.geometry);
+  
+  let handleMat = getMaterial(boxProps.matProps, boxProps.parent.material.stencilRef);
+  handleMat.depthWrite = true;
+  let baseMat = getMaterial(boxProps.matProps, boxProps.parent.material.stencilRef);
+  let mat = boxProps.parent.material;
+  let c = colorsea('#'+baseMat.color.getHexString(), 100).darken(10);
+  baseMat.color.set(c.hex());
+
+  let handleGeometry = new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth);
+  let baseGeometry = new THREE.BoxGeometry(baseWidth+padding, baseHeight+padding, boxProps.depth/2);
+
+  if(boxProps.complexMesh){
+    handleGeometry = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+    baseGeometry = RoundedBoxGeometry(baseWidth+padding, baseHeight+padding, boxProps.depth/2, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+  }
+
+  const handle = new THREE.Mesh(handleGeometry, handleMat);
+  handle.renderOrder = 2;
+  const base = new THREE.Mesh(baseGeometry, baseMat);
   base.add(handle);
 
   if(horizontal){
-    handle.position.set(-(baseSize.width/2-width/2)+padding, handle.position.y, handle.position.z+baseSize.depth);
+    handle.position.set(-(baseWidth/2-boxProps.width/2)+padding, handle.position.y, handle.position.z+baseDepth);
   }else{
-    handle.position.set(handle.position.x, -(baseSize.height/2-height/2)+padding, handle.position.z+baseSize.depth);
+    handle.position.set(handle.position.x, -(baseHeight/2-boxProps.height/2)+padding, handle.position.z+baseDepth);
   }
   base.userData.horizontal = horizontal;
 
   let result = { 'handle': handle, 'base': base }
-  setToggleUserData(result, width, height, padding, horizontal)
+  setToggleUserData(result, boxProps, padding, horizontal)
 
   return result
 
@@ -1076,26 +1078,28 @@ export function textMeshProperties(curveSegments=12, bevelEnabled=false, bevelTh
   }
 }
 
-function setToggleUserData(toggle, width, height, padding, horizontal=true){
-  let baseSize = getGeometrySize(toggle.base.geometry);
-  let handleSize = getGeometrySize(toggle.handle.geometry);
+function setToggleUserData(toggle, boxProps, padding, horizontal=true){
+  
+  let baseWidth=boxProps.width*2;
+  let baseHeight=boxProps.height;
+  let baseDepth=boxProps.depth/2;
 
   toggle.base.userData.type = 'TOGGLE';
-  toggle.base.userData.size = baseSize;
+  toggle.base.userData.size = {'width': baseWidth, 'height': baseHeight, 'depth': baseDepth};
   toggle.base.userData.handle = toggle.handle;
   toggle.base.userData.horizontal = horizontal;
 
   toggle.handle.userData.type = 'TOGGLE';
-  toggle.handle.userData.size = handleSize;
+  toggle.handle.userData.size = {'width': boxProps.width-padding, 'height': boxProps.height-padding, 'depth': boxProps.depth*2};
   toggle.handle.userData.offPos = new THREE.Vector3().copy(toggle.handle.position);
   toggle.handle.userData.horizontal = horizontal;
   toggle.handle.userData.anim = false;
   toggle.handle.userData.on = false;
 
   if(horizontal){
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+baseSize.width/2-padding, toggle.handle.position.y, toggle.handle.position.z+baseSize.depth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+baseWidth/2-(padding*2), toggle.handle.position.y, toggle.handle.position.z+baseDepth);
   }else{
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, (baseSize.height/2-height/2)-padding, toggle.handle.position.z+baseSize.depth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, (baseHeight-boxProps.height/2)-padding, toggle.handle.position.z+baseDepth);
   }
 
 }
@@ -1225,8 +1229,7 @@ export function createStaticTextBox(boxProps, text, textProps=undefined, meshPro
   // Load the font
   loader.load(textProps.font, (font) => {
     const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
-
-    let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+    let mat = getMaterial(textProps.matProps, 0);
 
     // Merge the individual letter geometries into a single buffer geometry
     let mergedGeometry = createMergedTextBoxGeometry(cBox, font, boxProps.width, boxProps.height, text, textProps, meshProps, animProps);
@@ -1270,11 +1273,7 @@ export function createStaticTextPortal(boxProps, text, textProps=undefined, mesh
   // Load the font
   loader.load(textProps.font, (font) => {
     const portal = portalWindow(boxProps, 0);
-
-    let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-    mat.stencilWrite = true;
-    mat.stencilRef = portal.stencilRef;
-    mat.stencilFunc = THREE.EqualStencilFunc;
+    let mat = getMaterial(textProps.matProps, portal.stencilRef);
 
     // Merge the individual letter geometries into a single buffer geometry
     let mergedGeometry = createMergedTextBoxGeometry(portal, font, boxProps.width, boxProps.height, text, textProps, meshProps, animProps);
@@ -1319,7 +1318,6 @@ export function createStaticScrollableTextBox(boxProps, text, textProps=undefine
   // Load the font
   loader.load(textProps.font, (font) => {
     const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
-
     let mat = getMaterial(textProps.matProps, 0);
 
     // Merge the individual letter geometries into a single buffer geometry
@@ -1490,7 +1488,6 @@ export function createMultiScrollableTextBox(boxProps, text, textProps=undefined
   // Load the font
   loader.load(textProps.font, (font) => {
     const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
-
     let mat = getMaterial(textProps.matProps, 0);
 
 
@@ -1527,7 +1524,6 @@ export function createMultiScrollableTextPortal(boxProps, text, textProps=undefi
   // Load the font
   loader.load(textProps.font, (font) => {
     const portal = portalWindow(boxProps, 0);
-
     let mat = getMaterial(textProps.matProps, portal.stencilRef);
 
     const mergedMesh = constructMultiTextMerged(portal, text, font, mat, textProps, meshProps, animProps);
@@ -1860,38 +1856,73 @@ export function createMouseOverButton(boxProps, text, textProps=undefined, meshP
   Button(boxProps, text, textProps.font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, true);
 };
 
-function createToggle(boxProps, text, fontPath, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=0.1, size=1, height=1, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true) {
-  loader.load(fontPath, (font) => {
+function createToggleText(font, boxProps, text, textProps, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true){
+  if(boxProps.name.length>0){
 
-    let toggle = toggleBox(boxProps.width, boxProps.height, padding, horizontal);
+    let mat = getMaterial(textProps.matProps, boxProps.parent.material.stencilRef);
+    const geometry = createTextGeometry(boxProps.name, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
+    const mergedMesh = new THREE.Mesh(geometry, mat);
+
+    mergedMesh.position.set(-boxProps.width+textProps.padding, boxProps.height/2+textProps.padding, 0);
+    if(!horizontal){
+      mergedMesh.position.set(-boxProps.width/2+textProps.padding, boxProps.height+textProps.padding, 0);
+    }
+    boxProps.parent.add(mergedMesh);
+
+  }
+}
+
+function createToggleBox(boxProps, text, textProps, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true) {
+  loader.load(textProps.font, (font) => {
+    const parentSize = getGeometrySize(boxProps.parent.geometry);
+    let toggle = toggleBox(boxProps, textProps.padding, horizontal);
     boxProps.parent.add(toggle.base);
+    toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
     toggles.push(toggle.handle);
 
-    if(boxProps.name.length>0){
-
-      let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-      const geometry = createTextGeometry(boxProps.name, font, size, height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
-      const mergedMesh = new THREE.Mesh(geometry, mat);
-      mergedMesh.position.set(-boxProps.width, boxProps.height, 0);
-      boxProps.parent.add(mergedMesh);
-
-    }
+    createToggleText(font, boxProps, text, textProps, meshProps, animProps, onCreated, horizontal);
 
   });
 }
 
-export function createHorizontalToggle(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
-  createToggle(boxProps, text, textProps.font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, true);
+function createTogglePortal(boxProps, text, textProps, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true) {
+  loader.load(textProps.font, (font) => {
+    const parentSize = getGeometrySize(boxProps.parent.geometry);
+    let stencilRef = getStencilRef();
+    let toggle = toggleBox(boxProps, textProps.padding, horizontal);
+    setupStencilMaterial(toggle.base.material, stencilRef);
+    setupStencilChildMaterial(toggle.handle.material, stencilRef);
+    toggle.base.material.depthWrite = false;
+    toggle.handle.material.depthWrite = false;
+    boxProps.parent.add(toggle.base);
+    toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
+    toggles.push(toggle.handle);
+
+    createToggleText(font, boxProps, text, textProps, meshProps, animProps, onCreated, horizontal);
+
+  });
+}
+
+export function createHorizontalToggleBox(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  createToggleBox(boxProps, text, textProps, meshProps, animProps, onCreated, true);
 };
 
-export function createVerticalToggle(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
-  createToggle(boxProps, text, textProps.font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, false);
+export function createHorizontalTogglePortal(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  createTogglePortal(boxProps, text, textProps, meshProps, animProps, onCreated, true);
+};
+
+export function createVerticalToggleBox(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  createToggleBox(boxProps, text, textProps, meshProps, animProps, onCreated, false);
+};
+
+export function createVerticalTogglePortal(boxProps, text, textProps=undefined, meshProps=undefined, animProps=undefined, onCreated=undefined){
+  createTogglePortal(boxProps, text, textProps, meshProps, animProps, onCreated, false);
 };
 
 
 export function createImageBox(boxProps, imgUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
 
-  const cBox = curvedBox(boxProps, 0, false);
+  const cBox = contentWindow(boxProps, 0, false);
   const boxSize = getGeometrySize(cBox.box.geometry);
   const map = new THREE.TextureLoader().load( imgUrl );
   const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
@@ -1909,7 +1940,7 @@ export function createImageBox(boxProps, imgUrl, textProps=undefined, meshProps=
 export function createImagePortal(boxProps, imgUrl, textProps=undefined, meshProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined){
 
   const portal = portalWindow(boxProps, 0);
-  const cBox = curvedBox(boxProps, 0, false);
+  const cBox = contentWindow(boxProps, 0, false);
   const boxSize = getGeometrySize(cBox.box.geometry);
   const map = new THREE.TextureLoader().load( imgUrl );
   const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
