@@ -1092,7 +1092,28 @@ export function sliderBox(boxProps, padding=0.1, horizontal=true){
 
 };
 
-function setSliderUserData(slider, boxProps, padding, horizontal=true, min=0, max=1){
+function onSliderMove(slider){
+  let extraSpace = slider.handle.userData.extraSpace;
+  let coord = 'x';
+  let divider = slider.base.userData.size.width-slider.handle.userData.padding-extraSpace;
+
+  if(!slider.handle.userData.horizontal){
+    coord = 'y';
+    divider = slider.base.userData.size.height-slider.handle.userData.padding-extraSpace;
+  }
+
+  let value = (slider.handle.position[coord]-slider.handle.userData.minScroll)/divider*slider.handle.userData.max;
+
+  if(slider.handle.userData.min<0){
+    value = ((slider.handle.position[coord]-slider.handle.userData.minScroll)/divider*(slider.handle.userData.max-slider.handle.userData.min))+slider.handle.userData.min;
+  }
+
+  console.log(value)
+  slider.handle.userData.value = value;
+
+}
+
+function setSliderUserData(slider, boxProps, padding, horizontal=true, min=0, max=1, value=0){
   let extraSpace = padding*0.5;
   let baseDepth=boxProps.depth/2;
   let handleWidth=boxProps.width/8;
@@ -1114,6 +1135,7 @@ function setSliderUserData(slider, boxProps, padding, horizontal=true, min=0, ma
   slider.handle.userData.horizontal = horizontal;
   slider.handle.userData.min = min;
   slider.handle.userData.max = max;
+  slider.handle.userData.value = value;
 
   slider.handle.userData.initialPosition = 0;
 
@@ -1128,9 +1150,13 @@ function setSliderUserData(slider, boxProps, padding, horizontal=true, min=0, ma
   }
 
   slider.handle.userData.padding = padding;
+  slider.handle.userData.extraSpace = extraSpace;
   slider.handle.userData.settleThreshold = handleHeight/50;
   slider.handle.userData.horizontal = horizontal;
   slider.handle.userData.draggable = true;
+  slider.handle.addEventListener('action', function(event) {
+    onSliderMove(slider);
+  });
 
 }
 
@@ -2444,6 +2470,7 @@ export function mouseMoveHandler(raycaster, event){
       dragPosition.y = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll+lastDragged.userData.padding, dragPosition.y - deltaY * 0.01));
       lastDragged.position.copy(dragPosition);
       previousMouseY = event.clientY;
+      lastDragged.dispatchEvent({type:'action'});
     }else{
       dragDistX = deltaX;
 
@@ -2456,6 +2483,7 @@ export function mouseMoveHandler(raycaster, event){
       dragPosition.x = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll-lastDragged.userData.padding, dragPosition.x + deltaX * 0.01));
       lastDragged.position.copy(dragPosition);
       previousMouseX = event.clientX;
+      lastDragged.dispatchEvent({type:'action'});
     }
     
   }
