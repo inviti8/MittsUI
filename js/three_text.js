@@ -1071,9 +1071,9 @@ export function switchWidgetBox(boxProps, padding=0.1, horizontal=true, handleSi
   base.add(handle);
 
   if(horizontal){
-    handle.position.set(-(boxProps.width/2-handleWidth/2)+padding, handle.position.y, handle.position.z+baseDepth);
+    handle.position.set(handle.position.x-(boxProps.width/2+handleWidth/2)+padding, handle.position.y, handle.position.z+baseDepth);
   }else{
-    handle.position.set(handle.position.x, handle.position.y+(boxProps.height/2-handleHeight/2)+padding, handle.position.z+baseDepth);
+    handle.position.set(handle.position.x, handle.position.y-(boxProps.height/2-handleHeight)-padding, handle.position.z+baseDepth);
   }
   base.userData.horizontal = horizontal;
 
@@ -1099,21 +1099,27 @@ function onSliderMove(slider){
 
   if(!slider.handle.userData.horizontal){
     coord = 'y';
-    divider = slider.base.userData.size.height-slider.handle.userData.padding-extraSpace;
+    divider = slider.base.userData.size.height-slider.handle.userData.padding+extraSpace;
   }
 
-  let value = (slider.handle.position[coord]-slider.handle.userData.minScroll)/divider*slider.handle.userData.max;
+  let pos = slider.handle.position[coord];
+  let minScroll = slider.handle.userData.minScroll;
+  let max = slider.handle.userData.max;
+  let min = slider.handle.userData.min;
+
+  let value = (pos-minScroll)/divider*max;
 
   if(slider.handle.userData.min<0){
-    value = ((slider.handle.position[coord]-slider.handle.userData.minScroll)/divider*(slider.handle.userData.max-slider.handle.userData.min))+slider.handle.userData.min;
+    value = ((pos-minScroll)/divider*(max-min))+min;
   }
+  value = value.toFixed(slider.handle.userData.places);
 
   console.log(value)
   slider.handle.userData.value = value;
 
 }
 
-function setSliderUserData(slider, boxProps, padding, horizontal=true, min=0, max=1, value=0){
+function setSliderUserData(slider, boxProps, padding, horizontal=true, min=0, max=1, value=0, places=2){
   let extraSpace = padding*0.5;
   let baseDepth=boxProps.depth/2;
   let handleWidth=boxProps.width/8;
@@ -1136,17 +1142,18 @@ function setSliderUserData(slider, boxProps, padding, horizontal=true, min=0, ma
   slider.handle.userData.min = min;
   slider.handle.userData.max = max;
   slider.handle.userData.value = value;
+  slider.handle.userData.places = places;
 
   slider.handle.userData.initialPosition = 0;
 
   if(horizontal){
     slider.handle.userData.startPos = new THREE.Vector3(slider.handle.position.x+boxProps.width/2-(padding*2), slider.handle.position.y, slider.handle.position.z+baseDepth);
-    slider.handle.userData.maxScroll = slider.handle.userData.startPos.x + boxProps.width/2 - (padding+extraSpace);
-  slider.handle.userData.minScroll = -boxProps.width+slider.handle.userData.maxScroll+(padding-extraSpace);
+    slider.handle.userData.maxScroll = slider.handle.position.x + boxProps.width - (padding+extraSpace);
+    slider.handle.userData.minScroll = -boxProps.width+slider.handle.userData.maxScroll+(padding+extraSpace);
   }else{
-    slider.handle.userData.startPos = new THREE.Vector3(slider.handle.position.x, slider.handle.position.y+(boxProps.height/2)-(padding*2), slider.handle.position.z+baseDepth);
-    slider.handle.userData.maxScroll = slider.handle.userData.startPos.y - boxProps.height/2 + (padding+extraSpace);
-    slider.handle.userData.minScroll = -boxProps.height+slider.handle.userData.maxScroll+(padding-extraSpace);
+    slider.handle.userData.startPos = new THREE.Vector3(slider.handle.position.x, slider.handle.position.y+boxProps.height/2-(padding*2), slider.handle.position.z+baseDepth);
+    slider.handle.userData.maxScroll = slider.handle.position.y + boxProps.height - (padding+extraSpace);
+    slider.handle.userData.minScroll = -boxProps.height+slider.handle.userData.maxScroll+(padding+extraSpace);
   }
 
   slider.handle.userData.padding = padding;
@@ -1168,6 +1175,10 @@ export function toggleBox(boxProps, padding=0.1, horizontal=true){
   return result
 
 };
+
+function onToggled(toggle){
+  console.log('On Toggle');
+}
 
 function setToggleUserData(toggle, boxProps, padding, horizontal=true){
   
@@ -1197,6 +1208,10 @@ function setToggleUserData(toggle, boxProps, padding, horizontal=true){
   }else{
     toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, toggle.handle.position.y+(boxProps.height/2)-(padding*2), toggle.handle.position.z+baseDepth);
   }
+
+  toggle.handle.addEventListener('action', function(event) {
+    onToggled(toggle);
+  });
 
 }
 
@@ -1955,16 +1970,16 @@ export function createMouseOverButton(boxProps, text, textProps=undefined, meshP
   Button(boxProps, text, textProps.font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, meshProps, animProps, onCreated, true);
 };
 
-function createToggleText(font, boxProps, text, textProps, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true){
+function createWidgetText(font, boxProps, text, textProps, meshProps=undefined, animProps=undefined, onCreated=undefined, horizontal=true){
   if(boxProps.name.length>0){
 
     let mat = getMaterial(textProps.matProps, boxProps.parent.material.stencilRef);
     const geometry = createTextGeometry(boxProps.name, font, textProps.size, textProps.height, meshProps.curveSegments, meshProps.bevelEnabled, meshProps.bevelThickness, meshProps.bevelSize, meshProps.bevelOffset, meshProps.bevelSegments);
     const mergedMesh = new THREE.Mesh(geometry, mat);
 
-    mergedMesh.position.set(-boxProps.width/2+textProps.padding, boxProps.height/2+textProps.padding, 0);
+    mergedMesh.position.set(-boxProps.width/2-textProps.padding, boxProps.height/2+textProps.padding, 0);
     if(!horizontal){
-      mergedMesh.position.set(-boxProps.width/2+textProps.padding, boxProps.height/2+textProps.padding, 0);
+      mergedMesh.position.set(-boxProps.width/2-textProps.padding, boxProps.height/2+textProps.padding, 0);
     }
     boxProps.parent.add(mergedMesh);
 
@@ -1979,7 +1994,7 @@ function createSliderBox(boxProps, text, textProps, meshProps=undefined, animPro
     toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
     draggable.push(toggle.handle);
 
-    createToggleText(font, boxProps, text, textProps, meshProps, animProps, onCreated, horizontal);
+    createWidgetText(font, boxProps, text, textProps, meshProps, animProps, onCreated, horizontal);
 
   });
 }
@@ -2000,7 +2015,7 @@ function createToggleBox(boxProps, text, textProps, meshProps=undefined, animPro
     toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
     toggles.push(toggle.handle);
 
-    createToggleText(font, boxProps, text, textProps, meshProps, animProps, onCreated, horizontal);
+    createWidgetText(font, boxProps, text, textProps, meshProps, animProps, onCreated, horizontal);
 
   });
 }
@@ -2018,7 +2033,7 @@ function createTogglePortal(boxProps, text, textProps, meshProps=undefined, anim
     toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
     toggles.push(toggle.handle);
 
-    createToggleText(font, boxProps, text, textProps, meshProps, animProps, onCreated, horizontal);
+    createWidgetText(font, boxProps, text, textProps, meshProps, animProps, onCreated, horizontal);
 
   });
 }
@@ -2588,8 +2603,6 @@ export function doubleClickHandler(raycaster){
           if(textProps.draggable){
             draggable.push(typingTextMesh);
           }
-
-          onsole.log(typingTextMesh.position.y);
 
         } else if (event.key === 'Backspace') {
             // Handle backspace
