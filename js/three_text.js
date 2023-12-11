@@ -1927,9 +1927,6 @@ function constructMultiTextMerged(obj, text, font, material, textProps, animProp
     }
     obj.box.name = name;
     merged.letterMeshes.forEach((m, i) => {
-      // if(scene != undefined){
-      //   m.layers.set(scene.userData.layer_index);
-      // }
       mergedMesh.add(m);
     });
 
@@ -2008,7 +2005,7 @@ function selectionText(boxProps, text, textProps, animProps=undefined, onCreated
 
 function handleTextInputSetup(inputProps, textProps, font){
   inputPrompts.push(inputProps.promptMesh);
-  const tProps = {'cBox': inputProps.Box, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'zOffset':textProps.zOffset, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'textProps.meshProps': textProps.meshProps };
+  const tProps = {'cBox': inputProps.Box, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'zOffset':textProps.zOffset, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': textProps.meshProps };
   inputProps.promptMesh.userData.textProps = tProps;
   inputProps.Box.box.userData.mouseOverParent = true;
   mouseOverable.push(inputProps.Box.box);
@@ -2019,14 +2016,14 @@ export function createTextInput(boxProps, text, textProps=undefined,  animProps=
   loader.load(textProps.font, (font) => {
     let inputProps = selectionTextBox(boxProps, text, font, textProps, textProps.meshProps, animProps, onCreated);
     mouseOverable.push(inputProps.promptMesh);
-    handleTextInputSetup(inputProps, textProps, textProps.meshProps, font);
+    handleTextInputSetup(inputProps, textProps, font);
   });
 };
 
 export function createScrollableTextInput(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
     let inputProps = selectionTextBox(boxProps, text, font, textProps, textProps.meshProps, animProps, onCreated);
-    handleTextInputSetup(inputProps, textProps, textProps.meshProps, font);
+    handleTextInputSetup(inputProps, textProps, font);
   });
 };
 
@@ -2034,14 +2031,14 @@ export function createTextInputPortal(boxProps, text, textProps=undefined,  anim
   loader.load(textProps.font, (font) => {
     let inputProps = selectionTextPortal(boxProps, text, font, textProps, textProps.meshProps, animProps, onCreated);
     mouseOverable.push(inputProps.promptMesh);
-    handleTextInputSetup(inputProps, textProps, textProps.meshProps, font);
+    handleTextInputSetup(inputProps, textProps, font);
   });
 };
 
 export function createScrollableTextInputPortal(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
     let inputProps = selectionTextPortal(boxProps, text, font, textProps, textProps.meshProps, animProps, onCreated);
-    handleTextInputSetup(inputProps, textProps, textProps.meshProps, font);
+    handleTextInputSetup(inputProps, textProps, font);
   });
 };
 
@@ -2051,7 +2048,7 @@ export function createListSelector(selectors, boxProps, text, textProps=undefine
     selectorUserData(cBox.box);
     for (const [selTxt, url] of Object.entries(selectors)) {
       let inputProps = selectionText(cBox.box, boxProps.width, boxProps.height, boxProps.name, selTxt, font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, textProps.meshProps, animProps, onCreated);
-      const tProps = {'cBox': inputProps.cBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'draggable': true, 'textProps.meshProps': textProps.meshProps };
+      const tProps = {'cBox': inputProps.cBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'draggable': true, 'meshProps': textProps.meshProps };
       inputProps.promptMesh.userData.textProps = tProps;
       inputPrompts.push(inputProps.promptMesh);
       mouseOverable.push(inputProps.promptMesh);
@@ -2071,7 +2068,7 @@ function Button(boxProps, text, fontPath, letterSpacing=1, lineSpacing=1, wordSp
   loader.load(fontPath, (font) => {
     let txtMesh = selectionText(boxProps, text, font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, textProps.meshProps, animProps, onCreated);
     inputPrompts.push(txtMesh.promptMesh);
-    const textProps = {'cBox': txtMesh.cBox, 'text': '', 'textMesh': txtMesh.promptMesh, 'font': font, 'size': size, 'height': height, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'textProps.meshProps': textProps.meshProps };
+    const textProps = {'cBox': txtMesh.cBox, 'text': '', 'textMesh': txtMesh.promptMesh, 'font': font, 'size': size, 'height': height, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': textProps.meshProps };
     txtMesh.cBox.box.userData.textProps = textProps;
     txtMesh.cBox.box.userData.draggable=false;
     txtMesh.promptMesh.userData.mouseOverParent = true;
@@ -2668,12 +2665,13 @@ export function doubleClickHandler(raycaster){
     let clicked = intersectsInputPrompt[0].object;
     let userData = clicked.userData;
     const textProps = clicked.userData.textProps;
+    console.log(textProps)
 
     // Initialize variables for typing
     let currentText = '';
     let boxSize = getGeometrySize(textProps.cBox.box.geometry);
     let pos = new THREE.Vector3().copy(clicked.position);
-    const textGeometry = createTextGeometry(currentText, textProps.font, textProps.size, textProps.height, textProps.textProps.meshProps.curveSegments, textProps.textProps.meshProps.bevelEnabled, textProps.textProps.meshProps.bevelThickness, textProps.textProps.meshProps.bevelSize, textProps.textProps.meshProps.bevelOffset, textProps.textProps.meshProps.bevelSegments);
+    const textGeometry = createTextGeometry(currentText, textProps.font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
     let mat = clicked.material;
     let padding = textProps.padding;
 
