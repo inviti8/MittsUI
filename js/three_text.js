@@ -135,22 +135,12 @@ export function attachToOuterLeft(parent, elem, depth){
 };
 
 export function attachToInnerRight(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x+parent.height/2, elem.box.position.y, elem.box.position.z);
+  elem.box.position.set(elem.box.position.x+parent.width/2, elem.box.position.y, elem.box.position.z);
 };
 
 export function attachToOuterRight(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x+parent.height/2+elem.height/2, elem.box.position.y, elem.box.position.z);
+  elem.box.position.set(elem.box.position.x+parent.width/2+elem.width/2, elem.box.position.y, elem.box.position.z);
 };
-
-export function darkenMaterial(material, value, alpha=100){
-  let c = colorsea('#'+material.color.getHexString(), alpha).darken(value);
-  material.color.set(c.hex());
-}
-
-export function lightenMaterial(material, value, alpha=100){
-  let c = colorsea('#'+material.color.getHexString(), alpha).lighten(value);
-  material.color.set(c.hex());
-}
 
 export function createMainSceneLighting(scene){
   const ambientLight = new THREE.AmbientLight(0x404040);
@@ -794,6 +784,16 @@ export function stencilMaterial(matProps){
   return getMaterial(matProps, stencilRef);
 };
 
+export function darkenMaterial(material, value, alpha=100){
+  let c = colorsea('#'+material.color.getHexString(), alpha).darken(value);
+  material.color.set(c.hex());
+}
+
+export function lightenMaterial(material, value, alpha=100){
+  let c = colorsea('#'+material.color.getHexString(), alpha).lighten(value);
+  material.color.set(c.hex());
+}
+
 export function getDraggable(obj){
   return draggable;
 };
@@ -1123,7 +1123,7 @@ export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
 
 };
 
-export function sliderProperties(name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined){
+export function sliderProperties(name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined, font=undefined){
   return {
     'name': name,
     'horizontal': horizontal,
@@ -1132,12 +1132,39 @@ export function sliderProperties(name='', horizontal=true, min=0, max=1, places=
     'places': places,
     'step': step,
     'padding': padding,
-    'textProps': textProps
+    'textProps': textProps,
+    'font': font
   }
 };
 
-export function valuePortal(boxProps, text, textProps, meshProps){
+function updateValueText(params){
 
+  let mergedGeometry = createMergedTextGeometry(params.font, params.boxProps.width, params.boxProps.height, params.box.parent.userData.value, params.textProps);
+  const mergedMesh = new THREE.Mesh(mergedGeometry, params.material);
+
+  for( var i = params.box.children.length - 1; i >= 0; i--) {
+    let text = params.box.children[i];
+    params.box.remove(text);
+    text.geometry.dispose();
+  }
+
+  params.box.add(mergedMesh);
+  mergedMesh.position.set(-params.boxProps.width/2+params.textProps.size/2, -params.boxProps.height/2+params.textProps.height/2, mergedMesh.position.z);
+
+}
+
+export function valueTextPortal(container, font, boxProps, textProps){
+
+  let material = getMaterial(textProps.matProps, container.box.material.stencilRef);
+  //setupStencilChildMaterial(material, container.stencilRef);
+  container.box.userData.textMaterial = material;
+  let params = {'box': container.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': textProps};
+  updateValueText(params);
+
+  
+  container.box.addEventListener('update', function(event) {
+    updateValueText(params);
+  });
 };
 
 export function sliderBox(boxProps, sliderProps){
@@ -1152,17 +1179,22 @@ export function sliderBox(boxProps, sliderProps){
     valBoxProps.height=valBoxProps.height/4;
     valBoxProps.width=valBoxProps.width;
   }
-  let valBox = portalWindow(valBoxProps, sliderProps.padding);
-  slider.base.add(valBox.box);
-  //createStaticTextPortal(boxProps, text, textProps=undefined,  animProps=undefined,  listConfig=undefined, onCreated=undefined)
-  darkenMaterial(valBox.box.material, 30);
-  attachToOuterBottom(slider, valBox, valBox.box.position.z);
-
   setSliderUserData(slider, boxProps, sliderProps);
+  let valBox = portalWindow(valBoxProps, sliderProps.padding);
+  setupStencilMaterial(valBox.box.material, valBox.box.material.stencilRef)
+  slider.base.add(valBox.box);
+  slider.base.userData.valueBox = valBox.box;
+  valueTextPortal(valBox, sliderProps.font, valBoxProps, sliderProps.textProps)
+  darkenMaterial(valBox.box.material, 30);
 
-
+  if(sliderProps.horizontal){
+    attachToOuterRight(slider, valBox, valBox.box.position.z);
+  }else{
+    attachToOuterBottom(slider, valBox, valBox.box.position.z);
+  }
+  
+  
   return slider
-
 };
 
 function onSliderMove(slider){
@@ -1188,7 +1220,10 @@ function onSliderMove(slider){
   value = value.toFixed(slider.handle.userData.places);
 
   console.log(value)
-  slider.handle.userData.value = value;
+  slider.base.userData.value = value;
+  if(slider.base.userData.valueBox != undefined){
+    slider.base.userData.valueBox.dispatchEvent({type:'update'});
+  }
 
 }
 
@@ -1207,6 +1242,7 @@ function setSliderUserData(slider, boxProps, sliderProps){
   slider.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': baseDepth};
   slider.base.userData.handle = slider.handle;
   slider.base.userData.horizontal = sliderProps.horizontal;
+  slider.base.userData.value = "0";
 
   slider.handle.userData.type = 'SLIDER';
   slider.handle.userData.size = {'width': handleWidth, 'height': handleHeight, 'depth': handleDepth};
@@ -1238,12 +1274,13 @@ function setSliderUserData(slider, boxProps, sliderProps){
 
 }
 
-export function toggleProperties(name='', horizontal=true, on=false, padding=0.01){
+export function toggleProperties(name='', horizontal=true, on=false, padding=0.01, font=undefined){
   return {
     'name': name,
     'horizontal': horizontal,
     'on': on,
-    'padding': padding
+    'padding': padding,
+    'font': font
   }
 };
 
@@ -1378,9 +1415,9 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
     return BufferGeometryUtils.mergeGeometries(letterGeometries);
 }
 
-export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPath, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1,  animProps=undefined) {
+export function createMergedTextGeometry(font, boxWidth, boxHeight, text, textProps, animProps=undefined) {
     let lineWidth = 0;
-    let yPosition = boxHeight / 2 - padding;
+    let yPosition = boxHeight / 2 - textProps.padding;
     const letterGeometries = [];
 
     for (let i = 0; i < text.length; i++) {
@@ -1391,12 +1428,12 @@ export function createMergedTextGeometry(font, boxWidth, boxHeight, text, fontPa
         lineWidth += wordSpacing;
       } else {
 
-        const geometry = createTextGeometry(character, font, size, height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
+        const geometry = createTextGeometry(character, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
         geometry.translate(lineWidth, yPosition, 0);
 
         // Calculate the width of the letter geometry
         let { width } = getGeometrySize(geometry);
-        width+=letterSpacing;
+        width+=textProps.letterSpacing;
 
         letterGeometries.push(geometry);
 
@@ -1927,9 +1964,9 @@ function selectionTextPortal(boxProps, text, font, textProps=undefined,  animPro
   return {promptMesh, Box}
 }
 
-function selectionText(boxProps, text, font, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1,  animProps=undefined, onCreated=undefined){
+function selectionText(boxProps, text, textProps, animProps=undefined, onCreated=undefined){
 
-  const promptGeometry = createMergedTextGeometry(font, boxProps.width, boxProps.height, text, 'fontPath', letterSpacing, lineSpacing, wordSpacing, padding, size, height, textProps.meshProps, animProps);
+  const promptGeometry = createMergedTextGeometry(font, boxProps.width, boxProps.height, text, textProps, animProps);
   promptGeometry.center();
 
   const geomSize = getGeometrySize(promptGeometry);
@@ -2055,24 +2092,21 @@ function createWidgetText(font, boxProps, name, textProps, animProps=undefined, 
 
 export function createSliderBox(boxProps, sliderProps, textProps,  animProps=undefined, onCreated=undefined, horizontal=true) {
   loader.load(textProps.font, (font) => {
+    sliderProps.font = font;
     const parentSize = getGeometrySize(boxProps.parent.geometry);
     let toggle = sliderBox(boxProps, sliderProps);
     boxProps.parent.add(toggle.base);
     toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
     draggable.push(toggle.handle);
 
-    console.log(sliderProps)
-
     createWidgetText(font, boxProps, sliderProps.name, textProps, animProps, onCreated, horizontal);
 
   });
 };
 
-function createToggleBox(boxProps, toggleProps, textProps, animProps=undefined, onCreated=undefined, horizontal=true) {
-  console.log(toggleProps)
-  console.log("textProps:")
-  console.log(textProps)
+export function createToggleBox(boxProps, toggleProps, textProps, animProps=undefined, onCreated=undefined, horizontal=true) {
   loader.load(textProps.font, (font) => {
+    toggleProps.font = font;
     const parentSize = getGeometrySize(boxProps.parent.geometry);
     let toggle = toggleBox(boxProps, toggleProps);
     boxProps.parent.add(toggle.base);
@@ -2082,10 +2116,11 @@ function createToggleBox(boxProps, toggleProps, textProps, animProps=undefined, 
     createWidgetText(font, boxProps, toggleProps.name, textProps, animProps, onCreated, horizontal);
 
   });
-}
+};
 
-function createTogglePortal(boxProps, toggleProps, textProps, animProps=undefined, onCreated=undefined, horizontal=true) {
+export function createTogglePortal(boxProps, toggleProps, textProps, animProps=undefined, onCreated=undefined, horizontal=true) {
   loader.load(textProps.font, (font) => {
+    toggleProps.font = font;
     const parentSize = getGeometrySize(boxProps.parent.geometry);
     let stencilRef = getStencilRef();
     let toggle = toggleBox(boxProps, textProps.padding, horizontal);
@@ -2100,22 +2135,6 @@ function createTogglePortal(boxProps, toggleProps, textProps, animProps=undefine
     createWidgetText(font, boxProps, toggleProps.title, textProps, textProps.meshProps, animProps, onCreated, horizontal);
 
   });
-}
-
-export function createHorizontalToggleBox(boxProps, toggleProps, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  createToggleBox(boxProps, toggleProps, textProps, animProps, onCreated, true);
-};
-
-export function createHorizontalTogglePortal(boxProps, toggleProps, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  createTogglePortal(boxProps, toggleProps, textProps, animProps, onCreated, true);
-};
-
-export function createVerticalToggleBox(boxProps, toggleProps, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  createToggleBox(boxProps, toggleProps, textProps, animProps, onCreated, false);
-};
-
-export function createVerticalTogglePortal(boxProps, toggleProps, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  createTogglePortal(boxProps, toggleProps, textProps, animProps, onCreated, false);
 };
 
 
