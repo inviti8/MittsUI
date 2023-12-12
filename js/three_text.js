@@ -1150,16 +1150,10 @@ export function sliderProperties(name='', horizontal=true, min=0, max=1, places=
 function updateValueText(params){
 
   let mergedGeometry = createMergedTextGeometry(params.font, params.boxProps.width, params.boxProps.height, params.box.parent.userData.value, params.textProps);
-  const mergedMesh = new THREE.Mesh(mergedGeometry, params.material);
+  params.base.promptMesh.geometry.dispose();
+  params.base.promptMesh.geometry = mergedGeometry;
 
-  for( var i = params.box.children.length - 1; i >= 0; i--) {
-    let text = params.box.children[i];
-    params.box.remove(text);
-    text.geometry.dispose();
-  }
-
-  params.box.add(mergedMesh);
-  mergedMesh.position.set(-params.boxProps.width/2+params.textProps.size/2, -params.boxProps.height/2+params.textProps.height/2, mergedMesh.position.z-params.textProps.size/2);
+  params.base.promptMesh.position.set(-params.boxProps.width/2+params.textProps.size/2, -params.boxProps.height/2+params.textProps.height/2, -params.textProps.size/2);
 
 }
 
@@ -1168,12 +1162,26 @@ export function valueTextPortal(container, font, boxProps, textProps){
   container.box.userData.textMaterial = material;
   let params = {'box': container.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': textProps};
   updateValueText(params);
-
   
   container.box.addEventListener('update', function(event) {
     updateValueText(params);
   });
 };
+
+export function editTextPortal(text, font, boxProps, sliderProps, textProps){
+    //selectionTextPortal(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined)
+   //{promptMesh, Box}
+  let base = selectionTextPortal(boxProps, text, sliderProps.font, sliderProps.textProps);
+  let material = getMaterial(sliderProps.textProps.matProps, base.Box.box.material.stencilRef);
+  base.Box.box.userData.textMaterial = material;
+  let params = {'base': base, 'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': sliderProps.textProps};
+  handleTextInputSetup(base, sliderProps.textProps, font);
+  base.Box.box.addEventListener('update', function(event) {
+    updateValueText(params);
+  });
+
+  return base.Box 
+}
 
 export function sliderBox(boxProps, sliderProps){
 
@@ -1199,16 +1207,18 @@ export function sliderBox(boxProps, sliderProps){
     valBoxProps.width=valBoxProps.width;
   }
   setSliderUserData(slider, boxProps, sliderProps);
-  let valBox = portalWindow(valBoxProps, sliderProps.padding);
+  //let valBox = portalWindow(valBoxProps, sliderProps.padding);
+  
+  //valueTextPortal(valBox, sliderProps.font, valBoxProps, sliderProps.textProps)
+  let valBox = editTextPortal("0", sliderProps.font, valBoxProps, sliderProps)
   slider.base.add(valBox.box);
   slider.base.userData.valueBox = valBox.box;
-  valueTextPortal(valBox, sliderProps.font, valBoxProps, sliderProps.textProps)
   darkenMaterial(valBox.box.material, 30);
 
   if(sliderProps.horizontal){
     valBox.box.position.set(baseWidth/2+valBox.width/2, valBox.box.position.y, valBox.box.position.z);
   }else{
-    valBox.box.position.set(valBox.box.position.z, -baseHeight+valBox.height, valBox.box.position.z);
+    valBox.box.position.set(valBox.box.position.x, -baseHeight+valBox.height, valBox.box.position.z);
   }
   
   return slider
@@ -1935,8 +1945,7 @@ function constructMultiTextMerged(obj, text, font, material, textProps, animProp
 
 function selectionTextBox(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined){
   const Box = contentBox(boxProps, textProps.padding, textProps.clipped);
-
-  let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
+  let mat = getMaterial(textProps.matProps, 0);
 
   const promptGeometry = createMergedTextBoxGeometry(Box, font, boxProps.width, boxProps.height, text, textProps, animProps);
   const promptMesh = new THREE.Mesh(promptGeometry, mat);
@@ -1957,11 +1966,7 @@ function selectionTextBox(boxProps, text, font, textProps=undefined,  animProps=
 
 function selectionTextPortal(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined){
   const Box = portalWindow(boxProps, 0);
-
-  let mat = new THREE.MeshPhongMaterial({color: Math.random() * 0xff00000 - 0xff00000});
-  mat.stencilWrite = true;
-  mat.stencilRef = Box.stencilRef;
-  mat.stencilFunc = THREE.EqualStencilFunc;
+  let mat = getMaterial(textProps.matProps, Box.stencilRef);
 
   const promptGeometry = createMergedTextBoxGeometry(Box, font, boxProps.width, boxProps.height, text, textProps, animProps);
   const promptMesh = new THREE.Mesh(promptGeometry, mat);
@@ -2014,7 +2019,7 @@ function handleTextInputSetup(inputProps, textProps, font){
 
 export function createTextInput(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
-    let inputProps = selectionTextBox(boxProps, text, font, textProps, textProps.meshProps, animProps, onCreated);
+    let inputProps = selectionTextBox(boxProps, text, font, textProps, animProps, onCreated);
     mouseOverable.push(inputProps.promptMesh);
     handleTextInputSetup(inputProps, textProps, font);
   });
@@ -2022,14 +2027,14 @@ export function createTextInput(boxProps, text, textProps=undefined,  animProps=
 
 export function createScrollableTextInput(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
-    let inputProps = selectionTextBox(boxProps, text, font, textProps, textProps.meshProps, animProps, onCreated);
+    let inputProps = selectionTextBox(boxProps, text, font, textProps, animProps, onCreated);
     handleTextInputSetup(inputProps, textProps, font);
   });
 };
 
 export function createTextInputPortal(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
-    let inputProps = selectionTextPortal(boxProps, text, font, textProps, textProps.meshProps, animProps, onCreated);
+    let inputProps = selectionTextPortal(boxProps, text, font, textProps, animProps, onCreated);
     mouseOverable.push(inputProps.promptMesh);
     handleTextInputSetup(inputProps, textProps, font);
   });
@@ -2037,7 +2042,7 @@ export function createTextInputPortal(boxProps, text, textProps=undefined,  anim
 
 export function createScrollableTextInputPortal(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
-    let inputProps = selectionTextPortal(boxProps, text, font, textProps, textProps.meshProps, animProps, onCreated);
+    let inputProps = selectionTextPortal(boxProps, text, font, textProps, animProps, onCreated);
     handleTextInputSetup(inputProps, textProps, font);
   });
 };
@@ -2665,7 +2670,6 @@ export function doubleClickHandler(raycaster){
     let clicked = intersectsInputPrompt[0].object;
     let userData = clicked.userData;
     const textProps = clicked.userData.textProps;
-    console.log(textProps)
 
     // Initialize variables for typing
     let currentText = '';
