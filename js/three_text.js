@@ -1132,7 +1132,7 @@ export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
 
 };
 
-export function sliderProperties(name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined, font=undefined, useValueText=true){
+export function sliderProperties(name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined, font=undefined, useValueText=true, numeric=true){
   return {
     'name': name,
     'horizontal': horizontal,
@@ -1143,41 +1143,69 @@ export function sliderProperties(name='', horizontal=true, min=0, max=1, places=
     'padding': padding,
     'textProps': textProps,
     'font': font,
-    'useValueText': useValueText
+    'useValueText': useValueText,
+    'numeric': numeric
   }
 };
 
-function updateValueText(params){
+function updateSliderUI(params){
+  if(isNaN(params.box.parent.userData.value))
+    return;
 
-  let mergedGeometry = createMergedTextGeometry(params.font, params.boxProps.width, params.boxProps.height, params.box.parent.userData.value, params.textProps);
-  params.base.promptMesh.geometry.dispose();
-  params.base.promptMesh.geometry = mergedGeometry;
+  let widget = params.base.textMesh.widget;
+  let pos = calculateSliderPosition(widget);
 
-  params.base.promptMesh.position.set(-params.boxProps.width/2+params.textProps.size/2, -params.boxProps.height/2+params.textProps.height/2, -params.textProps.size/2);
+  widget.handle.position.copy(pos);
+  updateValueText(params);
 
 }
 
-export function valueTextPortal(container, font, boxProps, textProps){
-  let material = getMaterial(textProps.matProps, container.box.material.stencilRef);
-  container.box.userData.textMaterial = material;
-  let params = {'box': container.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': textProps};
+function updateValueText(params){
+
+  if(params.base.textMesh.numeric && isNaN(params.box.parent.userData.value))
+    return;
+
+  let mergedGeometry = createMergedTextGeometry(params.font, params.boxProps.width, params.boxProps.height, params.box.parent.userData.value, params.textProps);
+  params.base.textMesh.geometry.dispose();
+  params.base.textMesh.geometry = mergedGeometry;
+
+  params.base.textMesh.position.set(-params.boxProps.width/2+params.textProps.size/2, -params.boxProps.height/2+params.textProps.height/2, -params.textProps.size/2);
+
+}
+
+
+export function valueTextPortal(text, font, boxProps, sliderProps, textProps){
+  let base = portalWindow(valBoxProps, sliderProps.padding);
+  
+  let material = getMaterial(textProps.matProps, base.box.material.stencilRef);
+  base.box.userData.textMaterial = material;
+  let params = {'box': base.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': textProps};
   updateValueText(params);
   
-  container.box.addEventListener('update', function(event) {
+  base.box.addEventListener('update', function(event) {
     updateValueText(params);
   });
 };
 
-export function editTextPortal(text, font, boxProps, sliderProps, textProps){
-    //selectionTextPortal(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined)
-   //{promptMesh, Box}
+export function editTextPortal(text, font, boxProps, sliderProps, widget=undefined){
   let base = selectionTextPortal(boxProps, text, sliderProps.font, sliderProps.textProps);
   let material = getMaterial(sliderProps.textProps.matProps, base.Box.box.material.stencilRef);
   base.Box.box.userData.textMaterial = material;
+  base.textMesh.userData.numeric = sliderProps.numeric;
+  //base.textMesh.userData.type = widget.base.userData.type;
+  base.textMesh.widget = widget;
+  console.log("widget")
+  console.log(widget)
+
   let params = {'base': base, 'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': sliderProps.textProps};
   handleTextInputSetup(base, sliderProps.textProps, font);
+
   base.Box.box.addEventListener('update', function(event) {
     updateValueText(params);
+  });
+
+  base.textMesh.addEventListener('update', function(event) {
+    updateSliderUI(params);
   });
 
   return base.Box 
@@ -1207,10 +1235,8 @@ export function sliderBox(boxProps, sliderProps){
     valBoxProps.width=valBoxProps.width;
   }
   setSliderUserData(slider, boxProps, sliderProps);
-  //let valBox = portalWindow(valBoxProps, sliderProps.padding);
-  
-  //valueTextPortal(valBox, sliderProps.font, valBoxProps, sliderProps.textProps)
-  let valBox = editTextPortal("0", sliderProps.font, valBoxProps, sliderProps)
+
+  let valBox = editTextPortal("0", sliderProps.font, valBoxProps, sliderProps, slider);
   slider.base.add(valBox.box);
   slider.base.userData.valueBox = valBox.box;
   darkenMaterial(valBox.box.material, 30);
@@ -1224,8 +1250,43 @@ export function sliderBox(boxProps, sliderProps){
   return slider
 };
 
-function onSliderMove(slider){
+export function calculateSliderPosition(slider){
+  let minScroll = slider.handle.userData.minScroll;
+  let maxScroll = slider.handle.userData.maxScroll;
+  let max = slider.handle.userData.max;
+  let min = slider.handle.userData.min;
+  let value = slider.base.userData.value;
+  if(value>max){
+    slider.base.userData.value = max;
+    value = max;
+  }else if(value<min){
+    slider.base.userData.value = min;
+    value = min;
+  }
+  if(isNaN(value))
+    return;
 
+  let coord = 'x';
+  let divider = (slider.base.userData.size.width*slider.base.userData.valTextOffset-slider.handle.userData.padding-slider.handle.userData.size.width);
+
+  if(!slider.handle.userData.horizontal){
+    coord = 'y';
+    divider = (slider.base.userData.size.height*slider.base.userData.valTextOffset+slider.handle.userData.padding-slider.handle.userData.size.height);
+  }
+
+  let vec = ((value-min)/(max-min))*divider+minScroll;
+  
+
+  let pos = new THREE.Vector3(slider.handle.position.x, vec, slider.handle.position.z);
+
+  if(slider.base.userData.horizontal){
+    pos.set(-vec, slider.handle.position.y, slider.handle.position.z);
+  }
+
+  return pos
+};
+
+export function calculateSliderValue(slider){
   let coord = 'x';
   let divider = (slider.base.userData.size.width*slider.base.userData.valTextOffset-slider.handle.userData.padding-slider.handle.userData.size.width);
 
@@ -1244,9 +1305,14 @@ function onSliderMove(slider){
   if(slider.handle.userData.min<0){
     value = ((pos-minScroll)/divider*(max-min))+min;
   }
-  value = value.toFixed(slider.handle.userData.places);
 
-  slider.base.userData.value = value;
+  return value.toFixed(slider.handle.userData.places);
+};
+
+function onSliderMove(slider){
+
+  slider.base.userData.value = calculateSliderValue(slider);
+
   if(slider.base.userData.valueBox != undefined){
     slider.base.userData.valueBox.dispatchEvent({type:'update'});
   }
@@ -1943,25 +2009,43 @@ function constructMultiTextMerged(obj, text, font, material, textProps, animProp
     return mergedMesh
 }
 
+export function editTextProperties(cBox, text, textMesh, font, size, height, zOffset, letterSpacing, lineSpacing, wordSpacing, padding, draggable, meshProps){
+  return {
+    'cBox': cBox,
+    'text': text,
+    'textMesh': textMesh,
+    'font': font,
+    'size': size,
+    'height': height,
+    'zOffset': zOffset,
+    'letterSpacing': letterSpacing,
+    'lineSpacing': lineSpacing,
+    'wordSpacing': wordSpacing,
+    'padding': padding,
+    'draggable': draggable,
+    'meshProps': meshProps
+  }
+};
+
 function selectionTextBox(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined){
   const Box = contentBox(boxProps, textProps.padding, textProps.clipped);
   let mat = getMaterial(textProps.matProps, 0);
 
   const promptGeometry = createMergedTextBoxGeometry(Box, font, boxProps.width, boxProps.height, text, textProps, animProps);
-  const promptMesh = new THREE.Mesh(promptGeometry, mat);
-  promptMesh.layers.set(0);
+  const textMesh = new THREE.Mesh(promptGeometry, mat);
+  textMesh.layers.set(0);
   const boxSize = getGeometrySize(Box.box.geometry);
   const geomSize = getGeometrySize(promptGeometry);
   const parentSize = getGeometrySize(boxProps.parent.geometry);
-  setMergedMeshUserData(boxSize, geomSize, textProps.padding, promptMesh);
+  setMergedMeshUserData(boxSize, geomSize, textProps.padding, textMesh);
 
-  Box.box.add(promptMesh);
-  promptMesh.position.set(promptMesh.position.x, promptMesh.position.y-textProps.padding, promptMesh.position.z);
+  Box.box.add(textMesh);
+  textMesh.position.set(textMesh.position.x, textMesh.position.y-textProps.padding, textMesh.position.z);
   boxProps.parent.add(Box.box);
   Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
   adjustBoxScaleRatio(Box.box, boxProps.parent);
 
-  return {promptMesh, Box}
+  return {textMesh, Box}
 }
 
 function selectionTextPortal(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined){
@@ -1969,19 +2053,19 @@ function selectionTextPortal(boxProps, text, font, textProps=undefined,  animPro
   let mat = getMaterial(textProps.matProps, Box.stencilRef);
 
   const promptGeometry = createMergedTextBoxGeometry(Box, font, boxProps.width, boxProps.height, text, textProps, animProps);
-  const promptMesh = new THREE.Mesh(promptGeometry, mat);
+  const textMesh = new THREE.Mesh(promptGeometry, mat);
   const boxSize = getGeometrySize(Box.box.geometry);
   const geomSize = getGeometrySize(promptGeometry);
   const parentSize = getGeometrySize(boxProps.parent.geometry);
-  setMergedMeshUserData(boxSize, geomSize, textProps.padding, promptMesh);
+  setMergedMeshUserData(boxSize, geomSize, textProps.padding, textMesh);
 
-  Box.box.add(promptMesh);
-  promptMesh.position.set(promptMesh.position.x, promptMesh.position.y-textProps.padding, promptMesh.position.z);
+  Box.box.add(textMesh);
+  textMesh.position.set(textMesh.position.x, textMesh.position.y-textProps.padding, textMesh.position.z);
   boxProps.parent.add(Box.box);
   Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
   adjustBoxScaleRatio(Box.box, boxProps.parent);
 
-  return {promptMesh, Box}
+  return {textMesh, Box}
 }
 
 function selectionText(boxProps, text, textProps, animProps=undefined, onCreated=undefined){
@@ -1995,32 +2079,33 @@ function selectionText(boxProps, text, textProps, animProps=undefined, onCreated
   const cBox = contentBox(geomSize.width+padding, boxHeight, padding, clipped);
   const boxSize = getGeometrySize(cBox.box.geometry);
 
-  const promptMesh = new THREE.Mesh(promptGeometry, mat);
+  const textMesh = new THREE.Mesh(promptGeometry, mat);
 
-  setMergedMeshUserData(boxSize, geomSize, padding, promptMesh);
+  setMergedMeshUserData(boxSize, geomSize, padding, textMesh);
 
-  cBox.box.add(promptMesh);
-  promptMesh.position.set(0, 0, 0);
+  cBox.box.add(textMesh);
+  textMesh.position.set(0, 0, 0);
   boxProps.parent.add(cBox.box);
   cBox.box.position.set(cBox.box.position.x, cBox.box.position.y, parentSize.depth/2+boxSize.depth/2);
   adjustBoxScaleRatio(cBox.box, boxProps.parent);
 
-  return {promptMesh, cBox}
+  return {textMesh, cBox}
 }
 
 function handleTextInputSetup(inputProps, textProps, font){
-  inputPrompts.push(inputProps.promptMesh);
-  const tProps = {'cBox': inputProps.Box, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'zOffset':textProps.zOffset, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': textProps.meshProps };
-  inputProps.promptMesh.userData.textProps = tProps;
+  inputPrompts.push(inputProps.textMesh);
+  const tProps = editTextProperties(inputProps.Box, '', inputProps.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps);
+  //const tProps = {'cBox': inputProps.Box, 'text': '', 'textMesh': inputProps.textMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'zOffset':textProps.zOffset, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': textProps.meshProps };
+  inputProps.textMesh.userData.textProps = tProps;
   inputProps.Box.box.userData.mouseOverParent = true;
   mouseOverable.push(inputProps.Box.box);
-  mouseOverUserData(inputProps.promptMesh);
+  mouseOverUserData(inputProps.textMesh);
 }
 
 export function createTextInput(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
     let inputProps = selectionTextBox(boxProps, text, font, textProps, animProps, onCreated);
-    mouseOverable.push(inputProps.promptMesh);
+    mouseOverable.push(inputProps.textMesh);
     handleTextInputSetup(inputProps, textProps, font);
   });
 };
@@ -2035,7 +2120,7 @@ export function createScrollableTextInput(boxProps, text, textProps=undefined,  
 export function createTextInputPortal(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
     let inputProps = selectionTextPortal(boxProps, text, font, textProps, animProps, onCreated);
-    mouseOverable.push(inputProps.promptMesh);
+    mouseOverable.push(inputProps.textMesh);
     handleTextInputSetup(inputProps, textProps, font);
   });
 };
@@ -2053,14 +2138,15 @@ export function createListSelector(selectors, boxProps, text, textProps=undefine
     selectorUserData(cBox.box);
     for (const [selTxt, url] of Object.entries(selectors)) {
       let inputProps = selectionText(cBox.box, boxProps.width, boxProps.height, boxProps.name, selTxt, font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, textProps.meshProps, animProps, onCreated);
-      const tProps = {'cBox': inputProps.cBox, 'text': '', 'textMesh': inputProps.promptMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'draggable': true, 'meshProps': textProps.meshProps };
-      inputProps.promptMesh.userData.textProps = tProps;
-      inputPrompts.push(inputProps.promptMesh);
-      mouseOverable.push(inputProps.promptMesh);
-      clickable.push(inputProps.promptMesh);
-      inputProps.promptMesh.userData.draggable=false;
+      const tProps = editTextProperties(inputProps.Box, '', inputProps.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
+      //const tProps = {'cBox': inputProps.cBox, 'text': '', 'textMesh': inputProps.textMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'draggable': true, 'meshProps': textProps.meshProps };
+      inputProps.textMesh.userData.textProps = tProps;
+      inputPrompts.push(inputProps.textMesh);
+      mouseOverable.push(inputProps.textMesh);
+      clickable.push(inputProps.textMesh);
+      inputProps.textMesh.userData.draggable=false;
       inputProps.cBox.box.userData.mouseOverParent = true;
-      mouseOverUserData(inputProps.promptMesh);
+      mouseOverUserData(inputProps.textMesh);
       cBox.box.userData.selectors.push(inputProps);
       selectorElems.push(inputProps.cBox.box);
     }
@@ -2072,11 +2158,11 @@ export function createListSelector(selectors, boxProps, text, textProps=undefine
 function Button(boxProps, text, fontPath, letterSpacing=1, lineSpacing=1, wordSpacing=1, padding=1, size=1, height=1,  animProps=undefined, onCreated=undefined, mouseOver=true) {
   loader.load(fontPath, (font) => {
     let txtMesh = selectionText(boxProps, text, font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, textProps.meshProps, animProps, onCreated);
-    inputPrompts.push(txtMesh.promptMesh);
-    const textProps = {'cBox': txtMesh.cBox, 'text': '', 'textMesh': txtMesh.promptMesh, 'font': font, 'size': size, 'height': height, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': textProps.meshProps };
+    inputPrompts.push(txtMesh.textMesh);
+    const textProps = {'cBox': txtMesh.cBox, 'text': '', 'textMesh': txtMesh.textMesh, 'font': font, 'size': size, 'height': height, 'letterSpacing': letterSpacing, 'lineSpacing': lineSpacing, 'wordSpacing': wordSpacing, 'padding': padding, 'draggable': true, 'meshProps': textProps.meshProps };
     txtMesh.cBox.box.userData.textProps = textProps;
     txtMesh.cBox.box.userData.draggable=false;
-    txtMesh.promptMesh.userData.mouseOverParent = true;
+    txtMesh.textMesh.userData.mouseOverParent = true;
 
     mouseOverUserData(txtMesh.cBox.box);
     clickable.push(txtMesh.cBox.box);
@@ -2717,6 +2803,13 @@ export function doubleClickHandler(raycaster){
           if(textProps.draggable){
             draggable.push(typingTextMesh);
           }
+          if(typingTextMesh.widget != undefined && !isNaN(currentText)){
+            typingTextMesh.widget.base.userData.value = currentText;
+          }
+          typingTextMesh.dispatchEvent({type:'update'});
+
+    
+          console.log(typingTextMesh.widget.base)
 
         } else if (event.key === 'Backspace') {
             // Handle backspace
