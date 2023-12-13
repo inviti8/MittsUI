@@ -1156,7 +1156,7 @@ function updateSliderUI(params){
   let pos = calculateSliderPosition(widget);
 
   widget.handle.position.copy(pos);
-  updateValueText(params);
+  //widget.base.userData.valueBox.dispatchEvent({type:'update'});
 
 }
 
@@ -1187,15 +1187,17 @@ export function valueTextPortal(text, font, boxProps, sliderProps, textProps){
   });
 };
 
-export function editTextPortal(text, font, boxProps, sliderProps, widget=undefined){
+export function editValueTextPortal(text, font, boxProps, sliderProps, widget=undefined){
   let base = selectionTextPortal(boxProps, text, sliderProps.font, sliderProps.textProps);
   let material = getMaterial(sliderProps.textProps.matProps, base.Box.box.material.stencilRef);
+  let textProps = sliderProps.textProps;
   base.Box.box.userData.textMaterial = material;
   base.textMesh.userData.numeric = sliderProps.numeric;
   //base.textMesh.userData.type = widget.base.userData.type;
   base.textMesh.widget = widget;
-  console.log("widget")
-  console.log(widget)
+  const tProps = editTextProperties(base.Box, '', base.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps, false);
+  base.textMesh.userData.textProps = tProps;
+
 
   let params = {'base': base, 'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': sliderProps.textProps};
   handleTextInputSetup(base, sliderProps.textProps, font);
@@ -1236,7 +1238,7 @@ export function sliderBox(boxProps, sliderProps){
   }
   setSliderUserData(slider, boxProps, sliderProps);
 
-  let valBox = editTextPortal("0", sliderProps.font, valBoxProps, sliderProps, slider);
+  let valBox = editValueTextPortal("0", sliderProps.font, valBoxProps, sliderProps, slider);
   slider.base.add(valBox.box);
   slider.base.userData.valueBox = valBox.box;
   darkenMaterial(valBox.box.material, 30);
@@ -1312,6 +1314,10 @@ export function calculateSliderValue(slider){
 function onSliderMove(slider){
 
   slider.base.userData.value = calculateSliderValue(slider);
+
+  if(slider.base.userData.valueBox != undefined){
+    slider.base.userData.valueBox.currentText = slider.base.userData.value;
+  }
 
   if(slider.base.userData.valueBox != undefined){
     slider.base.userData.valueBox.dispatchEvent({type:'update'});
@@ -2009,7 +2015,7 @@ function constructMultiTextMerged(obj, text, font, material, textProps, animProp
     return mergedMesh
 }
 
-export function editTextProperties(cBox, text, textMesh, font, size, height, zOffset, letterSpacing, lineSpacing, wordSpacing, padding, draggable, meshProps){
+export function editTextProperties(cBox, text, textMesh, font, size, height, zOffset, letterSpacing, lineSpacing, wordSpacing, padding, draggable, meshProps, wrap=true){
   return {
     'cBox': cBox,
     'text': text,
@@ -2023,7 +2029,8 @@ export function editTextProperties(cBox, text, textMesh, font, size, height, zOf
     'wordSpacing': wordSpacing,
     'padding': padding,
     'draggable': draggable,
-    'meshProps': meshProps
+    'meshProps': meshProps,
+    'wrap': wrap
   }
 };
 
@@ -2095,9 +2102,9 @@ function selectionText(boxProps, text, textProps, animProps=undefined, onCreated
 function handleTextInputSetup(inputProps, textProps, font){
   inputPrompts.push(inputProps.textMesh);
   const tProps = editTextProperties(inputProps.Box, '', inputProps.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps);
-  //const tProps = {'cBox': inputProps.Box, 'text': '', 'textMesh': inputProps.textMesh, 'font': font, 'size': textProps.size, 'height': textProps.height, 'zOffset':textProps.zOffset, 'letterSpacing': textProps.letterSpacing, 'lineSpacing': textProps.lineSpacing, 'wordSpacing': textProps.wordSpacing, 'padding': textProps.padding, 'scrollable': false, 'meshProps': textProps.meshProps };
   inputProps.textMesh.userData.textProps = tProps;
   inputProps.Box.box.userData.mouseOverParent = true;
+  inputProps.Box.box.userData.currentText = '';
   mouseOverable.push(inputProps.Box.box);
   mouseOverUserData(inputProps.textMesh);
 }
@@ -2747,70 +2754,101 @@ export function mouseMoveHandler(raycaster, event){
   }
 }
 
+function inputTextYPosition(event, textMesh, boxSize, padding){
+
+  let yPosition = textMesh.position.y;
+  let textSize = getGeometrySize(textMesh.geometry);
+
+  if(textMesh.widget == undefined){
+    if (event.key === 'Enter') {
+      yPosition=boxSize.height-boxSize.height;
+    }else{
+      yPosition=textSize.height-padding;
+    }
+  }
+
+  return yPosition
+
+}
+
+function onEnterKey(event, textMesh, currentText, boxSize, padding){
+
+  let yPosition = textMesh.position.y;
+
+  if(textMesh.widget == undefined){
+    yPosition=inputTextYPosition(event, textMesh, boxSize, padding);
+    textMesh.position.set(textMesh.position.x, yPosition, textMesh.position.z);
+    if(textMesh.userData.textProps.draggable){
+      draggable.push(textMesh);
+    }
+  }else{
+    textMesh.widget.base.userData.value = currentText;
+    textMesh.dispatchEvent({type:'update'});
+  }
+}
+
+function onHandleTextGeometry(textMesh, currentText, boxSize){
+  if(textMesh.widget != undefined)
+    return;
+
+  let textProps = textMesh.userData.textProps;
+  if(currentText.length > 0){
+    textMesh.scale.copy(textMesh.userData.defaultScale);
+    textMesh.geometry.dispose(); // Clear the previous text
+    textMesh.geometry = createMergedTextBoxGeometry(textProps.cBox, textProps.font, boxSize.Width, boxSize.height, currentText, textProps);
+  }
+}
+
+function onHandleTypingText(event, textMesh, currentText, boxSize, padding){
+
+  let yPosition = textMesh.position.y;
+
+  if(textMesh.widget == undefined){
+    yPosition=inputTextYPosition(event, textMesh, boxSize, padding);
+    textMesh.position.set(textMesh.position.x, yPosition, textMesh.position.z);
+
+    textMesh.userData.textProps.cBox.box.userData.currentText = currentText;
+  }else{
+    if(textMesh.userData.numeric && !isNaN(currentText)){
+      textMesh.widget.base.userData.value = currentText;
+      textMesh.widget.base.userData.valueBox.dispatchEvent({type:'update'});
+    }
+  } 
+}
+
 export function doubleClickHandler(raycaster){
   raycaster.layers.set(0);
   const intersectsInputPrompt = raycaster.intersectObjects(inputPrompts);
 
   if(intersectsInputPrompt.length > 0){
 
-    let clicked = intersectsInputPrompt[0].object;
-    let userData = clicked.userData;
-    const textProps = clicked.userData.textProps;
+    let textMesh = intersectsInputPrompt[0].object;
+    let userData = textMesh.userData;
+    const textProps = textMesh.userData.textProps;
 
     // Initialize variables for typing
-    let currentText = '';
+    let currentText = textProps.cBox.box.userData.currentText;
+    console.log(currentText)
+    console.log(textProps.cBox.box.userData)
     let boxSize = getGeometrySize(textProps.cBox.box.geometry);
-    let pos = new THREE.Vector3().copy(clicked.position);
-    const textGeometry = createTextGeometry(currentText, textProps.font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
-    let mat = clicked.material;
+    let pos = new THREE.Vector3().copy(textMesh.position);
     let padding = textProps.padding;
 
-    let typingTextMesh = textProps.textMesh;
-
-    if(typingTextMesh==undefined){
-      typingTextMesh = new THREE.Mesh(textGeometry, mat);
-      typingTextMesh.layers.set( i );
-      typingTextMesh.userData = userData;
-      typingTextMesh.userData.textProps = textProps;
-      typingTextMesh.position.copy(pos); // Adjust position in the scene
-      textProps.cBox.box.add(typingTextMesh);
-      textProps.cBox.box.userData.inputText = typingTextMesh;
-    }
-
-
-    let geomSize = getGeometrySize(typingTextMesh.geometry);
     if(!textProps.draggable){
-      inputPrompts.push(typingTextMesh);
-      mouseOverable.push(typingTextMesh);
-      clickable.push(typingTextMesh);
+      inputPrompts.push(textMesh);
+      mouseOverable.push(textMesh);
+      clickable.push(textMesh);
     }
 
-    let yPosition = boxSize.height / 2 - padding;
+    let yPosition = inputTextYPosition(event, textMesh, boxSize, padding);
 
     // Listen for keyboard input
     window.addEventListener('keydown', (event) => {
-      if(clicked!=undefined){
-        clicked.geometry.dispose();
-        //textProps.cBox.box.remove(clicked);
-        clicked=undefined;
-      }
+
         if (event.key === 'Enter') {
           // Handle the entered text (e.g., send it to a server)
           console.log('Entered text:', currentText);
-          geomSize = getGeometrySize(typingTextMesh.geometry);
-          yPosition=boxSize.height-boxSize.height;
-          typingTextMesh.position.set(typingTextMesh.position.x, yPosition, typingTextMesh.position.z);
-          if(textProps.draggable){
-            draggable.push(typingTextMesh);
-          }
-          if(typingTextMesh.widget != undefined && !isNaN(currentText)){
-            typingTextMesh.widget.base.userData.value = currentText;
-          }
-          typingTextMesh.dispatchEvent({type:'update'});
-
-    
-          console.log(typingTextMesh.widget.base)
-
+          onEnterKey(event, textMesh, currentText, boxSize, padding);
         } else if (event.key === 'Backspace') {
             // Handle backspace
             currentText = currentText.slice(0, -1);
@@ -2825,16 +2863,12 @@ export function doubleClickHandler(raycaster){
             currentText += event.key.toUpperCase();
           }else{
             currentText += event.key;
-            geomSize = getGeometrySize(typingTextMesh.geometry);
-            yPosition=geomSize.height-padding;
-            typingTextMesh.position.set(typingTextMesh.position.x, yPosition, typingTextMesh.position.z);
           }
-        }
-        typingTextMesh.scale.copy(typingTextMesh.userData.defaultScale);
-        typingTextMesh.geometry.dispose(); // Clear the previous text
-        typingTextMesh.geometry = createMergedTextBoxGeometry(textProps.cBox, textProps.font, boxSize.Width, boxSize.height, currentText, textProps);
+          onHandleTypingText(event, textMesh, currentText, boxSize, padding);
 
-        });
+        }
+        onHandleTextGeometry(textMesh, currentText, boxSize);
+      });
     }
 }
 
