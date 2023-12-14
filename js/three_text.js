@@ -1193,11 +1193,9 @@ export function editValueTextPortal(text, font, boxProps, sliderProps, widget=un
   let textProps = sliderProps.textProps;
   base.Box.box.userData.textMaterial = material;
   base.textMesh.userData.numeric = sliderProps.numeric;
-  //base.textMesh.userData.type = widget.base.userData.type;
   base.textMesh.widget = widget;
   const tProps = editTextProperties(base.Box, '', base.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps, false);
   base.textMesh.userData.textProps = tProps;
-
 
   let params = {'base': base, 'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': sliderProps.textProps};
   handleTextInputSetup(base, sliderProps.textProps, font);
@@ -1216,29 +1214,27 @@ export function editValueTextPortal(text, font, boxProps, sliderProps, widget=un
 export function sliderBox(boxProps, sliderProps){
 
   let slider = switchWidgetBox(boxProps, sliderProps, 8);
-  let valMatProps = materialProperties('BASIC', slider.handle.material.color, false, 1, THREE.FrontSide, 'STENCIL')
+  let valMatProps = materialProperties('BASIC', slider.handle.material.color, false, 1, THREE.FrontSide, 'STENCIL');
   let baseWidth = boxProps.width*slider.base.userData.valTextOffset;
   let baseHeight = boxProps.height;
-  let alignLeft = boxProps.width*(1-1*slider.base.userData.valTextOffset);
+  let valBoxSize = 1-slider.base.userData.valTextOffset;
   if(sliderProps.horizontal==false){
     baseWidth = boxProps.width;
     baseHeight = boxProps.height*slider.base.userData.valTextOffset;
-    alignLeft = boxProps.height*(1-1*slider.base.userData.valTextOffset);
   }
   let valBoxProps = {...boxProps};
   valBoxProps.matProps = valMatProps;
 
-  
   if(sliderProps.horizontal){
-    valBoxProps.width=valBoxProps.width/4;
-    valBoxProps.height=valBoxProps.height;
+    valBoxProps.height=boxProps.height;
+    valBoxProps.width=boxProps.width*valBoxSize;
   }else{
-    valBoxProps.height=valBoxProps.height/4;
-    valBoxProps.width=valBoxProps.width;
+    valBoxProps.height=boxProps.height*valBoxSize;
+    valBoxProps.width=boxProps.width;
   }
   setSliderUserData(slider, boxProps, sliderProps);
 
-  let valBox = editValueTextPortal("0", sliderProps.font, valBoxProps, sliderProps, slider);
+  let valBox = editValueTextPortal("0.0", sliderProps.font, valBoxProps, sliderProps, slider);
   slider.base.add(valBox.box);
   slider.base.userData.valueBox = valBox.box;
   darkenMaterial(valBox.box.material, 30);
@@ -1469,39 +1465,40 @@ function adjustBoxScaleRatio(box, parent){
   box.userData.defaultScale = new THREE.Vector3().copy(box.scale);
 }
 
+function handleCharacterGeometry(character, font, boxSize, lineWidth, yPosition, textProps, letterGeometries){
+  if (character === ' ') {
+    // Handle spaces by adjusting the x position
+    lineWidth += textProps.wordSpacing;
+  } else {
+
+    const geometry = createTextGeometry(character, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
+    geometry.translate(lineWidth, yPosition, boxSize.depth+textProps.zOffset);
+
+    // Calculate the width of the letter geometry
+    let { width } = getGeometrySize(geometry);
+    width+=textProps.letterSpacing;
+
+    letterGeometries.push(geometry);
+
+    // Update lineWidth
+    lineWidth += width-textProps.padding;
+  }
+
+  return { letterGeometries, lineWidth }
+}
+
 export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, text, textProps=undefined,  animProps=undefined) {
-    let extraSpace = cBox.padding*0.5;
     let lineWidth = -(cBox.width / 2 - (textProps.padding));
     let yPosition = cBox.height / 2 - (textProps.padding*2);
     const boxSize = getGeometrySize(cBox.box.geometry);
-    const letterGeometries = [];
+    let letterGeometries = [];
 
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
-      if (character === ' ') {
-        // Handle spaces by adjusting the x position
-        lineWidth += textProps.wordSpacing;
-      } else {
-
-        const geometry = createTextGeometry(character, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
-        geometry.translate(lineWidth, yPosition, boxSize.depth+textProps.zOffset);
-
-
-        // Calculate the width of the letter geometry
-        let { width } = getGeometrySize(geometry);
-
-
-        width+=textProps.letterSpacing;
-
-        // Check if the letter is within the bounds of the cBox mesh
-        if (width <= cBox.width / 2 - textProps.padding) {
-          letterGeometries.push(geometry);
-        }
-
-        // Update lineWidth
-        lineWidth += width-textProps.padding;
-      }
+      let geoHandler = handleCharacterGeometry(character, font, boxSize, lineWidth, yPosition, textProps, letterGeometries);
+      lineWidth = geoHandler.lineWidth;
+      letterGeometries = geoHandler.letterGeometries;
 
       // Check if lineWidth exceeds cBox width - padding
       if (lineWidth > cBox.width / 2 - textProps.padding) {
@@ -1509,7 +1506,6 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
         yPosition -= textProps.lineSpacing; // Move to the next line
       }
     }
-
 
     // Merge the individual letter geometries into a single buffer geometry
     return BufferGeometryUtils.mergeGeometries(letterGeometries);
@@ -1523,23 +1519,9 @@ export function createMergedTextGeometry(font, boxWidth, boxHeight, text, textPr
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
-      if (character === ' ') {
-        // Handle spaces by adjusting the x position
-        lineWidth += wordSpacing;
-      } else {
-
-        const geometry = createTextGeometry(character, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
-        geometry.translate(lineWidth, yPosition, 0);
-
-        // Calculate the width of the letter geometry
-        let { width } = getGeometrySize(geometry);
-        width+=textProps.letterSpacing;
-
-        letterGeometries.push(geometry);
-
-        // Update lineWidth
-        lineWidth += width;
-      }
+      let geoHandler = handleCharacterGeometry(character, font, boxSize, lineWidth, yPosition, textProps, letterGeometries);
+      lineWidth = geoHandler.lineWidth;
+      letterGeometries = geoHandler.letterGeometries;
 
     }
 
@@ -1902,9 +1884,6 @@ function constructMultiMergedGeometry(obj, text, font, material, textProps, anim
         const geometry = createTextGeometry(character, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
 
         const letterMesh = new THREE.Mesh(geometry, material);
-        if(scene != undefined){
-          letterMesh.layers.set(scene.userData.layer_index);
-        }
         letterMesh.position.set(lineWidth, yPosition, boxSize.depth/2-textProps.height/2);
         if(animProps!=undefined){
           letterMesh.material.transparent=true;
@@ -1923,7 +1902,7 @@ function constructMultiMergedGeometry(obj, text, font, material, textProps, anim
         }
 
         // Update lineWidth
-        lineWidth += width;
+        lineWidth += width-textProps.padding;
       }
 
       // Check if lineWidth exceeds cBox width - padding
@@ -1977,7 +1956,7 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
           cubes.push(cube);
         }
         // Update lineWidth
-        lineWidth += width;
+        lineWidth += width-textProps.padding;
       }
 
       // Check if lineWidth exceeds cBox width - padding
@@ -2067,7 +2046,7 @@ function selectionTextPortal(boxProps, text, font, textProps=undefined,  animPro
   setMergedMeshUserData(boxSize, geomSize, textProps.padding, textMesh);
 
   Box.box.add(textMesh);
-  textMesh.position.set(textMesh.position.x, textMesh.position.y-textProps.padding, textMesh.position.z);
+  textMesh.position.set(Box.width/2-geomSize.width/2-textProps.padding, -Box.height/2+geomSize.height/2+textProps.padding, textMesh.position.z);
   boxProps.parent.add(Box.box);
   Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
   adjustBoxScaleRatio(Box.box, boxProps.parent);
@@ -2151,7 +2130,7 @@ export function createListSelector(selectors, boxProps, text, textProps=undefine
       inputPrompts.push(inputProps.textMesh);
       mouseOverable.push(inputProps.textMesh);
       clickable.push(inputProps.textMesh);
-      inputProps.textMesh.userData.draggable=false;
+      inputProps.textMesh.userData.draggable = false;
       inputProps.cBox.box.userData.mouseOverParent = true;
       mouseOverUserData(inputProps.textMesh);
       cBox.box.userData.selectors.push(inputProps);
@@ -2192,14 +2171,15 @@ function createWidgetText(font, boxProps, name, textProps, animProps=undefined, 
 
     let mat = getMaterial(textProps.matProps, boxProps.parent.material.stencilRef);
     const geometry = createTextGeometry(name, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
+    geometry.center();
     const mergedMesh = new THREE.Mesh(geometry, mat);
 
-    mergedMesh.position.set(-boxProps.width/2+textProps.padding, boxProps.height/2+textProps.padding, 0);
+
+    mergedMesh.position.set(0, boxProps.height/2+textProps.padding, 0);
     if(!horizontal){
-      mergedMesh.position.set(-boxProps.width/2-textProps.padding, boxProps.height/2+textProps.padding, 0);
+      mergedMesh.position.set(0, boxProps.height/2+textProps.padding, 0);
     }
     boxProps.parent.add(mergedMesh);
-
   }
 }
 
@@ -2788,7 +2768,7 @@ function onEnterKey(event, textMesh, currentText, boxSize, padding){
 }
 
 function onHandleTextGeometry(textMesh, currentText, boxSize){
-  if(textMesh.widget != undefined)
+  if(textMesh.widget != undefined)//widgets update their own text geometry
     return;
 
   let textProps = textMesh.userData.textProps;
@@ -2811,6 +2791,7 @@ function onHandleTypingText(event, textMesh, currentText, boxSize, padding){
   }else{
     if(textMesh.userData.numeric && !isNaN(currentText)){
       textMesh.widget.base.userData.value = currentText;
+      textMesh.userData.textProps.cBox.box.userData.currentText = currentText;
       textMesh.widget.base.userData.valueBox.dispatchEvent({type:'update'});
     }
   } 
@@ -2828,8 +2809,6 @@ export function doubleClickHandler(raycaster){
 
     // Initialize variables for typing
     let currentText = textProps.cBox.box.userData.currentText;
-    console.log(currentText)
-    console.log(textProps.cBox.box.userData)
     let boxSize = getGeometrySize(textProps.cBox.box.geometry);
     let pos = new THREE.Vector3().copy(textMesh.position);
     let padding = textProps.padding;
@@ -2845,9 +2824,7 @@ export function doubleClickHandler(raycaster){
     // Listen for keyboard input
     window.addEventListener('keydown', (event) => {
 
-        if (event.key === 'Enter') {
-          // Handle the entered text (e.g., send it to a server)
-          console.log('Entered text:', currentText);
+        if (event.key === 'Enter') {;
           onEnterKey(event, textMesh, currentText, boxSize, padding);
         } else if (event.key === 'Backspace') {
             // Handle backspace
