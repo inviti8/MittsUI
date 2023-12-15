@@ -544,22 +544,22 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
 
 export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
 
-  if(elem.userData.anim != false && gsap.isTweening( elem.userData.anim ))
+  if(elem.handle.userData.anim != false && gsap.isTweening( elem.handle.userData.anim ))
   return;
 
-  let pos = elem.userData.onPos;
+  let pos = elem.handle.userData.onPos;
 
-  if(elem.userData.on){
-    pos=elem.userData.offPos;
+  if(elem.handle.userData.on){
+    pos=elem.handle.userData.offPos;
   }
 
-  let props = { duration: duration, x: pos.x, y: elem.position.y, z: elem.position.z, ease: easeIn, onComplete: updateToggleState, onCompleteParams:[elem] };
+  let props = { duration: duration, x: pos.x, y: elem.handle.position.y, z: elem.handle.position.z, ease: easeIn, onComplete: updateToggleState, onCompleteParams:[elem] };
 
-  if(!elem.userData.horizontal){
-    props = { duration: duration, x: elem.position.x, y: pos.y, z: elem.position.z, ease: easeIn, onComplete: updateToggleState, onCompleteParams:[elem] };
+  if(!elem.handle.userData.horizontal){
+    props = { duration: duration, x: elem.handle.position.x, y: pos.y, z: elem.handle.position.z, ease: easeIn, onComplete: updateToggleState, onCompleteParams:[elem] };
   }
 
-  elem.userData.anim = gsap.to(elem.position, props);
+  elem.handle.userData.anim = gsap.to(elem.handle.position, props);
 
 };
 
@@ -621,12 +621,6 @@ export function createTextGeometry(character, font, size, height, curveSegments,
     bevelSegments: bevelSegments,
   });
 };
-
-function updateToggleState(elem){
-
-  elem.userData.on=!elem.userData.on;
-
-}
 
 //MATERIAL CREATION
 //useCase='SIMPLE','STENCIL','STENCIL_CHILD'
@@ -1086,14 +1080,14 @@ export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
   let baseWidth = boxProps.width*valTextOffset;
   let baseHeight = boxProps.height;
   let baseDepth=boxProps.depth/2;
-  let handleWidth=boxProps.width/handleSize;
+  let handleWidth=boxProps.width/handleSize*valTextOffset;
   let handleHeight=boxProps.height;
   let handleDepth=boxProps.depth*2;
   if(widgetProps.horizontal==false){
     baseWidth = boxProps.width;
     baseHeight = boxProps.height*valTextOffset;
     handleWidth=boxProps.width;
-    handleHeight=boxProps.height/handleSize;
+    handleHeight=boxProps.height/handleSize*valTextOffset;
   }
   
   let handleMat = getMaterial(boxProps.matProps, boxProps.parent.material.stencilRef);
@@ -1126,13 +1120,24 @@ export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
   base.userData.horizontal = widgetProps.horizontal;
   base.userData.valTextOffset = valTextOffset;
 
-  let result = { 'handle': handle, 'base': base,  'width': boxProps.width, 'height': boxProps.height, 'padding': widgetProps.padding}
+  let result = { 'base': base, 'handle': handle,  'width': boxProps.width, 'height': boxProps.height, 'padding': widgetProps.padding}
 
   return result
 
 };
 
-export function sliderProperties(name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined, font=undefined, useValueText=true, numeric=true){
+export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, step=0.001, editable=true){
+  return {
+    'defaultValue': defaultValue,
+    'min': min,
+    'max': max,
+    'places': places,
+    'step': step,
+    'editable': editable
+  }
+};
+
+export function sliderProperties(name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined, font=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties()){
   return {
     'name': name,
     'horizontal': horizontal,
@@ -1144,7 +1149,8 @@ export function sliderProperties(name='', horizontal=true, min=0, max=1, places=
     'textProps': textProps,
     'font': font,
     'useValueText': useValueText,
-    'numeric': numeric
+    'numeric': numeric,
+    'valueProps': valueProps
   }
 };
 
@@ -1169,36 +1175,42 @@ function updateValueText(params){
   params.base.textMesh.geometry.dispose();
   params.base.textMesh.geometry = mergedGeometry;
 
-  params.base.textMesh.position.set(-params.boxProps.width/2+params.textProps.size/2, -params.boxProps.height/2+params.textProps.height/2, -params.textProps.size/2);
+  params.base.textMesh.position.set(-params.boxProps.width/2+params.textProps.size/2, -params.boxProps.height/2+params.textProps.height, -params.textProps.size/2);
 
 }
 
 
-export function valueTextPortal(text, font, boxProps, sliderProps, textProps){
-  let base = portalWindow(valBoxProps, sliderProps.padding);
+export function valueTextPortal(text, font, boxProps, widgetProps, widget=undefined){
+  let base = portalWindow(valBoxProps, widgetProps.padding);
   
   let material = getMaterial(textProps.matProps, base.box.material.stencilRef);
   base.box.userData.textMaterial = material;
-  let params = {'box': base.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': textProps};
+  base.textMesh.userData.numeric = widgetProps.numeric;
+  base.textMesh.widget = widget;
+
+  let params = {'box': base.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': widgetProps.textProps};
   updateValueText(params);
+
   
   base.box.addEventListener('update', function(event) {
     updateValueText(params);
   });
+
+  return base
 };
 
-export function editValueTextPortal(text, font, boxProps, sliderProps, widget=undefined){
-  let base = selectionTextPortal(boxProps, text, sliderProps.font, sliderProps.textProps);
-  let material = getMaterial(sliderProps.textProps.matProps, base.Box.box.material.stencilRef);
-  let textProps = sliderProps.textProps;
+export function editValueTextPortal(text, font, boxProps, widgetProps, widget=undefined){
+  let base = selectionTextPortal(boxProps, text, widgetProps.font, widgetProps.textProps);
+  let material = getMaterial(widgetProps.textProps.matProps, base.Box.box.material.stencilRef);
+  let textProps = widgetProps.textProps;
   base.Box.box.userData.textMaterial = material;
-  base.textMesh.userData.numeric = sliderProps.numeric;
+  base.textMesh.userData.numeric = widgetProps.numeric;
   base.textMesh.widget = widget;
   const tProps = editTextProperties(base.Box, '', base.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps, false);
   base.textMesh.userData.textProps = tProps;
 
-  let params = {'base': base, 'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': sliderProps.textProps};
-  handleTextInputSetup(base, sliderProps.textProps, font);
+  let params = {'base': base, 'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': widgetProps.textProps};
+  handleTextInputSetup(base, widgetProps.textProps, font);
 
   base.Box.box.addEventListener('update', function(event) {
     updateValueText(params);
@@ -1209,40 +1221,48 @@ export function editValueTextPortal(text, font, boxProps, sliderProps, widget=un
   });
 
   return base.Box 
-}
+};
 
-export function sliderBox(boxProps, sliderProps){
-
-  let slider = switchWidgetBox(boxProps, sliderProps, 8);
-  let valMatProps = materialProperties('BASIC', slider.handle.material.color, false, 1, THREE.FrontSide, 'STENCIL');
-  let baseWidth = boxProps.width*slider.base.userData.valTextOffset;
-  let baseHeight = boxProps.height;
-  let valBoxSize = 1-slider.base.userData.valTextOffset;
-  if(sliderProps.horizontal==false){
-    baseWidth = boxProps.width;
-    baseHeight = boxProps.height*slider.base.userData.valTextOffset;
-  }
+function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
   let valBoxProps = {...boxProps};
+  let valMatProps = materialProperties('BASIC', widget.handle.material.color, false, 1, THREE.FrontSide, 'STENCIL');
+  let valBoxSize = 1-widget.base.userData.valTextOffset;
+
   valBoxProps.matProps = valMatProps;
 
-  if(sliderProps.horizontal){
+  if(widgetProps.horizontal){
     valBoxProps.height=boxProps.height;
     valBoxProps.width=boxProps.width*valBoxSize;
   }else{
     valBoxProps.height=boxProps.height*valBoxSize;
     valBoxProps.width=boxProps.width;
   }
-  setSliderUserData(slider, boxProps, sliderProps);
 
-  let valBox = editValueTextPortal("0.0", sliderProps.font, valBoxProps, sliderProps, slider);
-  slider.base.add(valBox.box);
-  slider.base.userData.valueBox = valBox.box;
+  let valBox = editValueTextPortal("0", widgetProps.font, valBoxProps, widgetProps, widget);
+  widget.base.add(valBox.box);
+  widget.base.userData.valueBox = valBox.box;
   darkenMaterial(valBox.box.material, 30);
 
-  if(sliderProps.horizontal){
+  if(widgetProps.horizontal){
     valBox.box.position.set(baseWidth/2+valBox.width/2, valBox.box.position.y, valBox.box.position.z);
   }else{
     valBox.box.position.set(valBox.box.position.x, -baseHeight+valBox.height, valBox.box.position.z);
+  }
+}
+
+export function sliderBox(boxProps, sliderProps){
+
+  let slider = switchWidgetBox(boxProps, sliderProps, 8);
+  let baseWidth = boxProps.width*slider.base.userData.valTextOffset;
+  let baseHeight = boxProps.height;
+  if(sliderProps.horizontal==false){
+    baseWidth = boxProps.width;
+    baseHeight = boxProps.height*slider.base.userData.valTextOffset;
+  }
+  setSliderUserData(slider, boxProps, sliderProps);
+
+  if(slider.base.userData.valTextOffset<1){
+    attachValueBox(slider, boxProps, sliderProps, baseWidth, baseHeight)
   }
   
   return slider
@@ -1273,8 +1293,6 @@ export function calculateSliderPosition(slider){
   }
 
   let vec = ((value-min)/(max-min))*divider+minScroll;
-  
-
   let pos = new THREE.Vector3(slider.handle.position.x, vec, slider.handle.position.z);
 
   if(slider.base.userData.horizontal){
@@ -1335,20 +1353,18 @@ function setSliderUserData(slider, boxProps, sliderProps){
     handleHeight=boxProps.height/8;
   }
 
-
   slider.base.userData.type = 'SLIDER';
   slider.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': baseDepth};
   slider.base.userData.handle = slider.handle;
   slider.base.userData.horizontal = sliderProps.horizontal;
-  slider.base.userData.value = "0";
+  slider.base.userData.value = sliderProps.valueProps.defaultValue;
 
   slider.handle.userData.type = 'SLIDER';
   slider.handle.userData.size = {'width': handleWidth, 'height': handleHeight, 'depth': handleDepth};
   slider.handle.userData.horizontal = sliderProps.horizontal;
-  slider.handle.userData.min = sliderProps.min;
-  slider.handle.userData.max = sliderProps.max;
-  slider.handle.userData.value = sliderProps.value;
-  slider.handle.userData.places = sliderProps.places;
+  slider.handle.userData.min = sliderProps.valueProps.min;
+  slider.handle.userData.max = sliderProps.valueProps.max;
+  slider.handle.userData.places = sliderProps.valueProps.places;
 
   if(sliderProps.horizontal){
     slider.handle.userData.maxScroll = slider.handle.position.x + (baseWidth-handleWidth);
@@ -1359,8 +1375,6 @@ function setSliderUserData(slider, boxProps, sliderProps){
   }
 
   slider.handle.userData.padding = sliderProps.padding;
-  slider.handle.userData.settleThreshold = handleHeight/50;
-  slider.handle.userData.horizontal = sliderProps.horizontal;
   slider.handle.userData.draggable = true;
 
   slider.handle.addEventListener('action', function(event) {
@@ -1369,37 +1383,77 @@ function setSliderUserData(slider, boxProps, sliderProps){
 
 }
 
-export function toggleProperties(name='', horizontal=true, on=false, padding=0.01, font=undefined, useValueText=false){
+export function stringValueProperties(defaultValue='Off', onValue='On', offValue='Off', editable=true){
+  return {
+    'defaultValue': defaultValue,
+    'onValue': onValue,
+    'offValue': offValue,
+    'editable': editable
+  }
+};
+
+export function toggleProperties(name='', horizontal=true, on=false, padding=0.01, textProps=undefined, font=undefined, useValueText=true, valueProps=stringValueProperties()){
   return {
     'name': name,
     'horizontal': horizontal,
     'on': on,
     'padding': padding,
+    'textProps': textProps,
     'font': font,
-    'useValueText': useValueText
+    'useValueText': useValueText,
+    'valueProps': valueProps
   }
 };
 
 export function toggleBox(boxProps, toggleProps){
 
   let toggle = switchWidgetBox(boxProps, toggleProps, 2);
+  let baseWidth = boxProps.width*toggle.base.userData.valTextOffset;
+  let baseHeight = boxProps.height;
+  if(toggleProps.horizontal==false){
+    baseWidth = boxProps.width;
+    baseHeight = boxProps.height*toggle.base.userData.valTextOffset;
+  }
+
+  if(toggle.base.userData.valTextOffset<1){
+    attachValueBox(toggle, boxProps, toggleProps, baseWidth, baseHeight)
+  }
+
   setToggleUserData(toggle, boxProps, toggleProps);
 
   return toggle
 
 };
 
-function onToggled(toggle){
-  console.log('On Toggle');
+function updateToggleState(toggle){
+  toggle.handle.userData.on=!toggle.handle.userData.on;
+  handleToggleValueText(toggle);
+}
+
+function handleToggleValueText(toggle){
+  if(toggle.base.userData.valueBox != undefined){
+
+    if(toggle.base.userData.value == toggle.base.userData.valueProps.onValue){
+      toggle.base.userData.value = toggle.base.userData.valueProps.offValue;
+    }else{
+      toggle.base.userData.value = toggle.base.userData.valueProps.onValue;
+    }
+
+    toggle.base.userData.valueBox.dispatchEvent({type:'update'});
+  }
 }
 
 function setToggleUserData(toggle, boxProps, toggleProps){
-  
+  let valTextOffset = toggle.base.userData.valTextOffset;
+  let baseWidth = boxProps.width*valTextOffset;
+  let baseHeight = boxProps.height;
   let baseDepth=boxProps.depth/2;
   let handleWidth=boxProps.width/2;
   let handleHeight=boxProps.height;
   let handleDepth=boxProps.depth*2;
   if(toggleProps.horizontal==false){
+    baseWidth = boxProps.width;
+    baseHeight = boxProps.height*valTextOffset;
     handleWidth=boxProps.width;
     handleHeight=boxProps.height/2;
   }
@@ -1408,6 +1462,8 @@ function setToggleUserData(toggle, boxProps, toggleProps){
   toggle.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': baseDepth};
   toggle.base.userData.handle = toggle.handle;
   toggle.base.userData.horizontal = toggleProps.horizontal;
+  toggle.base.userData.valueProps = toggleProps.valueProps;
+  toggle.base.userData.value = toggleProps.valueProps.defaultValue;
 
   toggle.handle.userData.type = 'TOGGLE';
   toggle.handle.userData.size = {'width': boxProps.width-toggleProps.padding, 'height': boxProps.height-toggleProps.padding, 'depth': boxProps.depth*2};
@@ -1417,13 +1473,22 @@ function setToggleUserData(toggle, boxProps, toggleProps){
   toggle.handle.userData.on = false;
 
   if(toggleProps.horizontal){
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+boxProps.width/2-(toggleProps.padding*2), toggle.handle.position.y, toggle.handle.position.z+baseDepth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+baseWidth/2-(toggleProps.padding*2), toggle.handle.position.y, toggle.handle.position.z+baseDepth);
   }else{
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, toggle.handle.position.y+(boxProps.height/2)-(toggleProps.padding*2), toggle.handle.position.z+baseDepth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, toggle.handle.position.y+(baseHeight/2)-(toggleProps.padding*2), toggle.handle.position.z+baseDepth);
+  }
+
+  if(toggleProps.valueProps.defaultValue == toggleProps.valueProps.onValue){
+    toggle.handle.position.copy(toggle.handle.userData.onPos);
+    toggle.handle.userData.on = true;
+  }
+
+  if(toggle.base.userData.valueBox != undefined){
+    toggle.base.userData.valueBox.dispatchEvent({type:'update'});
   }
 
   toggle.handle.addEventListener('action', function(event) {
-    onToggled(toggle);
+    toggleAnimation(toggle);
   });
 
 }
@@ -1465,14 +1530,15 @@ function adjustBoxScaleRatio(box, parent){
   box.userData.defaultScale = new THREE.Vector3().copy(box.scale);
 }
 
-function handleCharacterGeometry(character, font, boxSize, lineWidth, yPosition, textProps, letterGeometries){
+function handleCharacterGeometry(character, font, depth, lineWidth, yPosition, textProps, letterGeometries){
+
   if (character === ' ') {
     // Handle spaces by adjusting the x position
     lineWidth += textProps.wordSpacing;
   } else {
 
     const geometry = createTextGeometry(character, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
-    geometry.translate(lineWidth, yPosition, boxSize.depth+textProps.zOffset);
+    geometry.translate(lineWidth, yPosition, depth+textProps.zOffset);
 
     // Calculate the width of the letter geometry
     let { width } = getGeometrySize(geometry);
@@ -1481,7 +1547,7 @@ function handleCharacterGeometry(character, font, boxSize, lineWidth, yPosition,
     letterGeometries.push(geometry);
 
     // Update lineWidth
-    lineWidth += width-textProps.padding;
+    lineWidth += width;
   }
 
   return { letterGeometries, lineWidth }
@@ -1496,7 +1562,7 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
-      let geoHandler = handleCharacterGeometry(character, font, boxSize, lineWidth, yPosition, textProps, letterGeometries);
+      let geoHandler = handleCharacterGeometry(character, font, boxSize.depth, lineWidth, yPosition, textProps, letterGeometries);
       lineWidth = geoHandler.lineWidth;
       letterGeometries = geoHandler.letterGeometries;
 
@@ -1514,12 +1580,12 @@ export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, tex
 export function createMergedTextGeometry(font, boxWidth, boxHeight, text, textProps, animProps=undefined) {
     let lineWidth = 0;
     let yPosition = boxHeight / 2 - textProps.padding;
-    const letterGeometries = [];
+    let letterGeometries = [];
 
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
-      let geoHandler = handleCharacterGeometry(character, font, boxSize, lineWidth, yPosition, textProps, letterGeometries);
+      let geoHandler = handleCharacterGeometry(character, font, 0, lineWidth, yPosition, textProps, letterGeometries);
       lineWidth = geoHandler.lineWidth;
       letterGeometries = geoHandler.letterGeometries;
 
@@ -1902,7 +1968,7 @@ function constructMultiMergedGeometry(obj, text, font, material, textProps, anim
         }
 
         // Update lineWidth
-        lineWidth += width-textProps.padding;
+        lineWidth += width;
       }
 
       // Check if lineWidth exceeds cBox width - padding
@@ -1956,7 +2022,7 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
           cubes.push(cube);
         }
         // Update lineWidth
-        lineWidth += width-textProps.padding;
+        lineWidth += width;
       }
 
       // Check if lineWidth exceeds cBox width - padding
@@ -2046,7 +2112,8 @@ function selectionTextPortal(boxProps, text, font, textProps=undefined,  animPro
   setMergedMeshUserData(boxSize, geomSize, textProps.padding, textMesh);
 
   Box.box.add(textMesh);
-  textMesh.position.set(Box.width/2-geomSize.width/2-textProps.padding, -Box.height/2+geomSize.height/2+textProps.padding, textMesh.position.z);
+  //textMesh.position.set(Box.width/2-geomSize.width/2-textProps.padding, -Box.height/2+geomSize.height/2+textProps.padding, textMesh.position.z);
+  textMesh.position.set(textMesh.position.x, textMesh.position.y-textProps.padding, textMesh.position.z);
   boxProps.parent.add(Box.box);
   Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
   adjustBoxScaleRatio(Box.box, boxProps.parent);
@@ -2478,8 +2545,8 @@ export function createStaticTextList( boxProps, contentArr, textProps=undefined,
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
-    createStaticTextBox(boxProps, text, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createStaticTextBox(boxProps, text, textProps, animProps, lConfig);
   });
 
 };
@@ -2489,8 +2556,8 @@ export function createStaticTextPortalList( boxProps, contentArr, textProps=unde
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
-    createStaticTextPortal(boxProps, text, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createStaticTextPortal(boxProps, text, textProps, animProps, lConfig);
   });
 
 };
@@ -2500,8 +2567,8 @@ export function createStaticScrollableTextList( boxProps, contentArr, textProps=
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
-    createStaticScrollableTextBox(boxProps, text, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createStaticScrollableTextBox(boxProps, text, textProps, animProps, lConfig);
   });
 
 };
@@ -2511,8 +2578,8 @@ export function createStaticScrollableTextPortalList( boxProps, contentArr, text
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
-    createStaticScrollableTextPortal(boxProps, text, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createStaticScrollableTextPortal(boxProps, text, textProps, animProps, lConfig);
   });
 
 };
@@ -2522,8 +2589,8 @@ export function createMultiTextList( boxProps, contentArr, textProps=undefined, 
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
-    createMultiTextBox(boxProps, text, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createMultiTextBox(boxProps, text, textProps, animProps, lConfig);
   });
 
 };
@@ -2533,8 +2600,8 @@ export function createMultiTextPortalList( boxProps, contentArr, textProps=undef
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
-    createMultiTextPortal(boxProps, text, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createMultiTextPortal(boxProps, text, textProps, animProps, lConfig);
   });
 
 };
@@ -2544,8 +2611,8 @@ export function createMultiScrollableTextList( boxProps, contentArr, textProps=u
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
-    createMultiScrollableTextBox(boxProps, text, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createMultiScrollableTextBox(boxProps, text, textProps, animProps, lConfig);
   });
 
 };
@@ -2555,8 +2622,8 @@ export function createMultiScrollableTextPortalList( boxProps, contentArr, textP
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((text, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
-    createMultiScrollableTextPortal(boxProps, text, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
+    createMultiScrollableTextPortal(boxProps, text, textProps, animProps, lConfig);
   });
 
 };
@@ -2567,8 +2634,8 @@ export function createImageContentList( boxProps, contentArr, textProps=undefine
 
   contentArr.forEach((imgUrl, index) =>{
     console.log(imgUrl);
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
-    createImageBox(boxProps, imgUrl, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
+    createImageBox(boxProps, imgUrl, textProps, animProps, lConfig);
   });
 
 };
@@ -2579,8 +2646,8 @@ export function createImagePortalList(boxProps, contentArr, textProps=undefined,
 
   contentArr.forEach((imgUrl, index) =>{
     console.log(imgUrl);
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
-    createImagePortal(boxProps, imgUrl, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
+    createImagePortal(boxProps, imgUrl, textProps, animProps, lConfig);
   });
 
 };
@@ -2591,8 +2658,8 @@ export function createGLTFContentList( boxProps, contentArr, textProps=undefined
 
   contentArr.forEach((gltfUrl, index) =>{
     console.log(gltfUrl)
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
-    createGLTFModel(lConfig.boxProps, gltfUrl, lConfig.textProps, lConfig.textProps.meshProps, lConfig.animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
+    createGLTFModel(lConfig.boxProps, gltfUrl, lConfig.textProps, lConfig.animProps, lConfig);
   });
 
 };
@@ -2602,8 +2669,8 @@ export function createGLTFContentPortalList( boxProps, contentArr, textProps=und
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((gltfUrl, index) =>{
-    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.textProps.meshProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
-    createGLTFModelPortal(boxProps, gltfUrl, textProps, textProps.meshProps, animProps, lConfig);
+    let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index)
+    createGLTFModelPortal(boxProps, gltfUrl, textProps, animProps, lConfig);
   });
 
 };
@@ -2646,7 +2713,7 @@ export function mouseDownHandler(raycaster){
 
   if ( intersectsToggle.length > 0 ) {
     let obj = intersectsToggle[0].object;
-    toggleAnimation(obj);
+    obj.dispatchEvent({type:'action'});
   }
 }
 
