@@ -1071,39 +1071,51 @@ export function renderMeshView(meshView, mainScene, mainCam, renderer){
   renderer.setScissorTest(false);
 }
 
-export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
-
-  let valTextOffset = 1;
-  if(widgetProps.useValueText){
-    valTextOffset = 0.75;
+function calculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDivisor){
+  let subOffset = 1;
+  if(useSubObject){
+    subOffset = 0.75;
   }
-  let baseWidth = boxProps.width*valTextOffset;
+  let baseWidth = boxProps.width*subOffset;
   let baseHeight = boxProps.height;
   let baseDepth=boxProps.depth/2;
-  let handleWidth=boxProps.width/handleSize*valTextOffset;
+  let handleWidth=boxProps.width/operatorSizeDivisor*subOffset;
   let handleHeight=boxProps.height;
   let handleDepth=boxProps.depth*2;
-  if(widgetProps.horizontal==false){
+  let subWidth=baseWidth*(1-1*subOffset);
+  let subHeight=baseHeight;
+  let subDepth=baseDepth;
+  
+  if(horizontal==false){
     baseWidth = boxProps.width;
-    baseHeight = boxProps.height*valTextOffset;
+    baseHeight = boxProps.height*subOffset;
     handleWidth=boxProps.width;
-    handleHeight=boxProps.height/handleSize*valTextOffset;
+    handleHeight=boxProps.height/operatorSizeDivisor*subOffset;
+    subWidth=baseWidth;
+    subHeight=baseHeight*(1-1*subOffset);
+    subDepth=baseDepth;
   }
+
+  return {baseWidth, baseHeight, baseDepth, handleWidth, handleHeight, handleDepth, subWidth, subHeight, subDepth}
+}
+
+export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
+  let size = calculateWidgetSize(boxProps, widgetProps.horizontal, widgetProps.useValueText, handleSize);
   
   let handleMat = getMaterial(boxProps.matProps, boxProps.parent.material.stencilRef);
   let baseMat = getMaterial(boxProps.matProps, boxProps.parent.material.stencilRef);
   let mat = boxProps.parent.material;
   darkenMaterial(baseMat, 10);
 
-  let handleGeometry = new THREE.BoxGeometry(handleWidth, handleHeight, handleDepth);
-  let baseGeometry = new THREE.BoxGeometry(baseWidth, baseHeight, boxProps.depth/2);
+  let handleGeometry = new THREE.BoxGeometry(size.handleWidth, size.handleHeight, size.handleDepth);
+  let baseGeometry = new THREE.BoxGeometry(size.baseWidth, size.baseHeight, size.baseDepth/2);
 
   if(boxProps.complexMesh){
-    handleGeometry = RoundedBoxGeometry(handleWidth, handleHeight, handleDepth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+    handleGeometry = RoundedBoxGeometry(size.handleWidth, size.handleHeight, size.handleDepth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
     if(boxProps.depth == 0){
-      baseGeometry = RoundedPlaneGeometry(baseWidth, baseHeight, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+      baseGeometry = RoundedPlaneGeometry(size.baseWidth, size.baseHeight, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
     }else{
-      baseGeometry = RoundedBoxGeometry(baseWidth, baseHeight, boxProps.depth/2, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+      baseGeometry = RoundedBoxGeometry(size.baseWidth, size.baseHeight, size.baseDepth/2, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
     }
   }
 
@@ -1113,12 +1125,12 @@ export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
   base.add(handle);
 
   if(widgetProps.horizontal){
-    handle.position.set(-(baseWidth/2-handleWidth/2), handle.position.y, handle.position.z+baseDepth);
+    handle.position.set(-(size.baseWidth/2-size.handleWidth/2), handle.position.y, handle.position.z+size.baseDepth);
   }else{
-    handle.position.set(handle.position.x,-(baseHeight/2-handleHeight/2), handle.position.z+baseDepth);
+    handle.position.set(handle.position.x,-(size.baseHeight/2-size.handleHeight/2), handle.position.z+size.baseDepth);
   }
   base.userData.horizontal = widgetProps.horizontal;
-  base.userData.valTextOffset = valTextOffset;
+  base.userData.hasSubObject = widgetProps.useValueText;
 
   let result = { 'base': base, 'handle': handle,  'width': boxProps.width, 'height': boxProps.height, 'padding': widgetProps.padding}
 
@@ -1231,25 +1243,27 @@ export function editValueTextPortal(text, font, boxProps, widgetProps, widget=un
 function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
   let valBoxProps = {...boxProps};
   let valMatProps = materialProperties('BASIC', widget.handle.material.color, false, 1, THREE.FrontSide, 'STENCIL');
-  let valBoxSize = 1-widget.base.userData.valTextOffset;
+  let size = calculateWidgetSize(boxProps, widgetProps.horizontal, widgetProps.useValueText);
 
   valBoxProps.matProps = valMatProps;
 
   if(widgetProps.horizontal){
     valBoxProps.height=boxProps.height;
-    valBoxProps.width=boxProps.width*valBoxSize;
+    valBoxProps.width=size.subWidth;
   }else{
-    valBoxProps.height=boxProps.height*valBoxSize;
+    valBoxProps.height=size.subHeight;
     valBoxProps.width=boxProps.width;
   }
 
   let valBox = undefined;
+
   let defaultVal = widget.base.userData.valueProps.defaultValue.toString();
-  if(!widget.base.userData.valueProps.editable){
+  if(widget.base.userData.valueProps.editable){
     valBox = editValueTextPortal(defaultVal, widgetProps.font, valBoxProps, widgetProps, widget);
   }else{
     valBox = valueTextPortal(defaultVal, widgetProps.font, valBoxProps, widgetProps, widget);
   }
+  valBox.box.userData.size = {'width': size.subWidth, 'height': size.subHeight, 'depth': size.subDepth};
   widget.base.add(valBox.box);
   widget.base.userData.valueBox = valBox.box;
   darkenMaterial(valBox.box.material, 30);
@@ -1264,16 +1278,12 @@ function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
 export function sliderBox(boxProps, sliderProps){
 
   let slider = switchWidgetBox(boxProps, sliderProps, 8);
-  let baseWidth = boxProps.width*slider.base.userData.valTextOffset;
-  let baseHeight = boxProps.height;
-  if(sliderProps.horizontal==false){
-    baseWidth = boxProps.width;
-    baseHeight = boxProps.height*slider.base.userData.valTextOffset;
-  }
+  let size = calculateWidgetSize(boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
+
   setSliderUserData(slider, boxProps, sliderProps);
 
-  if(slider.base.userData.valTextOffset<1){
-    attachValueBox(slider, boxProps, sliderProps, baseWidth, baseHeight)
+  if(slider.base.userData.hasSubObject){
+    attachValueBox(slider, boxProps, sliderProps, size.baseWidth, size.baseHeight)
   }
   
   return slider
@@ -1296,18 +1306,18 @@ export function calculateSliderPosition(slider){
     return;
 
   let coord = 'x';
-  let divider = (slider.base.userData.size.width*slider.base.userData.valTextOffset-slider.handle.userData.padding-slider.handle.userData.size.width);
+  let divider = (slider.base.userData.size.width-slider.handle.userData.padding-slider.handle.userData.size.width);
 
   if(!slider.handle.userData.horizontal){
     coord = 'y';
-    divider = (slider.base.userData.size.height*slider.base.userData.valTextOffset+slider.handle.userData.padding-slider.handle.userData.size.height);
+    divider = (slider.base.userData.size.height+slider.handle.userData.padding-slider.handle.userData.size.height);
   }
 
   let vec = ((value-min)/(max-min))*divider+minScroll;
   let pos = new THREE.Vector3(slider.handle.position.x, vec, slider.handle.position.z);
 
   if(slider.base.userData.horizontal){
-    pos.set(-vec, slider.handle.position.y, slider.handle.position.z);
+    pos.set(vec, slider.handle.position.y, slider.handle.position.z);
   }
 
   return pos
@@ -1315,11 +1325,12 @@ export function calculateSliderPosition(slider){
 
 export function calculateSliderValue(slider){
   let coord = 'x';
-  let divider = (slider.base.userData.size.width*slider.base.userData.valTextOffset-slider.handle.userData.padding-slider.handle.userData.size.width);
+  let valBoxSize = slider.base.userData.valueBox.userData.size;
+  let divider = (slider.base.userData.size.width-slider.handle.userData.padding-slider.handle.userData.size.width);
 
   if(!slider.handle.userData.horizontal){
     coord = 'y';
-    divider = (slider.base.userData.size.height*slider.base.userData.valTextOffset+slider.handle.userData.padding-slider.handle.userData.size.height);
+    divider = (slider.base.userData.size.height+slider.handle.userData.padding-slider.handle.userData.size.height);
   }
 
   let pos = slider.handle.position[coord];
@@ -1351,39 +1362,29 @@ function onSliderMove(slider){
 }
 
 function setSliderUserData(slider, boxProps, sliderProps){
-  let baseWidth = boxProps.width*slider.base.userData.valTextOffset;
-  let baseHeight = boxProps.height;
-  let baseDepth=boxProps.depth/2;
-  let handleWidth=boxProps.width/8;
-  let handleHeight=boxProps.height;
-  let handleDepth=boxProps.depth*2;
-  if(sliderProps.horizontal==false){
-    baseWidth = boxProps.width;
-    baseHeight = boxProps.height*slider.base.userData.valTextOffset;
-    handleWidth=boxProps.width;
-    handleHeight=boxProps.height/8;
-  }
+  let size = calculateWidgetSize(boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
 
   slider.base.userData.type = 'SLIDER';
-  slider.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': baseDepth};
+  //slider.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': size.baseDepth};
+  slider.base.userData.size = {'width': size.baseWidth, 'height': size.baseHeight, 'depth': size.baseDepth};
   slider.base.userData.handle = slider.handle;
   slider.base.userData.horizontal = sliderProps.horizontal;
   slider.base.userData.valueProps = sliderProps.valueProps;
   slider.base.userData.value = sliderProps.valueProps.defaultValue;
 
   slider.handle.userData.type = 'SLIDER';
-  slider.handle.userData.size = {'width': handleWidth, 'height': handleHeight, 'depth': handleDepth};
+  slider.handle.userData.size = {'width': size.handleWidth, 'height': size.handleHeight, 'depth': size.handleDepth};
   slider.handle.userData.horizontal = sliderProps.horizontal;
   slider.handle.userData.min = sliderProps.valueProps.min;
   slider.handle.userData.max = sliderProps.valueProps.max;
   slider.handle.userData.places = sliderProps.valueProps.places;
 
   if(sliderProps.horizontal){
-    slider.handle.userData.maxScroll = slider.handle.position.x + (baseWidth-handleWidth);
-    slider.handle.userData.minScroll = -baseWidth+(slider.handle.userData.maxScroll+handleWidth);
+    slider.handle.userData.maxScroll = slider.handle.position.x + (size.baseWidth-size.handleWidth);
+    slider.handle.userData.minScroll = -size.baseWidth+(slider.handle.userData.maxScroll+size.handleWidth);
   }else{
-    slider.handle.userData.maxScroll = slider.handle.position.y + (baseHeight-handleHeight);
-    slider.handle.userData.minScroll = -baseHeight+(slider.handle.userData.maxScroll+handleHeight);
+    slider.handle.userData.maxScroll = slider.handle.position.y + (size.baseHeight-size.handleHeight);
+    slider.handle.userData.minScroll = -size.baseHeight+(slider.handle.userData.maxScroll+size.handleHeight);
   }
 
   slider.handle.userData.padding = sliderProps.padding;
@@ -1420,17 +1421,12 @@ export function toggleProperties(name='', horizontal=true, on=false, padding=0.0
 export function toggleBox(boxProps, toggleProps){
 
   let toggle = switchWidgetBox(boxProps, toggleProps, 2);
-  let baseWidth = boxProps.width*toggle.base.userData.valTextOffset;
-  let baseHeight = boxProps.height;
-  if(toggleProps.horizontal==false){
-    baseWidth = boxProps.width;
-    baseHeight = boxProps.height*toggle.base.userData.valTextOffset;
-  }
+  let size = calculateWidgetSize(boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
 
   setToggleUserData(toggle, boxProps, toggleProps);
 
-  if(toggle.base.userData.valTextOffset<1){
-    attachValueBox(toggle, boxProps, toggleProps, baseWidth, baseHeight)
+  if(toggle.base.userData.hasSubObject){
+    attachValueBox(toggle, boxProps, toggleProps, size.baseWidth, size.baseHeight)
   }
 
   return toggle
@@ -1456,38 +1452,26 @@ function handleToggleValueText(toggle){
 }
 
 function setToggleUserData(toggle, boxProps, toggleProps){
-  let valTextOffset = toggle.base.userData.valTextOffset;
-  let baseWidth = boxProps.width*valTextOffset;
-  let baseHeight = boxProps.height;
-  let baseDepth=boxProps.depth/2;
-  let handleWidth=boxProps.width/2;
-  let handleHeight=boxProps.height;
-  let handleDepth=boxProps.depth*2;
-  if(toggleProps.horizontal==false){
-    baseWidth = boxProps.width;
-    baseHeight = boxProps.height*valTextOffset;
-    handleWidth=boxProps.width;
-    handleHeight=boxProps.height/2;
-  }
+  let size = calculateWidgetSize(boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
 
   toggle.base.userData.type = 'TOGGLE';
-  toggle.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': baseDepth};
+  toggle.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': size.baseDepth};
   toggle.base.userData.handle = toggle.handle;
   toggle.base.userData.horizontal = toggleProps.horizontal;
   toggle.base.userData.valueProps = toggleProps.valueProps;
   toggle.base.userData.value = toggleProps.valueProps.defaultValue;
 
   toggle.handle.userData.type = 'TOGGLE';
-  toggle.handle.userData.size = {'width': boxProps.width-toggleProps.padding, 'height': boxProps.height-toggleProps.padding, 'depth': boxProps.depth*2};
+  toggle.handle.userData.size = {'width': size.handleWidth, 'height': size.handleHeight, 'depth': size.handleDepth};
   toggle.handle.userData.offPos = new THREE.Vector3().copy(toggle.handle.position);
   toggle.handle.userData.horizontal = toggleProps.horizontal;
   toggle.handle.userData.anim = false;
   toggle.handle.userData.on = false;
 
   if(toggleProps.horizontal){
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+baseWidth/2-(toggleProps.padding*2), toggle.handle.position.y, toggle.handle.position.z+baseDepth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+size.baseWidth/2-(toggleProps.padding*2), toggle.handle.position.y, toggle.handle.position.z+size.baseDepth);
   }else{
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, toggle.handle.position.y+(baseHeight/2)-(toggleProps.padding*2), toggle.handle.position.z+baseDepth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, toggle.handle.position.y+(size.baseHeight/2)-(toggleProps.padding*2), toggle.handle.position.z+size.baseDepth);
   }
 
   if(toggleProps.valueProps.defaultValue == toggleProps.valueProps.onValue){
@@ -2267,6 +2251,7 @@ export function createSliderBox(boxProps, sliderProps, textProps,  animProps=und
     sliderProps.font = font;
     const parentSize = getGeometrySize(boxProps.parent.geometry);
     let slider = sliderBox(boxProps, sliderProps);
+    let size = calculateWidgetSize(boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
     
     boxProps.parent.add(slider.base);
     slider.base.position.set(slider.base.position.x, slider.base.position.y, slider.base.position.z+parentSize.depth/2);
@@ -2274,16 +2259,12 @@ export function createSliderBox(boxProps, sliderProps, textProps,  animProps=und
 
     createWidgetText(font, boxProps, sliderProps.name, textProps, animProps, onCreated, horizontal);
     if(sliderProps.useValueText){
-      let align = (boxProps.width/2)*(1-1*slider.base.userData.valTextOffset);
       if(sliderProps.horizontal){
-        slider.base.position.set(slider.base.position.x-align, slider.base.position.y, slider.base.position.z);
+        slider.base.position.set(slider.base.position.x-size.subWidth/2, slider.base.position.y, slider.base.position.z);
       }else{
-        align = boxProps.height/2*(1-1*slider.base.userData.valTextOffset);
-        slider.base.position.set(slider.base.position.x, slider.base.position.y+align, slider.base.position.z);
+        slider.base.position.set(slider.base.position.x, slider.base.position.y+size.subHeight/2, slider.base.position.z);
       }
     }
-    
-
   });
 };
 
@@ -2927,4 +2908,3 @@ export function doubleClickHandler(raycaster){
       });
     }
 }
-
