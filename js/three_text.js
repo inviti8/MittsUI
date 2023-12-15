@@ -1181,22 +1181,27 @@ function updateValueText(params){
 
 
 export function valueTextPortal(text, font, boxProps, widgetProps, widget=undefined){
-  let base = portalWindow(valBoxProps, widgetProps.padding);
+  let Box = portalWindow(boxProps, widgetProps.padding);
   
-  let material = getMaterial(textProps.matProps, base.box.material.stencilRef);
-  base.box.userData.textMaterial = material;
+  let material = getMaterial(widgetProps.textProps.matProps, Box.box.material.stencilRef);
+  const textGeometry = createMergedTextGeometry(font, boxProps.width, boxProps.height, text, widgetProps.textProps);
+
+  const textMesh = new THREE.Mesh(textGeometry, material);
+  textMesh.position.set(-boxProps.width/2+widgetProps.textProps.size/2, -boxProps.height/2+widgetProps.textProps.height, -widgetProps.textProps.size/2);
+  let base = {textMesh, Box}
+  base.Box.box.userData.textMaterial = material;
   base.textMesh.userData.numeric = widgetProps.numeric;
   base.textMesh.widget = widget;
 
-  let params = {'box': base.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': widgetProps.textProps};
-  updateValueText(params);
+  Box.box.add(textMesh);
 
-  
-  base.box.addEventListener('update', function(event) {
+  let params = {'base': base,'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': widgetProps.textProps};
+
+  base.Box.box.addEventListener('update', function(event) {
     updateValueText(params);
   });
 
-  return base
+  return base.Box
 };
 
 export function editValueTextPortal(text, font, boxProps, widgetProps, widget=undefined){
@@ -1238,7 +1243,13 @@ function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
     valBoxProps.width=boxProps.width;
   }
 
-  let valBox = editValueTextPortal("0", widgetProps.font, valBoxProps, widgetProps, widget);
+  let valBox = undefined;
+  let defaultVal = widget.base.userData.valueProps.defaultValue.toString();
+  if(!widget.base.userData.valueProps.editable){
+    valBox = editValueTextPortal(defaultVal, widgetProps.font, valBoxProps, widgetProps, widget);
+  }else{
+    valBox = valueTextPortal(defaultVal, widgetProps.font, valBoxProps, widgetProps, widget);
+  }
   widget.base.add(valBox.box);
   widget.base.userData.valueBox = valBox.box;
   darkenMaterial(valBox.box.material, 30);
@@ -1357,6 +1368,7 @@ function setSliderUserData(slider, boxProps, sliderProps){
   slider.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': baseDepth};
   slider.base.userData.handle = slider.handle;
   slider.base.userData.horizontal = sliderProps.horizontal;
+  slider.base.userData.valueProps = sliderProps.valueProps;
   slider.base.userData.value = sliderProps.valueProps.defaultValue;
 
   slider.handle.userData.type = 'SLIDER';
@@ -1383,7 +1395,7 @@ function setSliderUserData(slider, boxProps, sliderProps){
 
 }
 
-export function stringValueProperties(defaultValue='Off', onValue='On', offValue='Off', editable=true){
+export function stringValueProperties(defaultValue='Off', onValue='On', offValue='Off', editable=false){
   return {
     'defaultValue': defaultValue,
     'onValue': onValue,
@@ -1415,11 +1427,11 @@ export function toggleBox(boxProps, toggleProps){
     baseHeight = boxProps.height*toggle.base.userData.valTextOffset;
   }
 
+  setToggleUserData(toggle, boxProps, toggleProps);
+
   if(toggle.base.userData.valTextOffset<1){
     attachValueBox(toggle, boxProps, toggleProps, baseWidth, baseHeight)
   }
-
-  setToggleUserData(toggle, boxProps, toggleProps);
 
   return toggle
 
