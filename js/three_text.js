@@ -518,13 +518,29 @@ export function mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power
 export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="power1.in", easeOut="elastic.Out", onComplete=undefined){
 
     let yPositions = [];
-    elem.children.forEach((c, idx) => {
+    let zPositions = [];
+    let selected = undefined;
+
+    elem.userData.selectors.forEach((c, idx) => {
       let size = getGeometrySize(c.geometry);
+      let parentSize = getGeometrySize(c.parent.geometry);
       let yPos = size.height*idx;
+      let zPos = c.userData.unselectedPos.z;
+      let sel = c.children[0].userData.selected;
+      c.material.renderOrder = 1;
+      if(sel){
+        selected = idx;
+      }
+      
       if(anim=='CLOSE'){
         yPos=0;
+        if(sel){
+          zPos = c.userData.selectedPos.z;
+          c.material.renderOrder = 2;
+        }
       }
       yPositions.push(yPos);
+      zPositions.push(zPos);
       if(idx>0){
         yPositions.push(-yPos);
       }
@@ -535,11 +551,29 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
       elem.userData.open = false;
     }
 
-    for (let i = 0; i < elem.children.length; i++) {
-        let current = elem.children[i];
-        let props = { duration: duration, x: current.position.x, y: yPositions[i], z: current.position.z, ease: easeIn };
+    if(anim=='OPEN' || anim=='CLOSE'){
+      for (let i = 0; i < elem.userData.selectors.length; i++) {
+        let current = elem.userData.selectors[i];
+        let props = { duration: duration, x: current.position.x, y: yPositions[i], z: zPositions[i], ease: easeIn };
         gsap.to(current.position, props);
+      }
     }
+
+    if(anim=='SELECT'){
+      
+      let current = elem.userData.selectors[selected];
+      let currentY = current.position.y;
+      let last = current.parent.userData.lastSelected;
+      let props = { duration: duration, x: current.position.x, y: current.userData.selectedPos.y, z: current.userData.selectedPos.z, ease: easeIn };
+      gsap.to(current.position, props);
+
+      if(last != undefined){
+        props = { duration: duration, x: last.position.x, y: currentY, z: zPositions[selected], ease: easeIn };
+        gsap.to(last.position, props);
+      }
+    }
+
+    
 };
 
 export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
@@ -2115,7 +2149,7 @@ function selectionTextPortal(boxProps, text, font, textProps=undefined,  animPro
   return {textMesh, Box}
 }
 
-function selectionText(boxProps, text, font, textProps, animProps=undefined, onCreated=undefined){
+function selectionText(boxProps, text, value, font, textProps, animProps=undefined, onCreated=undefined){
 
   const textGeometry = createMergedTextGeometry(font, boxProps.width, boxProps.height, text, textProps, animProps);
   textGeometry.center();
@@ -2135,6 +2169,8 @@ function selectionText(boxProps, text, font, textProps, animProps=undefined, onC
   boxProps.parent.add(cBox.box);
   cBox.box.position.set(cBox.box.position.x, cBox.box.position.y, parentSize.depth/2+boxSize.depth/2);
   adjustBoxScaleRatio(cBox.box, boxProps.parent);
+  cBox.box.userData.value = value;
+  textMesh.userData.value = value;
 
   return {textMesh, cBox}
 }
@@ -2179,30 +2215,74 @@ export function createScrollableTextInputPortal(boxProps, text, textProps=undefi
   });
 };
 
+function onSelectorChoice(selection){
+  let base = selection.parent.parent;
+  base.userData.selection = selection;
+
+  base.userData.selectors.forEach((c, idx) => {
+    if(c.children[0].userData.selected){
+      base.userData.lastSelected = c;
+    }
+    c.children[0].userData.selected = false;
+  })
+
+  selection.userData.selected = true;
+  let first = selection.parent;
+  let index = base.userData.selectors.indexOf(selection.parent);
+  base.userData.selectors.sort(function(x,y){ return x == first ? -1 : y == first ? 1 : 0; });
+  selectorAnimation(selection.parent.parent, 'SELECT');
+
+}
+
 export function createListSelector(selectors, boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
   loader.load(textProps.font, (font) => {
-    const cBox = contentBox(boxProps, textProps.padding, textProps.clipped);
+    const cBox = contentBox(boxProps, textProps.padding);
     selectorUserData(cBox.box);
-    for (const [selTxt, url] of Object.entries(selectors)) {
-      let inputProps = selectionText(cBox.box, boxProps.width, boxProps.height, boxProps.name, selTxt, font, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, textProps.size, textProps.height, textProps.meshProps, animProps, onCreated);
-      const tProps = editTextProperties(inputProps.Box, '', inputProps.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
+    let idx = 0;
+
+    for (const [key, val] of Object.entries(selectors)) {
+      let inputProps = selectionText(boxProps, key, val, font, textProps, animProps, onCreated);
+      const textSize = getGeometrySize(inputProps.textMesh.geometry);
+      const tProps = editTextProperties(inputProps.cBox, '', inputProps.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
       inputProps.textMesh.userData.textProps = tProps;
       inputPrompts.push(inputProps.textMesh);
       mouseOverable.push(inputProps.textMesh);
       clickable.push(inputProps.textMesh);
       inputProps.textMesh.userData.draggable = false;
+      inputProps.textMesh.userData.key = key;
+      inputProps.textMesh.userData.value = val;
+      inputProps.textMesh.userData.index = idx;
+      inputProps.textMesh.userData.selected = false;
+      inputProps.cBox.box.userData.selectedPos = new THREE.Vector3(inputProps.cBox.box.position.x, inputProps.cBox.box.position.y, inputProps.cBox.depth+(boxProps.depth+textSize.depth));
+      inputProps.cBox.box.userData.unselectedPos = new THREE.Vector3(inputProps.cBox.box.position.x, inputProps.cBox.box.position.y, inputProps.cBox.depth);
+      inputProps.cBox.box.name = key;
+      
       inputProps.cBox.box.userData.mouseOverParent = true;
+      inputProps.cBox.box.userData.currentText = key;
       mouseOverUserData(inputProps.textMesh);
-      cBox.box.userData.selectors.push(inputProps);
+      cBox.box.userData.selectors.push(inputProps.cBox.box);
       selectorElems.push(inputProps.cBox.box);
+      cBox.box.add(inputProps.cBox.box);
+      inputProps.textMesh.addEventListener('action', function(event) {
+        onSelectorChoice(inputProps.textMesh)
+      });
+
+      if(idx==0){
+        inputProps.textMesh.userData.selected = true;
+        inputProps.cBox.box.position.copy(inputProps.cBox.box.userData.selectedPos);
+      }else{
+        inputProps.cBox.box.position.copy(inputProps.cBox.box.userData.unselectedPos);
+      }
+
+      idx+=1;
     }
 
     boxProps.parent.add(cBox.box);
   });
 };
 
-function ButtonElement(boxProps, text, font, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true){
-  let textMesh = selectionText(boxProps, text, font, textProps, animProps);
+function ButtonElement(boxProps, text, value, font, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true){
+  let textMesh = selectionText(boxProps, text, value, font, textProps, animProps);
   const tProps = editTextProperties(textMesh.cBox, '', textMesh.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
   textMesh.cBox.box.userData.textProps = tProps;
   textMesh.cBox.box.userData.draggable = false;
@@ -2217,13 +2297,13 @@ function ButtonElement(boxProps, text, font, fontPath, textProps, animProps=unde
   return textMesh
 }
 
-function Button(boxProps, text, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true) {
+function Button(boxProps, text, value, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true) {
   loader.load(fontPath, (font) => {
     let txtMesh = ButtonElement(boxProps, text, font, fontPath, textProps, animProps, onCreated, mouseOver);
   });
 }
 
-function portalButton(boxProps, text, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true) {
+function portalButton(boxProps, text, value, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true) {
   loader.load(fontPath, (font) => {
     const portal = portalWindow(boxProps, 0);
     const stencilRef = portal.box.material.stencilRef;
@@ -2233,27 +2313,30 @@ function portalButton(boxProps, text, fontPath, textProps, animProps=undefined, 
 
     txtMesh.cBox.box.material.opacity = 0;
     txtMesh.cBox.box.material.transparent = true;
-    txtMesh.cBox.box.material.stencilRef = stencilRef;
     setupStencilChildMaterial(txtMesh.cBox.box.material, stencilRef);
     setupStencilChildMaterial(txtMesh.textMesh.material, stencilRef);
     portal.box.add(txtMesh.cBox);
-    txtMesh.cBox.box.position.set(txtMesh.cBox.box.position.x, txtMesh.cBox.box.position.y, -txtMesh.cBox.depth+textSize.depth);
+    txtMesh.cBox.box.position.set(txtMesh.cBox.box.position.x, txtMesh.cBox.box.position.y, -txtMesh.cBox.depth/2);
+    txtMesh.textMesh.position.set(txtMesh.textMesh.position.x, txtMesh.textMesh.position.y, -textSize.depth/2);
     boxProps.parent.add(portal.box);
-
 
   });
 }
 
-export function createButton(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  Button(boxProps, text, textProps.font, textProps, animProps, onCreated, false);
+export function createButton(boxProps, text, value, textProps=undefined,  animProps=undefined, onCreated=undefined){
+  Button(boxProps, text, value, textProps.font, textProps, animProps, onCreated, false);
 };
 
-export function createPortalButton(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  portalButton(boxProps, text, textProps.font, textProps, animProps, onCreated, false);
+export function createPortalButton(boxProps, text, value, textProps=undefined,  animProps=undefined, onCreated=undefined){
+  portalButton(boxProps, text, value, textProps.font, textProps, animProps, onCreated, false);
 };
 
-export function createMouseOverButton(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  Button(boxProps, text, textProps, animProps, onCreated, true);
+export function createMouseOverButton(boxProps, text, value, textProps=undefined,  animProps=undefined, onCreated=undefined){
+  Button(boxProps, text, value, textProps, animProps, onCreated, true);
+};
+
+export function createMouseOverPortalButton(boxProps, text, value, textProps=undefined,  animProps=undefined, onCreated=undefined){
+  portalButton(boxProps, text, value, textProps, animProps, onCreated, true);
 };
 
 function createWidgetText(font, boxProps, name, textProps, animProps=undefined, onCreated=undefined, horizontal=true){
@@ -2723,6 +2806,7 @@ export function mouseDownHandler(raycaster){
   if ( intersectsClickable.length > 0 ) {
     console.log("Clickable")
     let obj = intersectsClickable[0].object;
+    obj.dispatchEvent({type:'action'});
 
     if(!clickable.includes(obj))
       return;
