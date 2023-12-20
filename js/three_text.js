@@ -2200,7 +2200,7 @@ function selectionText(boxProps, text, value, font, textProps, animProps=undefin
   return {textMesh, cBox}
 }
 
-export function textInputProperties(name='', btnText='Button', padding=0.01, textProps=undefined, font=undefined, hasButton=false, matProps=undefined, btnProps=undefined){
+export function textInputProperties(name='', btnText='Button', padding=0.01, textProps=undefined, font=undefined, hasButton=false, matProps=undefined, buttonProps=undefined){
   return {
     'name': name,
     'btnText': btnText,
@@ -2209,7 +2209,7 @@ export function textInputProperties(name='', btnText='Button', padding=0.01, tex
     'font': font,
     'hasButton': hasButton,
     'matProps': matProps,
-    'btnProps': btnProps
+    'buttonProps': buttonProps
   }
 };
 
@@ -2226,7 +2226,12 @@ function handleTextInputSetup(inputProps, textProps, font){
 function handleInputTextBoxProps(boxProps, widgetProps){
   let inputBoxProps = {...boxProps};
   let btnBoxProps = {...boxProps};
-  let size = calculateWidgetSize(boxProps, widgetProps.hasButton, true, 2);
+  let hasButton = (widgetProps.buttonProps != undefined);
+  let horizontal = true;
+  if(hasButton && widgetProps.buttonProps.attach == 'BOTTOM'){
+    horizontal = false;
+  }
+  let size = calculateWidgetSize(boxProps, horizontal, hasButton, 2);
 
   inputBoxProps.width = size.baseWidth;
   inputBoxProps.height = size.baseHeight;
@@ -2241,23 +2246,37 @@ function handleInputTextBoxProps(boxProps, widgetProps){
 }
 
 function attachButton(widget, boxProps, widgetProps, baseWidth, baseHeight, baseDepth){
-  //ButtonElement(boxProps, text, value, font, textProps, mouseOver=true)
-  let btn = ButtonElement(boxProps, widgetProps.btnText, '', widgetProps.font, widgetProps.textProps, true);
-  btn.cBox.box.position.set(baseWidth/2+boxProps.width/2, btn.cBox.box.position.y, -baseDepth/2+boxProps.depth/2);
+  boxProps.parent = widget.Box.box;
+  widgetProps.buttonProps.boxProps = boxProps;
+  widgetProps.buttonProps.font = widgetProps.font;
+  let btn = undefined;
+  if(!widgetProps.buttonProps.portal){
+    btn = ButtonElement(widgetProps.buttonProps);
+  }else{
+    btn = PortalButtonElement(widgetProps.buttonProps);
+  }
+
+  if(widgetProps.buttonProps.attach == 'RIGHT'){
+    btn.cBox.box.position.set(baseWidth/2+boxProps.width/2, btn.cBox.box.position.y, -baseDepth/2+boxProps.depth/2);
+  }else if(widgetProps.buttonProps.attach == 'BOTTOM'){
+    btn.box.position.set(btn.box.position.x, -(baseHeight/2+boxProps.height/2), -baseDepth/2+boxProps.depth/2);
+  }
+  
 }
 
 export function createTextInput(boxProps, text, textInputProps,  animProps=undefined, onCreated=undefined) {
   loader.load(textInputProps.font, (font) => {
     textInputProps.font = font;
+
     let props = handleInputTextBoxProps(boxProps, textInputProps);
 
     let input = selectionTextBox(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
     mouseOverable.push(input.textMesh);
 
-    if(textInputProps.hasButton){
-      props.btnBoxProps.parent = input.Box.box;
+    if(textInputProps.buttonProps != undefined){
       attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth);
     }
+
     handleTextInputSetup(input, textInputProps.textProps, font);
   });
 };
@@ -2268,9 +2287,8 @@ export function createScrollableTextInput(boxProps, text, textInputProps,  animP
     let props = handleInputTextBoxProps(boxProps, textInputProps);
     let input = selectionTextBox(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
 
-    if(textInputProps.hasButton){
-      props.btnBoxProps.parent = input.Box.box;
-      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth)
+    if(textInputProps.buttonProps != undefined){
+      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth);
     }
 
     handleTextInputSetup(input, textInputProps.textProps, font);
@@ -2285,8 +2303,7 @@ export function createTextInputPortal(boxProps, text, textInputProps,  animProps
     let input = selectionTextPortal(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
     mouseOverable.push(input.textMesh);
 
-    if(textInputProps.hasButton){
-      props.btnBoxProps.parent = input.Box.box;
+    if(textInputProps.buttonProps != undefined){
       attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth)
     }
 
@@ -2300,8 +2317,7 @@ export function createScrollableTextInputPortal(boxProps, text, textInputProps, 
     let props = handleInputTextBoxProps(boxProps, textInputProps);
     let input = selectionTextPortal(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
 
-    if(textInputProps.hasButton){
-      props.btnBoxProps.parent = input.Box.box;
+    if(textInputProps.buttonProps != undefined){
       attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth)
     }
 
@@ -2384,7 +2400,7 @@ function selectorTextUserData(selText, key, value, index, boxProps){
   selText.cBox.box.userData.currentText = key;
 }
 
-export function buttonProperties(boxProps, font, name='Button', value='', padding=0.01, textProps=undefined, matProps=undefined, mouseOver=false, attach='RIGHT'){
+export function buttonProperties(boxProps, font, name='Button', value='', padding=0.01, textProps=undefined, matProps=undefined, mouseOver=false, portal=false, attach='RIGHT'){
   return {
     'boxProps': boxProps,
     'font': font,
@@ -2394,13 +2410,15 @@ export function buttonProperties(boxProps, font, name='Button', value='', paddin
     'textProps': textProps,
     'matProps': matProps,
     'mouseOver': mouseOver,
+    'portal': portal,
     'attach': attach
   }
 };
 
-function ButtonElement(boxProps, text, value, font, textProps, mouseOver=true){
-  let textMesh = selectionText(boxProps, text, value, font, textProps);
-  const tProps = editTextProperties(textMesh.cBox, '', textMesh.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
+function ButtonElement(buttonProps){
+  let textMesh = selectionText(buttonProps.boxProps, buttonProps.name, buttonProps.value, buttonProps.font, buttonProps.textProps);
+  let textProps = buttonProps.textProps;
+  const tProps = editTextProperties(textMesh.cBox, '', textMesh.textMesh, buttonProps.font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
   textMesh.cBox.box.userData.textProps = tProps;
   textMesh.cBox.box.userData.draggable = false;
   textMesh.textMesh.userData.mouseOverParent = true;
@@ -2414,46 +2432,55 @@ function ButtonElement(boxProps, text, value, font, textProps, mouseOver=true){
   return textMesh
 }
 
-function Button(boxProps, text, value, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true) {
-  loader.load(fontPath, (font) => {
-    let txtMesh = ButtonElement(boxProps, text, font, textProps, mouseOver);
+function PortalButtonElement(buttonProps){
+  const portal = portalWindow(buttonProps.boxProps, 0);
+  const stencilRef = portal.box.material.stencilRef;
+  setupStencilChildMaterial(portal.box.material, stencilRef);
+  let txtMesh = ButtonElement(buttonProps);
+  const textSize = getGeometrySize(txtMesh.textMesh.geometry);
+
+  txtMesh.cBox.box.material.opacity = 0;
+  txtMesh.cBox.box.material.transparent = true;
+  setupStencilChildMaterial(txtMesh.cBox.box.material, stencilRef);
+  setupStencilChildMaterial(txtMesh.textMesh.material, stencilRef);
+  portal.box.add(txtMesh.cBox.box);
+  txtMesh.cBox.box.position.set(txtMesh.cBox.box.position.x, txtMesh.cBox.box.position.y, -txtMesh.cBox.depth/2);
+  txtMesh.textMesh.position.set(txtMesh.textMesh.position.x, txtMesh.textMesh.position.y, -textSize.depth/2);
+  buttonProps.boxProps.parent.add(portal.box);
+
+  return portal
+}
+
+function Button(buttonProps, animProps=undefined, onCreated=undefined, mouseOver=true) {
+  loader.load(buttonProps.font, (font) => {
+    buttonProps.font = font;
+    let txtMesh = ButtonElement(buttonProps);
   });
 }
 
-function portalButton(boxProps, text, value, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true) {
-  loader.load(fontPath, (font) => {
-    const portal = portalWindow(boxProps, 0);
-    const stencilRef = portal.box.material.stencilRef;
-    let txtMesh = ButtonElement(boxProps, text, font, textProps, mouseOver);
-    const textSize = getGeometrySize(txtMesh.textMesh.geometry);
-
-
-    txtMesh.cBox.box.material.opacity = 0;
-    txtMesh.cBox.box.material.transparent = true;
-    setupStencilChildMaterial(txtMesh.cBox.box.material, stencilRef);
-    setupStencilChildMaterial(txtMesh.textMesh.material, stencilRef);
-    portal.box.add(txtMesh.cBox);
-    txtMesh.cBox.box.position.set(txtMesh.cBox.box.position.x, txtMesh.cBox.box.position.y, -txtMesh.cBox.depth/2);
-    txtMesh.textMesh.position.set(txtMesh.textMesh.position.x, txtMesh.textMesh.position.y, -textSize.depth/2);
-    boxProps.parent.add(portal.box);
-
+function portalButton(buttonProps, animProps=undefined, onCreated=undefined, mouseOver=true) {
+  loader.load(buttonProps.font, (font) => {
+    buttonProps.font = font;
+    let txtMesh = PortalButtonElement(buttonProps);
   });
 }
 
-export function createButton(boxProps, text, value, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  Button(boxProps, text, value, textProps.font, textProps, animProps, onCreated, false);
+export function createButton(buttonProps, animProps=undefined, onCreated=undefined){
+  Button(buttonProps, animProps, onCreated, false);
 };
 
-export function createPortalButton(boxProps, text, value, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  portalButton(boxProps, text, value, textProps.font, textProps, animProps, onCreated, false);
+export function createPortalButton(buttonProps, animProps=undefined, onCreated=undefined){
+  portalButton(buttonProps, animProps, onCreated, false);
 };
 
-export function createMouseOverButton(boxProps, text, value, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  Button(boxProps, text, value, textProps, animProps, onCreated, true);
+export function createMouseOverButton(buttonProps, animProps=undefined, onCreated=undefined){
+  buttonProps.mouseOver = true;
+  Button(buttonProps, animProps, onCreated, true);
 };
 
-export function createMouseOverPortalButton(boxProps, text, value, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  portalButton(boxProps, text, value, textProps, animProps, onCreated, true);
+export function createMouseOverPortalButton(buttonProps, animProps=undefined, onCreated=undefined){
+  buttonProps.mouseOver = true;
+  portalButton(buttonProps, animProps, onCreated, true);
 };
 
 function createWidgetText(font, boxProps, name, textProps, animProps=undefined, onCreated=undefined, horizontal=true){
