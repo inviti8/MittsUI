@@ -519,6 +519,7 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
 
     let yPositions = [];
     let zPositions = [];
+    let scales = [];
     let selected = undefined;
 
     elem.userData.selectors.forEach((c, idx) => {
@@ -530,6 +531,9 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
       c.material.renderOrder = 1;
       if(sel){
         selected = idx;
+        scales.push(c.userData.selectedScale);
+      }else{
+        scales.push(c.userData.unselectedScale);
       }
       
       if(anim=='CLOSE'){
@@ -539,10 +543,10 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
           c.material.renderOrder = 2;
         }
       }
-      yPositions.push(yPos);
+      yPositions.push(-yPos);
       zPositions.push(zPos);
       if(idx>0){
-        yPositions.push(-yPos);
+        yPositions.push(yPos);
       }
     });
 
@@ -556,6 +560,8 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
         let current = elem.userData.selectors[i];
         let props = { duration: duration, x: current.position.x, y: yPositions[i], z: zPositions[i], ease: easeIn };
         gsap.to(current.position, props);
+        props = { duration: duration, x: scales[i], y: scales[i], z: scales[i], ease: easeIn };
+        gsap.to(current.scale, props);
       }
     }
 
@@ -566,14 +572,17 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
       let last = current.parent.userData.lastSelected;
       let props = { duration: duration, x: current.position.x, y: current.userData.selectedPos.y, z: current.userData.selectedPos.z, ease: easeIn };
       gsap.to(current.position, props);
+      props = { duration: duration, x: current.userData.selectedScale, y: current.userData.selectedScale, z: current.userData.selectedScale, ease: easeIn };
+      gsap.to(current.scale, props);
 
       if(last != undefined){
         props = { duration: duration, x: last.position.x, y: currentY, z: zPositions[selected], ease: easeIn };
         gsap.to(last.position, props);
+        props = { duration: duration, x: last.userData.unselectedScale, y: last.userData.unselectedScale, z: last.userData.unselectedScale, ease: easeIn };
+        gsap.to(last.scale, props);
       }
     }
 
-    
 };
 
 export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
@@ -1132,6 +1141,20 @@ function calculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDiv
 
   return {baseWidth, baseHeight, baseDepth, handleWidth, handleHeight, handleDepth, subWidth, subHeight, subDepth}
 }
+
+export function panelProperties( name='Panel', widgets, padding, textProps, font){
+  return {
+    'name': name,
+    'widgets': widgets,
+    'padding': padding,
+    'textProps': textProps,
+    'font': font
+  }
+};
+
+export function contentPanel(boxProps){
+
+};
 
 export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
   let size = calculateWidgetSize(boxProps, widgetProps.horizontal, widgetProps.useValueText, handleSize);
@@ -2088,7 +2111,7 @@ function constructMultiTextMerged(obj, text, font, material, textProps, animProp
     return mergedMesh
 }
 
-export function editTextProperties(cBox, text, textMesh, font, size, height, zOffset, letterSpacing, lineSpacing, wordSpacing, padding, draggable, meshProps, wrap=true){
+export function editTextProperties(cBox, text, textMesh, font, size, height, zOffset, letterSpacing, lineSpacing, wordSpacing, padding, draggable, meshProps, wrap=true, hasButton=false){
   return {
     'cBox': cBox,
     'text': text,
@@ -2103,11 +2126,13 @@ export function editTextProperties(cBox, text, textMesh, font, size, height, zOf
     'padding': padding,
     'draggable': draggable,
     'meshProps': meshProps,
-    'wrap': wrap
+    'wrap': wrap,
+    'hasButton': hasButton
   }
 };
 
 function selectionTextBox(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined){
+
   const Box = contentBox(boxProps, textProps.padding, textProps.clipped);
   let mat = getMaterial(textProps.matProps, 0);
 
@@ -2120,7 +2145,7 @@ function selectionTextBox(boxProps, text, font, textProps=undefined,  animProps=
   setMergedMeshUserData(boxSize, geomSize, textProps.padding, textMesh);
 
   Box.box.add(textMesh);
-  textMesh.position.set(textMesh.position.x, textMesh.position.y-textProps.padding, textMesh.position.z);
+  textMesh.position.set(textMesh.position.x, textMesh.position.y-textProps.padding, boxSize.depth/2+geomSize.depth/2);
   boxProps.parent.add(Box.box);
   Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
   adjustBoxScaleRatio(Box.box, boxProps.parent);
@@ -2165,7 +2190,7 @@ function selectionText(boxProps, text, value, font, textProps, animProps=undefin
   setMergedMeshUserData(boxSize, geomSize, textProps.padding, textMesh);
 
   cBox.box.add(textMesh);
-  textMesh.position.set(textMesh.position.x, textMesh.position.y, boxProps.depth/2+geomSize.depth);
+  textMesh.position.set(textMesh.position.x, textMesh.position.y, boxProps.depth/2+geomSize.depth/2);
   boxProps.parent.add(cBox.box);
   cBox.box.position.set(cBox.box.position.x, cBox.box.position.y, parentSize.depth/2+boxSize.depth/2);
   adjustBoxScaleRatio(cBox.box, boxProps.parent);
@@ -2174,6 +2199,19 @@ function selectionText(boxProps, text, value, font, textProps, animProps=undefin
 
   return {textMesh, cBox}
 }
+
+export function textInputProperties(name='', btnText='Button', padding=0.01, textProps=undefined, font=undefined, hasButton=false, matProps=undefined, btnProps=undefined){
+  return {
+    'name': name,
+    'btnText': btnText,
+    'padding': padding,
+    'textProps': textProps,
+    'font': font,
+    'hasButton': hasButton,
+    'matProps': matProps,
+    'btnProps': btnProps
+  }
+};
 
 function handleTextInputSetup(inputProps, textProps, font){
   inputPrompts.push(inputProps.textMesh);
@@ -2185,33 +2223,89 @@ function handleTextInputSetup(inputProps, textProps, font){
   mouseOverUserData(inputProps.textMesh);
 }
 
-export function createTextInput(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
-  loader.load(textProps.font, (font) => {
-    let inputProps = selectionTextBox(boxProps, text, font, textProps, animProps, onCreated);
-    mouseOverable.push(inputProps.textMesh);
-    handleTextInputSetup(inputProps, textProps, font);
+function handleInputTextBoxProps(boxProps, widgetProps){
+  let inputBoxProps = {...boxProps};
+  let btnBoxProps = {...boxProps};
+  let size = calculateWidgetSize(boxProps, widgetProps.hasButton, true, 2);
+
+  inputBoxProps.width = size.baseWidth;
+  inputBoxProps.height = size.baseHeight;
+  inputBoxProps.depth = size.baseDepth;
+
+  btnBoxProps.width = size.subWidth;
+  btnBoxProps.height = size.subHeight;
+  btnBoxProps.depth = size.subDepth;
+  btnBoxProps.matProps = widgetProps.matProps;
+
+  return { inputBoxProps, btnBoxProps }
+}
+
+function attachButton(widget, boxProps, widgetProps, baseWidth, baseHeight, baseDepth){
+  //ButtonElement(boxProps, text, value, font, textProps, mouseOver=true)
+  let btn = ButtonElement(boxProps, widgetProps.btnText, '', widgetProps.font, widgetProps.textProps, true);
+  btn.cBox.box.position.set(baseWidth/2+boxProps.width/2, btn.cBox.box.position.y, -baseDepth/2+boxProps.depth/2);
+}
+
+export function createTextInput(boxProps, text, textInputProps,  animProps=undefined, onCreated=undefined) {
+  loader.load(textInputProps.font, (font) => {
+    textInputProps.font = font;
+    let props = handleInputTextBoxProps(boxProps, textInputProps);
+
+    let input = selectionTextBox(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
+    mouseOverable.push(input.textMesh);
+
+    if(textInputProps.hasButton){
+      props.btnBoxProps.parent = input.Box.box;
+      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth);
+    }
+    handleTextInputSetup(input, textInputProps.textProps, font);
   });
 };
 
-export function createScrollableTextInput(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
-  loader.load(textProps.font, (font) => {
-    let inputProps = selectionTextBox(boxProps, text, font, textProps, animProps, onCreated);
-    handleTextInputSetup(inputProps, textProps, font);
+export function createScrollableTextInput(boxProps, text, textInputProps,  animProps=undefined, onCreated=undefined) {
+  loader.load(textInputProps.font, (font) => {
+    textInputProps.font = font;
+    let props = handleInputTextBoxProps(boxProps, textInputProps);
+    let input = selectionTextBox(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
+
+    if(textInputProps.hasButton){
+      props.btnBoxProps.parent = input.Box.box;
+      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth)
+    }
+
+    handleTextInputSetup(input, textInputProps.textProps, font);
   });
 };
 
-export function createTextInputPortal(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
-  loader.load(textProps.font, (font) => {
-    let inputProps = selectionTextPortal(boxProps, text, font, textProps, animProps, onCreated);
-    mouseOverable.push(inputProps.textMesh);
-    handleTextInputSetup(inputProps, textProps, font);
+export function createTextInputPortal(boxProps, text, textInputProps,  animProps=undefined, onCreated=undefined) {
+  loader.load(textInputProps.font, (font) => {
+    textInputProps.font = font;
+    let props = handleInputTextBoxProps(boxProps, textInputProps);
+    //selectionTextPortal(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined)
+    let input = selectionTextPortal(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
+    mouseOverable.push(input.textMesh);
+
+    if(textInputProps.hasButton){
+      props.btnBoxProps.parent = input.Box.box;
+      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth)
+    }
+
+    handleTextInputSetup(input, textInputProps.textProps, font);
   });
 };
 
-export function createScrollableTextInputPortal(boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
-  loader.load(textProps.font, (font) => {
-    let inputProps = selectionTextPortal(boxProps, text, font, textProps, animProps, onCreated);
-    handleTextInputSetup(inputProps, textProps, font);
+export function createScrollableTextInputPortal(boxProps, text, textInputProps,  animProps=undefined, onCreated=undefined) {
+  loader.load(textInputProps.font, (font) => {
+    textInputProps.font = font;
+    let props = handleInputTextBoxProps(boxProps, textInputProps);
+    let input = selectionTextPortal(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
+
+    if(textInputProps.hasButton){
+      props.btnBoxProps.parent = input.Box.box;
+      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth)
+    }
+
+    handleTextInputSetup(input, textInputProps.textProps, font);
   });
 };
 
@@ -2228,7 +2322,6 @@ function onSelectorChoice(selection){
 
   selection.userData.selected = true;
   let first = selection.parent;
-  let index = base.userData.selectors.indexOf(selection.parent);
   base.userData.selectors.sort(function(x,y){ return x == first ? -1 : y == first ? 1 : 0; });
   selectorAnimation(selection.parent.parent, 'SELECT');
 
@@ -2241,37 +2334,32 @@ export function createListSelector(selectors, boxProps, text, textProps=undefine
     let idx = 0;
 
     for (const [key, val] of Object.entries(selectors)) {
-      let inputProps = selectionText(boxProps, key, val, font, textProps, animProps, onCreated);
-      const textSize = getGeometrySize(inputProps.textMesh.geometry);
-      const tProps = editTextProperties(inputProps.cBox, '', inputProps.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
-      inputProps.textMesh.userData.textProps = tProps;
-      inputPrompts.push(inputProps.textMesh);
-      mouseOverable.push(inputProps.textMesh);
-      clickable.push(inputProps.textMesh);
-      inputProps.textMesh.userData.draggable = false;
-      inputProps.textMesh.userData.key = key;
-      inputProps.textMesh.userData.value = val;
-      inputProps.textMesh.userData.index = idx;
-      inputProps.textMesh.userData.selected = false;
-      inputProps.cBox.box.userData.selectedPos = new THREE.Vector3(inputProps.cBox.box.position.x, inputProps.cBox.box.position.y, inputProps.cBox.depth+(boxProps.depth+textSize.depth));
-      inputProps.cBox.box.userData.unselectedPos = new THREE.Vector3(inputProps.cBox.box.position.x, inputProps.cBox.box.position.y, inputProps.cBox.depth);
-      inputProps.cBox.box.name = key;
+      let selText = selectionText(boxProps, key, val, font, textProps, animProps, onCreated);
+      const tProps = editTextProperties(selText.cBox, '', selText.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
+      selText.textMesh.userData.textProps = tProps;
+      inputPrompts.push(selText.textMesh);
+      mouseOverable.push(selText.textMesh);
+      clickable.push(selText.textMesh);
+      selText.cBox.box.name = key;
       
-      inputProps.cBox.box.userData.mouseOverParent = true;
-      inputProps.cBox.box.userData.currentText = key;
-      mouseOverUserData(inputProps.textMesh);
-      cBox.box.userData.selectors.push(inputProps.cBox.box);
-      selectorElems.push(inputProps.cBox.box);
-      cBox.box.add(inputProps.cBox.box);
-      inputProps.textMesh.addEventListener('action', function(event) {
-        onSelectorChoice(inputProps.textMesh)
+      selectorTextUserData(selText, key, val, idx, boxProps);
+      mouseOverUserData(selText.textMesh);
+
+      cBox.box.userData.selectors.push(selText.cBox.box);
+      selectorElems.push(selText.cBox.box);
+      cBox.box.add(selText.cBox.box);
+      
+      selText.textMesh.addEventListener('action', function(event) {
+        onSelectorChoice(selText.textMesh)
       });
 
       if(idx==0){
-        inputProps.textMesh.userData.selected = true;
-        inputProps.cBox.box.position.copy(inputProps.cBox.box.userData.selectedPos);
+        selText.textMesh.userData.selected = true;
+        selText.cBox.box.position.copy(selText.cBox.box.userData.selectedPos);
+
       }else{
-        inputProps.cBox.box.position.copy(inputProps.cBox.box.userData.unselectedPos);
+        selText.cBox.box.position.copy(selText.cBox.box.userData.unselectedPos);
+        selText.cBox.box.scale.set(cBox.box.unselectedScale, cBox.box.unselectedScale, cBox.box.unselectedScale);
       }
 
       idx+=1;
@@ -2281,8 +2369,37 @@ export function createListSelector(selectors, boxProps, text, textProps=undefine
   });
 };
 
-function ButtonElement(boxProps, text, value, font, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true){
-  let textMesh = selectionText(boxProps, text, value, font, textProps, animProps);
+function selectorTextUserData(selText, key, value, index, boxProps){
+  const textSize = getGeometrySize(selText.textMesh.geometry);
+  selText.textMesh.userData.draggable = false;
+  selText.textMesh.userData.key = key;
+  selText.textMesh.userData.value = value;
+  selText.textMesh.userData.index = index;
+  selText.textMesh.userData.selected = false;
+  selText.cBox.box.userData.selectedScale = 1;
+  selText.cBox.box.userData.unselectedScale = 0.9;
+  selText.cBox.box.userData.selectedPos = new THREE.Vector3(selText.cBox.box.position.x, selText.cBox.box.position.y, selText.cBox.depth+(boxProps.depth+textSize.depth));
+  selText.cBox.box.userData.unselectedPos = new THREE.Vector3(selText.cBox.box.position.x, selText.cBox.box.position.y, selText.cBox.depth);
+  selText.cBox.box.userData.mouseOverParent = true;
+  selText.cBox.box.userData.currentText = key;
+}
+
+export function buttonProperties(boxProps, font, name='Button', value='', padding=0.01, textProps=undefined, matProps=undefined, mouseOver=false, attach='RIGHT'){
+  return {
+    'boxProps': boxProps,
+    'font': font,
+    'name': name,
+    'value': value,
+    'padding': padding,
+    'textProps': textProps,
+    'matProps': matProps,
+    'mouseOver': mouseOver,
+    'attach': attach
+  }
+};
+
+function ButtonElement(boxProps, text, value, font, textProps, mouseOver=true){
+  let textMesh = selectionText(boxProps, text, value, font, textProps);
   const tProps = editTextProperties(textMesh.cBox, '', textMesh.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
   textMesh.cBox.box.userData.textProps = tProps;
   textMesh.cBox.box.userData.draggable = false;
@@ -2299,7 +2416,7 @@ function ButtonElement(boxProps, text, value, font, fontPath, textProps, animPro
 
 function Button(boxProps, text, value, fontPath, textProps, animProps=undefined, onCreated=undefined, mouseOver=true) {
   loader.load(fontPath, (font) => {
-    let txtMesh = ButtonElement(boxProps, text, font, fontPath, textProps, animProps, onCreated, mouseOver);
+    let txtMesh = ButtonElement(boxProps, text, font, textProps, mouseOver);
   });
 }
 
@@ -2307,7 +2424,7 @@ function portalButton(boxProps, text, value, fontPath, textProps, animProps=unde
   loader.load(fontPath, (font) => {
     const portal = portalWindow(boxProps, 0);
     const stencilRef = portal.box.material.stencilRef;
-    let txtMesh = ButtonElement(boxProps, text, font, fontPath, textProps, animProps, onCreated, mouseOver);
+    let txtMesh = ButtonElement(boxProps, text, font, textProps, mouseOver);
     const textSize = getGeometrySize(txtMesh.textMesh.geometry);
 
 
