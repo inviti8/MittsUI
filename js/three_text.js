@@ -8,6 +8,29 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import * as CameraUtils from 'three/addons/utils/CameraUtils.js';
 import colorsea from 'colorsea'
 
+//Needed hack for pivot points
+THREE.Object3D.prototype.updateMatrix = function () {
+
+  this.matrix.compose( this.position, this.quaternion, this.scale );
+
+  if ( this.pivot && this.pivot.isVector3 ) {
+
+    var px = this.pivot.x;
+    var py = this.pivot.y;
+    var pz = this.pivot.z;
+
+    var te = this.matrix.elements;
+
+    te[ 12 ] += px - te[ 0 ] * px - te[ 4 ] * py - te[ 8 ] * pz;
+    te[ 13 ] += py - te[ 1 ] * px - te[ 5 ] * py - te[ 9 ] * pz;
+    te[ 14 ] += pz - te[ 2 ] * px - te[ 6 ] * py - te[ 10 ] * pz;
+
+  }
+
+  this.matrixWorldNeedsUpdate = true;
+
+};
+
 
 const loader = new FontLoader();
 const gltfLoader = new GLTFLoader();
@@ -24,6 +47,7 @@ let clippedMeshes = [];//Everything that is clipped locally needs to have the tr
 let stencilRefs = [];//For assigning a unique stencil ref to each clipped material
 let meshViews = [];
 let portals = [];
+let panels = [];
 
 //Need pools for scenes to manage meshView content
 const SCENE_MAX = 32;
@@ -606,6 +630,10 @@ export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut
 
 };
 
+export function panelAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
+
+}
+
 export function clickAnimation(elem, anim='SCALE', duration=0.15, easeIn="power1.in", easeOut="elastic.Out", onComplete=undefined){
     scaleVar.set(elem.userData.defaultScale.x*0.9,elem.userData.defaultScale.y*0.9,elem.userData.defaultScale.z);
     let props = { duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: easeIn, transformOrigin: '50% 50%' };
@@ -915,7 +943,7 @@ export function getScenePool(){
   return scenePool;
 };
 
-export function boxProperties(name, parent, color, width, height, depth, smoothness, radius, zOffset = 1, complexMesh=true, matProps=materialProperties()){
+export function boxProperties(name, parent, color, width, height, depth, smoothness, radius, zOffset = 1, complexMesh=true, matProps=materialProperties(), pivot='CENTER'){
   return {
     'name': name,
     'parent': parent,
@@ -927,18 +955,56 @@ export function boxProperties(name, parent, color, width, height, depth, smoothn
     'radius': radius,
     'zOffset': zOffset,
     'complexMesh': complexMesh,
-    'matProps': matProps
+    'matProps': matProps,
+    'pivot': pivot
   }
 };
+
+function setGeometryPivot(mesh, boxProps){
+  let geomSize = getGeometrySize(mesh.geometry);
+  switch (boxProps.pivot) {
+    case 'LEFT':
+      mesh.pivot = new THREE.Vector3(-boxProps.width, boxProps.height/2, boxProps.depth/2);
+      break;
+    case 'RIGHT':
+      console.log('IN HERE')
+      mesh.pivot = new THREE.Vector3(boxProps.width, boxProps.height/2, boxProps.depth/2);
+      break;
+    case 'TOP':
+      mesh.pivot = new THREE.Vector3(boxProps.width/2, -boxProps.height, boxProps.depth/2);
+      break;
+    case 'TOP_LEFT':
+      mesh.pivot = new THREE.Vector3(-boxProps.width, -boxProps.height, boxProps.depth/2);
+      break;
+    case 'TOP_RIGHT':
+      mesh.pivot = new THREE.Vector3(boxProps.width, -boxProps.height, boxProps.depth/2);
+      break;
+    case 'BOTTOM':
+      mesh.pivot = new THREE.Vector3(boxProps.width/2, boxProps.height, boxProps.depth/2);
+      break;
+    case 'BOTTOM_LEFT':
+      mesh.pivot = new THREE.Vector3(-boxProps.width, boxProps.height, boxProps.depth/2);
+      break;
+    case 'BOTTOM_RIGHT':
+      mesh.pivot = new THREE.Vector3(boxProps.width, boxProps.height, boxProps.depth/2);
+      break;
+    default:
+      mesh.pivot = new THREE.Vector3(-boxProps.width/2, boxProps.height/2, boxProps.depth/2);
+
+  }
+}
 
 export function contentBox(boxProps, padding){
   const mat = getMaterial(boxProps.matProps, 0);
   let geometry = new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth);
+  
   if(boxProps.complexMesh){
     geometry = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
   }
 
   const box = new THREE.Mesh(geometry, mat);
+  setGeometryPivot(box, boxProps);
+
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
@@ -971,7 +1037,9 @@ export function roundedBox(boxProps, padding){
   const mat = new THREE.MeshPhongMaterial();
   mat.color.set(boxProps.color);
   mat.depthWrite = false;
-  const box = new THREE.Mesh(RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset), mat );
+  let geometry = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+  const box = new THREE.Mesh(geometry, mat );
+  setGeometryPivot(box, boxProps);
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
@@ -983,11 +1051,14 @@ export function roundedBox(boxProps, padding){
 export function portalBox(boxProps, padding){
   const mat = stencilMaterial(boxProps.matProps);
   let geometry = new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth);
+
   if(boxProps.complexMesh){
     geometry = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
   }
 
   const box = new THREE.Mesh(geometry, mat );
+  setGeometryPivot(box, boxProps);
+
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
@@ -1004,11 +1075,14 @@ export function portalBox(boxProps, padding){
 export function portalWindow(boxProps, padding){
   const mat = stencilMaterial(boxProps.matProps);
   let geometry = new THREE.PlaneGeometry(boxProps.width, boxProps.height);
+
   if(boxProps.complexMesh){
     geometry = RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness );
   }
 
   const box = new THREE.Mesh(geometry, mat );
+  setGeometryPivot(box, boxProps);
+
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
@@ -1025,10 +1099,13 @@ export function portalWindow(boxProps, padding){
 export function contentWindow(boxProps, padding){
   const mat = new THREE.MeshPhongMaterial();
   let geometry = new THREE.PlaneGeometry(boxProps.width, boxProps.height);
+
   if(boxProps.complexMesh){
     geometry = RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness );
   }
   const box = new THREE.Mesh(geometry, mat );
+  setGeometryPivot(box, boxProps);
+
   box.userData.width = boxProps.width;
   box.userData.height = boxProps.height;
   box.userData.depth = boxProps.depth;
@@ -1142,18 +1219,83 @@ function calculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDiv
   return {baseWidth, baseHeight, baseDepth, handleWidth, handleHeight, handleDepth, subWidth, subHeight, subDepth}
 }
 
-export function panelProperties( name='Panel', widgets, padding, textProps, font){
+export function panelProperties( boxProps, font, name='Panel', padding, textProps, matProps, attach='LEFT', sections={}, open=false){
   return {
+    'type': 'PANEL',
+    'boxProps': boxProps,
+    'font': font,
     'name': name,
-    'widgets': widgets,
     'padding': padding,
     'textProps': textProps,
-    'font': font
+    'matProps': matProps,
+    'attach': attach,
+    'sections': sections,
+    'open': open
   }
 };
 
-export function contentPanel(boxProps){
+function PanelElement(panelProps){
+  let panel = undefined;
 
+  if(panelProps.attach == 'CENTER'){
+
+    panel = selectionText(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
+    const parentSize = getGeometrySize(panelProps.boxProps.parent.geometry);
+
+    panel.cBox.box.position.set(parentSize.width/2, parentSize.height/2, parentSize.depth);
+  }else if(panelProps.attach == 'LEFT'){
+
+    panelProps.boxProps.pivot = 'RIGHT';
+    panel = selectionText(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
+    const parentSize = getGeometrySize(panelProps.boxProps.parent.geometry);
+
+    panel.cBox.box.position.set(-(parentSize.width/2+panel.cBox.width/2), parentSize.height/2-panel.cBox.height/2, parentSize.depth);
+
+  }else if(panelProps.attach == 'RIGHT'){
+
+    panelProps.boxProps.pivot = 'LEFT';
+    panel = selectionText(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
+    const parentSize = getGeometrySize(panelProps.boxProps.parent.geometry);
+
+    panel.cBox.box.position.set(parentSize.width/2+panel.cBox.width/2, parentSize.height/2-panel.cBox.height/2, parentSize.depth);
+
+  }
+
+  panel.cBox.box.userData.textMesh = panel.cBox.textMesh;
+  panel.cBox.box.userData.properties = panelProps;
+  panel.cBox.box.userData.sectionElements = [];
+  panel.cBox.box.userData.widgetElements = [];
+
+  panels.push(panel.cBox.box);
+
+  panel.cBox.box.addWidget = function(widget){
+    panel.cBox.box.add(widget);
+    panel.cBox.box.userData.widgetElements.push(widget);
+  }
+
+  if(panelProps.sections != undefined){
+    for (const [key, value] of Object.entries(panelProps.sections)) {
+      let sectionProps = {...panelProps};
+      sectionProps.name = key;
+
+      sectionProps.sections = value;
+      let section = PanelElement(sectionProps);
+      panel.cBox.box.userData.sectionElements.push({key: section});
+    }
+  }
+
+  return panel;
+
+}
+
+export function contentPanel(panelProps){
+  loader.load(panelProps.font, (font) => {
+    panelProps.font = font;
+    let base = PanelElement(panelProps);
+
+    console.log(base)  
+    
+  });
 };
 
 export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
@@ -2200,14 +2342,13 @@ function selectionText(boxProps, text, value, font, textProps, animProps=undefin
   return {textMesh, cBox}
 }
 
-export function textInputProperties(name='', btnText='Button', padding=0.01, textProps=undefined, font=undefined, hasButton=false, matProps=undefined, buttonProps=undefined){
+export function textInputProperties(name='', btnText='Button', padding=0.01, textProps=undefined, font=undefined, matProps=undefined, buttonProps=undefined){
   return {
     'name': name,
     'btnText': btnText,
     'padding': padding,
     'textProps': textProps,
     'font': font,
-    'hasButton': hasButton,
     'matProps': matProps,
     'buttonProps': buttonProps
   }
