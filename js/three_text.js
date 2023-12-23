@@ -630,34 +630,81 @@ export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut
 
 };
 
-export function panelAnimation(elem, duration=0.1, easeIn="power1.in", easeOut="elastic.Out"){
-
-  let onScale = elem.userData.onScale;
-  let offScale = elem.userData.offScale;
+export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.in", easeOut="elastic.Out"){
 
   function panelAnimComplete(elem, props){
     gsap.to(elem.scale, props);
   }
 
-  if(elem.userData.on){
-    let rot = elem.userData.handle.userData.offRotation;
-    let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
-    gsap.to(elem.userData.handle.rotation, props);
-    let offprops = { duration: duration, x: offScale.x, y: offScale.y, z: offScale.z, ease: easeOut };
-    let xprops = { duration: duration, x: onScale.x, y: offScale.y, z: offScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, offprops]};
-    let yprops = { duration: duration, x: offScale.x, y: offScale.y, z: offScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, xprops] };
+  function handleRotate(handle, props){
+    gsap.to(handle.rotation, props);
+  }
+
+
+  if(anim == 'OPEN'){
+    let onScale = elem.userData.onScale;
+    let offScale = elem.userData.offScale;
+
+    elem.userData.properties.open = !elem.userData.properties.open;
+
+    if(!elem.userData.properties.open){
+      let rot = elem.userData.handleOpen.userData.offRotation;
+      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+      handleRotate(elem.userData.handleOpen, props);
+
+      let xprops = { duration: duration, x: onScale.x, y: offScale.y, z: offScale.z, ease: easeOut};
+      let yprops = { duration: duration, x: offScale.x, y: offScale.y, z: offScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, xprops] };
+      
+      gsap.to(elem.scale, xprops);
+    }else if(elem.userData.properties.open){
+      let rot = elem.userData.handleOpen.userData.onRotation;
+      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+      handleRotate(elem.userData.handleOpen, props);
+
+      let yprops = { duration: duration, x: onScale.x, y: onScale.y, z: onScale.z, ease: easeOut };
+      let xprops = { duration: duration, x: onScale.x, y: offScale.y, z: onScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, yprops] };
+      
+      gsap.to(elem.scale, xprops);
+    }
+  }
+
+  if(anim == 'EXPAND'){
+    let idx = 1;
+    elem.userData.properties.expanded = !elem.userData.properties.expanded;
+    let expanded = elem.userData.properties.expanded;
+    let bottom = elem.userData.bottom;
+    let yPos = 0;
+    for (const obj of elem.userData.sectionElements) {
+      if(expanded){
+        let pos = obj.userData.closedPos;
+        let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+        gsap.to(obj.position, props);
+
+      }else if(!expanded){
+        let pos = obj.userData.expandedPos;
+        yPos += pos.y;
+        let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+        gsap.to(obj.position, props);
+      }
+
+      idx +=1;
+    }
     
-    gsap.to(elem.scale, xprops);
-    elem.userData.on = false;
-  }else{
-    let rot = elem.userData.handle.userData.onRotation;
-    let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
-    gsap.to(elem.userData.handle.rotation, props);
-    let yprops = { duration: duration, x: onScale.x, y: onScale.y, z: onScale.z, ease: easeOut };
-    let xprops = { duration: duration, x: onScale.x, y: offScale.y, z: onScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, yprops] };
-    
-    gsap.to(elem.scale, xprops);
-    elem.userData.on = true;
+    if(expanded){
+      let rot = elem.userData.handleExpand.userData.offRotation;
+      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+      handleRotate(elem.userData.handleExpand, props);
+      let pos = bottom.userData.closedPos;
+      props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+      gsap.to(bottom.position, props);
+    }else{
+      let rot = elem.userData.handleExpand.userData.onRotation;
+      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+      handleRotate(elem.userData.handleExpand, props);
+      let pos = bottom.userData.expandedPos;
+      props = { duration: duration, x: pos.x, y: yPos, z: pos.z, ease: easeOut };
+      gsap.to(bottom.position, props);
+    }
   }
 
 }
@@ -992,11 +1039,11 @@ function setGeometryPivot(mesh, boxProps){
   let geomSize = getGeometrySize(mesh.geometry);
   switch (boxProps.pivot) {
     case 'LEFT':
-      mesh.pivot = new THREE.Vector3(-boxProps.width, boxProps.height/2, boxProps.depth/2);
+      mesh.pivot = new THREE.Vector3(-boxProps.width/2, boxProps.height/2, boxProps.depth/2);
       break;
     case 'RIGHT':
       console.log('IN HERE')
-      mesh.pivot = new THREE.Vector3(boxProps.width, boxProps.height/2, boxProps.depth/2);
+      mesh.pivot = new THREE.Vector3(boxProps.width/2, boxProps.height/2, boxProps.depth/2);
       break;
     case 'TOP':
       mesh.pivot = new THREE.Vector3(boxProps.width/2, -boxProps.height, boxProps.depth/2);
@@ -1247,7 +1294,7 @@ function calculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDiv
   return {baseWidth, baseHeight, baseDepth, handleWidth, handleHeight, handleDepth, subWidth, subHeight, subDepth}
 }
 
-export function panelProperties( boxProps, font, name='Panel', padding, textProps, matProps, attach='LEFT', sections={}, open=false){
+export function panelProperties( boxProps, font, name='Panel', padding, textProps, matProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined){
   return {
     'type': 'PANEL',
     'boxProps': boxProps,
@@ -1258,59 +1305,117 @@ export function panelProperties( boxProps, font, name='Panel', padding, textProp
     'matProps': matProps,
     'attach': attach,
     'sections': sections,
-    'open': open
+    'open': open,
+    'expanded': expanded,
+    'isSubPanel': isSubPanel,
+    'topPanel': topPanel
   }
 };
 
 function panelHandle(panelProps){
   let handleMat = getMaterial(panelProps.matProps, panelProps.matProps.stencilRef);
-  let handleGeo = new THREE.OctahedronGeometry(0.1, 0);
+  let handleGeo = new THREE.OctahedronGeometry(panelProps.boxProps.height*0.2, 0);
   handleGeo.center()
-  const handle = new THREE.Mesh(handleGeo, handleMat );
+  const handleSize = getGeometrySize(handleGeo);
+  const handle = new THREE.Mesh(handleGeo, handleMat);
   handle.userData.offRotation = new THREE.Vector3().copy(handle.rotation);
   handle.userData.onRotation = new THREE.Vector3(handle.rotation.x, handle.rotation.y, handle.rotation.z+0.8)
+  handle.userData.size = handleSize;
   mouseOverUserData(handle);
   clickable.push(handle);
 
   return handle
 }
 
+function panelOpenHandle(panel, panelProps){
+  const handleOpen = panelHandle(panelProps);
+  const parentSize = getGeometrySize(panelProps.boxProps.parent.geometry);
+
+  panelProps.boxProps.parent.add(handleOpen);
+
+  if(panelProps.attach == 'CENTER'){
+    handleOpen.position.set(panel.cBox.width/2, panel.cBox.height/2, parentSize.depth+panel.cBox.depth/2);
+  }else if(panelProps.attach == 'LEFT'){
+    handleOpen.position.set(-(parentSize.width/2), parentSize.height/2, parentSize.depth+panel.cBox.depth/2);
+  }else if(panelProps.attach == 'RIGHT'){
+    handleOpen.position.set(parentSize.width/2, parentSize.height/2, -(parentSize.depth+panel.cBox.depth/2));
+  }
+
+  if(!panelProps.open){
+    handleOpen.rotation.z = handleOpen.rotation.z;
+  }else if(panelProps.open){
+    handleOpen.rotation.z = handleOpen.rotation.z+0.8;
+  }
+
+  panel.cBox.box.userData.handleOpen = handleOpen;
+
+  handleOpen.addEventListener('action', function(event) {
+    panelAnimation(panel.cBox.box);
+  });
+}
+
+function panelBottom(panel, panelProps){
+  let bottomBoxProps = {...panelProps.boxProps};
+  bottomBoxProps.height=bottomBoxProps.height*0.5;
+  bottomBoxProps.parent = panel.cBox.box;
+  const panel_bottom = contentBox(bottomBoxProps, bottomBoxProps.padding);
+  let bottomSize = getGeometrySize(panel_bottom.box.geometry);
+  panel_bottom.box.material = panel.cBox.box.material;
+  panel_bottom.box.position.set(panel_bottom.box.position.x, -(panel.cBox.height/2+panel_bottom.height/2), panel_bottom.box.position.z);
+  panel.cBox.box.add(panel_bottom.box);
+  panel_bottom.box.userData.expandedPos = new THREE.Vector3().set(panel_bottom.box.position.x, -(panel.cBox.height+panel_bottom.height), panel_bottom.box.position.z);
+  panel_bottom.box.userData.closedPos = new THREE.Vector3().copy(panel_bottom.box.position);
+  panel_bottom.box.userData.size = bottomSize;
+
+  return panel_bottom
+}
+
 function PanelElement(panelProps){
   let panel = undefined;
 
-  const handle = panelHandle(panelProps);
-  panelProps.boxProps.parent.add(handle)
+  const handleExpand = panelHandle(panelProps);
+  panelProps.boxProps.parent.add(handleExpand);
+  let parentSize = getGeometrySize(panelProps.boxProps.parent.geometry);
 
   if(panelProps.attach == 'CENTER'){
 
     panel = selectionText(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
-    const parentSize = getGeometrySize(panelProps.boxProps.parent.geometry);
-
     panel.cBox.box.position.set(parentSize.width/2, parentSize.height/2, parentSize.depth);
-    handle.position.set(panel.cBox.width/2, panel.cBox.height/2, parentSize.depth+panel.cBox.depth/2);
+    
   }else if(panelProps.attach == 'LEFT'){
 
     panelProps.boxProps.pivot = 'RIGHT';
     panel = selectionText(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
-    const parentSize = getGeometrySize(panelProps.boxProps.parent.geometry);
-
     panel.cBox.box.position.set(-(parentSize.width/2+panel.cBox.width/2), parentSize.height/2-panel.cBox.height/2, parentSize.depth);
-    handle.position.set(-(parentSize.width/2), parentSize.height/2, parentSize.depth+panel.cBox.depth/2);
 
   }else if(panelProps.attach == 'RIGHT'){
 
     panelProps.boxProps.pivot = 'LEFT';
     panel = selectionText(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
-    const parentSize = getGeometrySize(panelProps.boxProps.parent.geometry);
-
     panel.cBox.box.position.set(parentSize.width/2+panel.cBox.width/2, parentSize.height/2-panel.cBox.height/2, parentSize.depth);
-    handle.position.set(parentSize.width/2, parentSize.height/2, -(parentSize.depth+panel.cBox.depth/2));
 
   }
 
-  panel.cBox.box.userData.handle = handle;
+  if(panelProps.topPanel == undefined){
+    panelProps.topPanel = panel.cBox.box;
+    const handleOpen = panelOpenHandle(panel, panelProps);
+  }
+
+  handleExpand.rotation.z = handleExpand.rotation.z+0.8;
+  panel.cBox.box.add(handleExpand);
+  panel.cBox.box.userData.handleExpand = handleExpand;
+  handleExpand.position.set(panelProps.boxProps.width/2, panelProps.boxProps.height/2 - handleExpand.userData.size.height*2, panelProps.boxProps.depth/2);
+
+  const panel_bottom = panelBottom(panel, panelProps);
+
+  
   panel.cBox.box.userData.textMesh = panel.cBox.textMesh;
+  panel.cBox.box.userData.bottom = panel_bottom.box;
   panel.cBox.box.userData.properties = panelProps;
+  panel.cBox.box.userData.expandedPos = new THREE.Vector3().copy(panel.cBox.box.position);
+  panel.cBox.box.userData.closedPos = new THREE.Vector3().copy(panel.cBox.box.position);
+  panel.cBox.box.userData.onPos = new THREE.Vector3().copy(panel.cBox.box.position);
+  panel.cBox.box.userData.offPos = new THREE.Vector3().copy(panel.cBox.box.position);
   panel.cBox.box.userData.onScale = new THREE.Vector3(0,0,0).copy(panel.cBox.box.scale);
   panel.cBox.box.userData.offScale = new THREE.Vector3(0,0,0);
   panel.cBox.box.userData.sectionElements = [];
@@ -1323,19 +1428,42 @@ function PanelElement(panelProps){
     panel.cBox.box.userData.widgetElements.push(widget);
   }
 
+  if(!panelProps.open){
+    panel.cBox.box.scale.set(0,0,0);
+  }
+
+  if(panelProps.isSubPanel){
+    panel.cBox.box.position.copy(panelProps.boxProps.parent.position);
+    darkenMaterial(panel.cBox.box.material, 10);
+    panel.cBox.box.userData.onPos = new THREE.Vector3(panel.cBox.box.position.x, -(parentSize.height/2-panel.cBox.height/2), panel.cBox.box.position.z);
+    panel.cBox.box.userData.offPos = new THREE.Vector3().copy(panel.cBox.box.position);
+  }
+
   if(panelProps.sections != undefined){
+    let index = 1;
     for (const [key, value] of Object.entries(panelProps.sections)) {
       let sectionProps = {...panelProps};
       sectionProps.name = key;
+      sectionProps.isSubPanel = true;
+      sectionProps.boxProps.parent = panelProps.topPanel;
+      parentSize = getGeometrySize(panelProps.topPanel.geometry);
 
       sectionProps.sections = value;
       let section = PanelElement(sectionProps);
-      panel.cBox.box.userData.sectionElements.push({key: section});
+      section.cBox.box.position.set(parentSize.width/2-section.cBox.width/2, 0, -parentSize.depth);
+      let sectObj = {}
+      sectObj[key] = section.cBox.box;
+      section.cBox.box.userData.index = index;
+      section.cBox.box.userData.expandedPos.set(section.cBox.box.position.x, -(section.cBox.height/2+parentSize.height)*index, section.cBox.box.position.z);
+      section.cBox.box.userData.closedPos = new THREE.Vector3().copy(section.cBox.box.position);
+      panelProps.topPanel.userData.sectionElements.push(section.cBox.box);
+      
+      index += 1;
     }
   }
 
-  handle.addEventListener('action', function(event) {
-    panelAnimation(panel.cBox.box);
+  handleExpand.addEventListener('action', function(event) {
+    panelAnimation(panel.cBox.box, 'EXPAND');
   });
 
   return panel;
@@ -1345,10 +1473,7 @@ function PanelElement(panelProps){
 export function contentPanel(panelProps){
   loader.load(panelProps.font, (font) => {
     panelProps.font = font;
-    let base = PanelElement(panelProps);
-
-    console.log(base)  
-    
+    let base = PanelElement(panelProps); 
   });
 };
 
