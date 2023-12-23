@@ -304,6 +304,14 @@ function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
 }
 
+function* range(from, to, step = 1) {
+  let value = from;
+  while (value <= to) {
+    yield value;
+    value += step;
+  }
+}
+
 export function listItemConfig(boxProps, textProps=undefined,  animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, childInset=0.9, index=0){
   return {
     'boxProps': boxProps,
@@ -678,8 +686,11 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     
     let expanded = elem.userData.properties.expanded;
     let bottom = elem.userData.bottom;
+    let topHeight = elem.userData.size.height;
     let bottomHeight = bottom.userData.size.height;
+    let elemHeight = topHeight+bottomHeight;
     let yPos = -bottomHeight/2;
+
     for (const obj of elem.userData.sectionElements) {
       if(expanded){
         let pos = obj.userData.closedPos;
@@ -691,6 +702,7 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
         yPos += pos.y;
         let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
         gsap.to(obj.position, props);
+
       }
 
       idx +=1;
@@ -701,8 +713,9 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       let rot = elem.userData.handleExpand.userData.onRotation;
       let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
+      let y = (bottomHeight/2+elemHeight * elem.userData.sectionElements.length) + bottomHeight;
       let pos = bottom.userData.expandedPos;
-      props = { duration: duration, x: pos.x, y: yPos, z: pos.z, ease: easeOut };
+      props = { duration: duration, x: pos.x, y: -y, z: pos.z, ease: easeOut };
       gsap.to(bottom.position, props);
     }else if(expanded){
       let rot = elem.userData.handleExpand.userData.offRotation;
@@ -714,13 +727,40 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     }
 
     //if a sub panel is opened, we need to manage positions of other sub panels and base panel elements
-    if(elem.isSubPanel){
-      let subPanels = elem.userData.properties.topPanel.userData.sectionElements;
-      let elemCnt = len(subPanels);
-      let idx = 1;
-      // for i in range(elem.index, elemCnt){
+    if(elem.userData.properties.isSubPanel){
+      let topPanel = elem.userData.properties.topPanel;
+      let topPanelBottom = topPanel.userData.bottom;
+      let subPanels = topPanel.userData.sectionElements;
+      let elemCnt = subPanels.length;
+      let startIdx = elem.userData.index+1;
+      // console.log(topPanel)
+      // console.log(elem.userData.index)
+      // console.log(elemCnt)
+      // console.log(subPanels)
 
-      // }
+      if(elem.userData.sectionElements.length == 0){
+        if(!expanded){
+   
+          for (const i of range(startIdx, elemCnt)) {
+            // let idx = i-1;
+            // let subPanel = subPanels[idx];
+            // yPos = (yPos-bottomHeight)-(elemHeight/2+bottomHeight);
+            // let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
+            // gsap.to(subPanel.position, props);
+          }
+
+          // yPos = yPos-bottomHeight;
+          // let props = { duration: duration, x: topPanelBottom.position.x, y: yPos, z: topPanelBottom.position.z, ease: easeOut };
+        }else if(expanded){
+          for (const i of range(startIdx, elemCnt)) {
+            // let idx = i-1;
+            // let subPanel = subPanels[idx];
+            // yPos = ((yPos-bottomHeight)-(elemHeight/2+bottomHeight);
+            // let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
+            // gsap.to(subPanel.position, props);
+          }
+        } 
+      }
 
     }
 
@@ -1444,6 +1484,7 @@ function PanelElement(panelProps){
   panel.cBox.box.userData.offScale = new THREE.Vector3(0,0,0);
   panel.cBox.box.userData.sectionElements = [];
   panel.cBox.box.userData.widgetElements = [];
+  panel.cBox.box.userData.size = getGeometrySize(panel.cBox.box.geometry);
 
   panels.push(panel.cBox.box);
 
