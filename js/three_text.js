@@ -645,18 +645,8 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     let onScale = elem.userData.onScale;
     let offScale = elem.userData.offScale;
 
-    elem.userData.properties.open = !elem.userData.properties.open;
-
     if(!elem.userData.properties.open){
-      let rot = elem.userData.handleOpen.userData.offRotation;
-      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
-      handleRotate(elem.userData.handleOpen, props);
 
-      let xprops = { duration: duration, x: onScale.x, y: offScale.y, z: offScale.z, ease: easeOut};
-      let yprops = { duration: duration, x: offScale.x, y: offScale.y, z: offScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, xprops] };
-      
-      gsap.to(elem.scale, xprops);
-    }else if(elem.userData.properties.open){
       let rot = elem.userData.handleOpen.userData.onRotation;
       let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleOpen, props);
@@ -665,15 +655,31 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       let xprops = { duration: duration, x: onScale.x, y: offScale.y, z: onScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, yprops] };
       
       gsap.to(elem.scale, xprops);
+
+    }else if(elem.userData.properties.open){
+
+      let rot = elem.userData.handleOpen.userData.offRotation;
+      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+      handleRotate(elem.userData.handleOpen, props);
+
+      let xprops = { duration: duration, x: offScale.x, y: offScale.y, z: offScale.z, ease: easeOut};
+      let yprops = { duration: duration, x: onScale.x, y: offScale.y, z: onScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, xprops] };
+      
+      gsap.to(elem.scale, yprops);
+
     }
+
+    elem.userData.properties.open = !elem.userData.properties.open;
   }
 
   if(anim == 'EXPAND'){
     let idx = 1;
-    elem.userData.properties.expanded = !elem.userData.properties.expanded;
+    let lastObj = undefined;
+    
     let expanded = elem.userData.properties.expanded;
     let bottom = elem.userData.bottom;
-    let yPos = 0;
+    let bottomHeight = bottom.userData.size.height;
+    let yPos = -bottomHeight/2;
     for (const obj of elem.userData.sectionElements) {
       if(expanded){
         let pos = obj.userData.closedPos;
@@ -688,23 +694,40 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       }
 
       idx +=1;
+      lastObj = obj;
     }
     
-    if(expanded){
-      let rot = elem.userData.handleExpand.userData.offRotation;
-      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
-      handleRotate(elem.userData.handleExpand, props);
-      let pos = bottom.userData.closedPos;
-      props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
-      gsap.to(bottom.position, props);
-    }else{
+    if(!expanded){
       let rot = elem.userData.handleExpand.userData.onRotation;
       let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
       let pos = bottom.userData.expandedPos;
       props = { duration: duration, x: pos.x, y: yPos, z: pos.z, ease: easeOut };
       gsap.to(bottom.position, props);
+    }else if(expanded){
+      let rot = elem.userData.handleExpand.userData.offRotation;
+      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+      handleRotate(elem.userData.handleExpand, props);
+      let pos = bottom.userData.closedPos;
+      props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+      gsap.to(bottom.position, props);
     }
+
+    //if a sub panel is opened, we need to manage positions of other sub panels and base panel elements
+    if(elem.isSubPanel){
+      let subPanels = elem.userData.properties.topPanel.userData.sectionElements;
+      let elemCnt = len(subPanels);
+      let idx = 1;
+      // for i in range(elem.index, elemCnt){
+
+      // }
+
+    }
+
+    //textMesh.widget.base.userData.valueBox.dispatchEvent({type:'update'});
+
+    elem.userData.properties.expanded = !elem.userData.properties.expanded;
+
   }
 
 }
@@ -1042,7 +1065,6 @@ function setGeometryPivot(mesh, boxProps){
       mesh.pivot = new THREE.Vector3(-boxProps.width/2, boxProps.height/2, boxProps.depth/2);
       break;
     case 'RIGHT':
-      console.log('IN HERE')
       mesh.pivot = new THREE.Vector3(boxProps.width/2, boxProps.height/2, boxProps.depth/2);
       break;
     case 'TOP':
@@ -1400,11 +1422,13 @@ function PanelElement(panelProps){
     panelProps.topPanel = panel.cBox.box;
     const handleOpen = panelOpenHandle(panel, panelProps);
   }
-
-  handleExpand.rotation.z = handleExpand.rotation.z+0.8;
+  
   panel.cBox.box.add(handleExpand);
   panel.cBox.box.userData.handleExpand = handleExpand;
   handleExpand.position.set(panelProps.boxProps.width/2, panelProps.boxProps.height/2 - handleExpand.userData.size.height*2, panelProps.boxProps.depth/2);
+  if(panelProps.expanded){
+    handleExpand.rotation.z = handleExpand.rotation.z+0.8;
+  }
 
   const panel_bottom = panelBottom(panel, panelProps);
 
@@ -1451,10 +1475,12 @@ function PanelElement(panelProps){
       sectionProps.sections = value;
       let section = PanelElement(sectionProps);
       section.cBox.box.position.set(parentSize.width/2-section.cBox.width/2, 0, -parentSize.depth);
-      let sectObj = {}
-      sectObj[key] = section.cBox.box;
+
+      let bottom = section.cBox.box.userData.bottom;
+      let bottomHeight = bottom.userData.size.height;
+      let yPos =  bottomHeight - (parentSize.height + bottomHeight)*index;
       section.cBox.box.userData.index = index;
-      section.cBox.box.userData.expandedPos.set(section.cBox.box.position.x, -(section.cBox.height/2+parentSize.height)*index, section.cBox.box.position.z);
+      section.cBox.box.userData.expandedPos.set(section.cBox.box.position.x, yPos, section.cBox.box.position.z);
       section.cBox.box.userData.closedPos = new THREE.Vector3().copy(section.cBox.box.position);
       panelProps.topPanel.userData.sectionElements.push(section.cBox.box);
       
