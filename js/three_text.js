@@ -2038,7 +2038,7 @@ export function createMergedTextGeometry(font, boxWidth, boxHeight, text, textPr
     return BufferGeometryUtils.mergeGeometries(letterGeometries);
 }
 
-export function textBoxProperties( boxProps, text, textProps, matProps, animProps=undefined, listConfig=undefined, onCreated=undefined, padding=0.01, isPortal=false){
+export function textBoxProperties( boxProps, text, textProps, matProps, animProps=undefined, listConfig=undefined, onCreated=undefined, padding=0.01, isPortal=false, scrollable=false, MultiLetterMeshes=false){
   return {
     'type': 'TEXT_BOX',
     'boxProps': boxProps,
@@ -2049,7 +2049,9 @@ export function textBoxProperties( boxProps, text, textProps, matProps, animProp
     'listConfig': listConfig,
     'onCreated': onCreated,
     'padding': padding,
-    'isPortal': isPortal
+    'isPortal': isPortal,
+    'scrollable': scrollable,
+    'MultiLetterMeshes': MultiLetterMeshes
   }
 };
 
@@ -2154,7 +2156,7 @@ function StaticTextPortal(textBoxProps){
   }
 
   if(textBoxProps.onCreated!=undefined){
-    onCreated(portal.box);
+    textBoxProps.onCreated(portal.box);
   }
 }
 
@@ -2170,248 +2172,321 @@ export function createStaticTextPortal(textBoxProps) {
   } 
 }
 
-export function createStaticScrollableTextBox(boxProps, text, textProps=undefined,  animProps=undefined,  listConfig=undefined, onCreated=undefined) {
-  // Load the font
-  loader.load(textProps.font, (font) => {
-    const cBox = contentBox(boxProps);
-    let mat = getMaterial(textProps.matProps, 0);
+function StaticScrollableTextBox(textBoxProps){
+  let boxProps = textBoxProps.boxProps;
+  let textProps = textBoxProps.textProps;
+  let listConfig = textBoxProps.listConfig;
+  let animProps = textBoxProps.animProps;
+  const cBox = contentBox(boxProps);
+  let mat = getMaterial(textProps.matProps, 0);
 
-    // Merge the individual letter geometries into a single buffer geometry
-    let mergedGeometry = createMergedTextBoxGeometry(cBox, font, boxProps.width, boxProps.height, text, textProps, animProps);
+  // Merge the individual letter geometries into a single buffer geometry
+  let mergedGeometry = createMergedTextBoxGeometry(cBox, textProps.font, boxProps.width, boxProps.height, textBoxProps.text, textProps, animProps);
 
-    // Create a mesh from the merged geometry
-    const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
-    if(animProps!=undefined){
-      mergedMesh.material.transparent=true;
-      mergedMesh.material.opacity=0;
-    }
-    const boxSize = getGeometrySize(cBox.box.geometry);
-    const geomSize = getGeometrySize(mergedGeometry);
-    mergedMesh.position.set(0, -textProps.padding, 0);
+  // Create a mesh from the merged geometry
+  const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
+  if(animProps!=undefined){
+    mergedMesh.material.transparent=true;
+    mergedMesh.material.opacity=0;
+  }
+  const boxSize = getGeometrySize(cBox.box.geometry);
+  const geomSize = getGeometrySize(mergedGeometry);
+  mergedMesh.position.set(0, -textProps.padding, 0);
 
-    if(listConfig != undefined){
-      cBox.box.name = boxProps.name;
-      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-    }else{
-      boxProps.parent.add(cBox.box);
-    }
-
-    cBox.box.add(mergedMesh);
-    if(boxProps.name==''){
-      boxProps.name='text-'+cBox.box.id;
-    }
+  if(listConfig != undefined){
     cBox.box.name = boxProps.name;
-    adjustBoxScaleRatio(cBox.box, boxProps.parent);
-    setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
-    mergedMesh.userData.draggable=true;
-    mergedMesh.userData.horizontal=false;
+    createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
+  }else{
+    boxProps.parent.add(cBox.box);
+  }
 
-    draggable.push(mergedMesh);
-    if(animProps!=undefined){
-      //anim, action, duration, ease, delay, onComplete
-      txtAnimation(cBox.box, mergedMesh, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, 0, animProps.callback);
-    }
-    if(onCreated!=undefined){
-      onCreated(cBox.box);
-    }
+  cBox.box.add(mergedMesh);
+  if(boxProps.name==''){
+    boxProps.name='text-'+cBox.box.id;
+  }
+  cBox.box.name = boxProps.name;
+  adjustBoxScaleRatio(cBox.box, boxProps.parent);
+  setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
+  mergedMesh.userData.draggable=true;
+  mergedMesh.userData.horizontal=false;
 
-  });
+  draggable.push(mergedMesh);
+  if(animProps!=undefined){
+    //anim, action, duration, ease, delay, onComplete
+    txtAnimation(cBox.box, mergedMesh, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, 0, animProps.callback);
+  }
+  if(textBoxProps.onCreated!=undefined){
+    textBoxProps.onCreated(cBox.box);
+  }
 }
 
-export function createStaticScrollableTextPortal(boxProps, text, textProps=undefined,  animProps=undefined,  listConfig=undefined, onCreated=undefined) {
-  // Load the font
-  loader.load(textProps.font, (font) => {
-    const portal = portalWindow(boxProps);
-    let mat = getMaterial(textProps.matProps, portal.stencilRef);
+export function createStaticScrollableTextBox(textBoxProps) {
+  if(typeof textBoxProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textBoxProps.textProps.font, (font) => {
+      textBoxProps.textProps.font = font;
+      StaticScrollableTextBox(textBoxProps);
+    });
+  }else if(textBoxProps.textProps.font.isFont){
+    StaticScrollableTextBox(textBoxProps);
+  } 
+}
 
-    // Merge the individual letter geometries into a single buffer geometry
-    let mergedGeometry = createMergedTextBoxGeometry(portal, font, boxProps.width, boxProps.height, text, textProps, animProps);
+function StaticScrollableTextPortal(textBoxProps){
+  let boxProps = textBoxProps.boxProps;
+  let textProps = textBoxProps.textProps;
+  let listConfig = textBoxProps.listConfig;
+  let animProps = textBoxProps.animProps;
+  const portal = portalWindow(boxProps);
+  let mat = getMaterial(textProps.matProps, portal.stencilRef);
 
-    // Create a mesh from the merged geometry
-    const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
-    if(animProps!=undefined){
-      mat.transparent=true;
-      mat.opacity=0;
-    }
+  // Merge the individual letter geometries into a single buffer geometry
+  let mergedGeometry = createMergedTextBoxGeometry(portal, textProps.font, boxProps.width, boxProps.height, textBoxProps.text, textProps, animProps);
 
-    const boxSize = getGeometrySize(portal.box.geometry);
-    const geomSize = getGeometrySize(mergedGeometry);
-    mergedMesh.position.set(0, -textProps.padding, 0);
-    portal.box.add(mergedMesh);
+  // Create a mesh from the merged geometry
+  const mergedMesh = new THREE.Mesh(mergedGeometry, mat);
+  if(animProps!=undefined){
+    mat.transparent=true;
+    mat.opacity=0;
+  }
+
+  const boxSize = getGeometrySize(portal.box.geometry);
+  const geomSize = getGeometrySize(mergedGeometry);
+  mergedMesh.position.set(0, -textProps.padding, 0);
+  portal.box.add(mergedMesh);
     
-    if(listConfig != undefined){
-      portal.box.name = boxProps.name;
-      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-    }else{
-      boxProps.parent.add( portal.box );
-    }
-
-    if(boxProps.name==''){
-      boxProps.name='text-'+portal.box.id;
-    }
-
+  if(listConfig != undefined){
     portal.box.name = boxProps.name;
-    adjustBoxScaleRatio(portal.box, boxProps.parent);
-    setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
-    mergedMesh.userData.draggable=true;
-    mergedMesh.userData.horizontal=false;
+    createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
+  }else{
+    boxProps.parent.add( portal.box );
+  }
 
-    draggable.push(mergedMesh);
-    if(animProps!=undefined){
-      //anim, action, duration, ease, delay, onComplete
-      txtAnimation(portal.box, mergedMesh, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, 0, animProps.callback);
-    }
-    if(onCreated!=undefined){
-      onCreated(portal.box);
-    }
+  if(boxProps.name==''){
+    boxProps.name='text-'+portal.box.id;
+  }
 
-  });
+  portal.box.name = boxProps.name;
+  adjustBoxScaleRatio(portal.box, boxProps.parent);
+  setMergedMeshUserData(boxSize, geomSize, textProps.padding, mergedMesh);
+  mergedMesh.userData.draggable=true;
+  mergedMesh.userData.horizontal=false;
+
+  draggable.push(mergedMesh);
+  if(animProps!=undefined){
+    //anim, action, duration, ease, delay, onComplete
+    txtAnimation(portal.box, mergedMesh, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, 0, animProps.callback);
+  }
+  if(textBoxProps.onCreated!=undefined){
+    textBoxProps.onCreated(portal.box);
+  }
 }
 
-export function createMultiTextBox(boxProps, text, textProps=undefined,  animProps=undefined,  listConfig=undefined, onCreated=undefined) {
-  // Load the font
-  loader.load(textProps.font, (font) => {
-    const cBox = contentBox(boxProps);
-    const boxSize = getGeometrySize(cBox.box.geometry);
-    const letterGeometries = [];
-    const letterMeshes = [];
+export function createStaticScrollableTextPortal(textBoxProps) {
+  if(typeof textBoxProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textBoxProps.textProps.font, (font) => {
+      textBoxProps.textProps.font = font;
+      StaticScrollableTextPortal(textBoxProps);
+    });
+  }else if(textBoxProps.textProps.font.isFont){
+    StaticScrollableTextPortal(textBoxProps);
+  }
+}
 
-    let mat = getMaterial(textProps.matProps, 0);
+function MultiTextBox(textBoxProps){
+  let boxProps = textBoxProps.boxProps;
+  let textProps = textBoxProps.textProps;
+  let listConfig = textBoxProps.listConfig;
+  let animProps = textBoxProps.animProps;
+  const cBox = contentBox(boxProps);
+  const boxSize = getGeometrySize(cBox.box.geometry);
+  const letterGeometries = [];
+  const letterMeshes = [];
 
-    constructMultiMergedGeometry(cBox, text, font, mat, textProps, textProps.meshProps, animProps);
+  let mat = getMaterial(textProps.matProps, 0);
 
-    if(listConfig != undefined){
-      cBox.box.name = name;
-      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-    }else{
-      boxProps.parent.add(cBox.box);
-    }
+  constructMultiMergedGeometry(cBox, textBoxProps.text, textProps.font, mat, textProps, textProps.meshProps, animProps);
 
-    adjustBoxScaleRatio(cBox.box, boxProps.parent);
-    if(boxProps.name==''){
-      boxProps.name='text-'+cBox.box.id;
-    }
+  if(listConfig != undefined){
+    cBox.box.name = name;
+    createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
+  }else{
+    boxProps.parent.add(cBox.box);
+  }
+
+  adjustBoxScaleRatio(cBox.box, boxProps.parent);
+  if(boxProps.name==''){
+    boxProps.name='text-'+cBox.box.id;
+  }
+  cBox.box.name = boxProps.name;
+
+  if(animProps!=undefined){
+    //anim, action, duration, ease, delay, onComplete
+    multiAnimation(cBox.box, cBox.box.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
+  }
+  if(textBoxProps.onCreated!=undefined){
+    textBoxProps.onCreated(cBox.box);
+  }
+}
+
+export function createMultiTextBox(textBoxProps) {
+  if(typeof textBoxProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textBoxProps.textProps.font, (font) => {
+      textBoxProps.textProps.font = font;
+      MultiTextBox(textBoxProps);
+    });
+  }else if(textBoxProps.textProps.font.isFont){
+    MultiTextBox(textBoxProps);
+  }
+};
+
+function MultiTextPortal(textBoxProps){
+  let boxProps = textBoxProps.boxProps;
+  let textProps = textBoxProps.textProps;
+  let listConfig = textBoxProps.listConfig;
+  let animProps = textBoxProps.animProps;
+  const portal = portalWindow(boxProps);
+  let lineWidth = -(portal.box.userData.width / 2 - textProps.padding);
+  let yPosition = portal.box.position.y+portal.box.userData.height / 2 - textProps.padding*2;
+  const boxSize = getGeometrySize(portal.box.geometry);
+  const letterGeometries = [];
+  const letterMeshes = [];
+
+  let mat = getMaterial(textProps.matProps, portal.stencilRef);
+
+  constructMultiMergedGeometry(portal, textBoxProps.text, textProps.font, mat, textProps, textProps.meshProps, animProps);
+
+  if(listConfig != undefined){
+    portal.box.name = name;
+    createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
+  }else{
+    boxProps.parent.add(portal.box);
+  }
+
+  adjustBoxScaleRatio(portal.box, boxProps.parent);
+  if(boxProps.name==''){
+    boxProps.name='text-'+portal.box.id;
+  }
+  portal.box.name = boxProps.name;
+
+  if(animProps!=undefined){
+    //anim, action, duration, ease, delay, onComplete
+    multiAnimation(portal.box, portal.box.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
+  }
+  if(textBoxProps.onCreated!=undefined){
+    textBoxProps.onCreated(portal.box);
+  }
+
+}
+
+export function createMultiTextPortal(textBoxProps) {
+  if(typeof textBoxProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textBoxProps.textProps.font, (font) => {
+      textBoxProps.textProps.font = font;
+      MultiTextPortal(textBoxProps);
+    });
+  }else if(textBoxProps.textProps.font.isFont){
+    MultiTextPortal(textBoxProps);
+  }
+};
+
+function MultiScrollableTextBox(textBoxProps){
+  let boxProps = textBoxProps.boxProps;
+  let textProps = textBoxProps.textProps;
+  let listConfig = textBoxProps.listConfig;
+  let animProps = textBoxProps.animProps;
+  const cBox = contentBox(boxProps);
+  let mat = getMaterial(textProps.matProps, 0);
+
+
+  const mergedMesh = constructMultiTextMerged(cBox, textBoxProps.text, textProps.font, mat, textProps, textProps.meshProps, animProps);
+  cBox.box.add(mergedMesh);
+
+  if(listConfig != undefined){
     cBox.box.name = boxProps.name;
+    createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
+  }else{
+    boxProps.parent.add(cBox.box);
+  }
 
-    if(animProps!=undefined){
-      //anim, action, duration, ease, delay, onComplete
-      multiAnimation(cBox.box, cBox.box.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
-    }
-    if(onCreated!=undefined){
-      onCreated(cBox.box);
-    }
+  adjustBoxScaleRatio(cBox.box, boxProps.parent);
+  draggable.push(mergedMesh);
 
-  });
+  if(animProps!=undefined){
+    //anim, action, duration, ease, delay, onComplete
+    multiAnimation(cBox.box, mergedMesh.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
+  }
+  if(textBoxProps.onCreated!=undefined){
+    textBoxProps.onCreated(cBox.box);
+  }
+  //TEST
+  // let aConfig = animationConfig('SLIDE_RIGHT', 'OUT', 2, 'back.inOut', 0)
+  // setTimeout(() => {
+  //   multiAnimation(cBox.box, mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
+  // }, "4000");
+}
+
+export function createMultiScrollableTextBox(textBoxProps) {
+  if(typeof textBoxProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textBoxProps.textProps.font, (font) => {
+      textBoxProps.textProps.font = font;
+      MultiScrollableTextBox(textBoxProps);
+    });
+  }else if(textBoxProps.textProps.font.isFont){
+    MultiScrollableTextBox(textBoxProps);
+  }
 };
 
-export function createMultiTextPortal(boxProps, text, textProps=undefined,  animProps=undefined,  listConfig=undefined, onCreated=undefined) {
-  // Load the font
-  loader.load(textProps.font, (font) => {
-    const portal = portalWindow(boxProps);
-    let lineWidth = -(portal.box.userData.width / 2 - textProps.padding);
-    let yPosition = portal.box.position.y+portal.box.userData.height / 2 - textProps.padding*2;
-    const boxSize = getGeometrySize(portal.box.geometry);
-    const letterGeometries = [];
-    const letterMeshes = [];
+function MultiScrollableTextPortal(textBoxProps){
+  let boxProps = textBoxProps.boxProps;
+  let textProps = textBoxProps.textProps;
+  let listConfig = textBoxProps.listConfig;
+  let animProps = textBoxProps.animProps;
+  const portal = portalWindow(boxProps);
+  let mat = getMaterial(textProps.matProps, portal.stencilRef);
 
-    let mat = getMaterial(textProps.matProps, portal.stencilRef);
+  const mergedMesh = constructMultiTextMerged(portal, textBoxProps.text, textProps.font, mat, textProps, textProps.meshProps, animProps);
+  portal.box.add(mergedMesh);
+  mergedMesh.position.set(mergedMesh.position.x, mergedMesh.position.y, mergedMesh.position.z+textProps.zOffset);
 
-    constructMultiMergedGeometry(portal, text, font, mat, textProps, textProps.meshProps, animProps);
-
-    if(listConfig != undefined){
-      portal.box.name = name;
-      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-    }else{
-      boxProps.parent.add(portal.box);
-    }
-
-    adjustBoxScaleRatio(portal.box, boxProps.parent);
-    if(boxProps.name==''){
-      boxProps.name='text-'+portal.box.id;
-    }
+  if(listConfig != undefined){
     portal.box.name = boxProps.name;
+    createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
+  }else{
+    boxProps.parent.add(portal.box);
+  }
 
-    if(animProps!=undefined){
-      //anim, action, duration, ease, delay, onComplete
-      multiAnimation(portal.box, portal.box.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
-    }
-    if(onCreated!=undefined){
-      onCreated(portal.box);
-    }
+  adjustBoxScaleRatio(portal.box, boxProps.parent);
+  draggable.push(mergedMesh);
 
-  });
-};
+  if(animProps!=undefined){
+    //anim, action, duration, ease, delay, onComplete
+    multiAnimation(portal.box, mergedMesh.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
+  }
+  if(textBoxProps.onCreated!=undefined){
+    textBoxProps.onCreated(portal.box);
+  }
+  //TEST
+  // let aConfig = animationConfig('SLIDE_RIGHT', 'OUT', 2, 'back.inOut', 0)
+  // setTimeout(() => {
+  //   multiAnimation(cBox.box, mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
+  // }, "4000");
+}
 
-export function createMultiScrollableTextBox(boxProps, text, textProps=undefined,  animProps=undefined,  listConfig=undefined, onCreated=undefined) {
-  // Load the font
-  loader.load(textProps.font, (font) => {
-    const cBox = contentBox(boxProps);
-    let mat = getMaterial(textProps.matProps, 0);
-
-
-    const mergedMesh = constructMultiTextMerged(cBox, text, font, mat, textProps, textProps.meshProps, animProps);
-    cBox.box.add(mergedMesh);
-
-    if(listConfig != undefined){
-      cBox.box.name = boxProps.name;
-      createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-    }else{
-      boxProps.parent.add(cBox.box);
-    }
-
-    adjustBoxScaleRatio(cBox.box, boxProps.parent);
-    draggable.push(mergedMesh);
-
-    if(animProps!=undefined){
-      //anim, action, duration, ease, delay, onComplete
-      multiAnimation(cBox.box, mergedMesh.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
-    }
-    if(onCreated!=undefined){
-      onCreated(cBox.box);
-    }
-    //TEST
-    // let aConfig = animationConfig('SLIDE_RIGHT', 'OUT', 2, 'back.inOut', 0)
-    // setTimeout(() => {
-    //   multiAnimation(cBox.box, mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
-    // }, "4000");
-  });
-
-};
-
-export function createMultiScrollableTextPortal(boxProps, text, textProps=undefined,  animProps=undefined,  listConfig=undefined, onCreated=undefined) {
-  // Load the font
-  loader.load(textProps.font, (font) => {
-    const portal = portalWindow(boxProps);
-    let mat = getMaterial(textProps.matProps, portal.stencilRef);
-
-    const mergedMesh = constructMultiTextMerged(portal, text, font, mat, textProps, textProps.meshProps, animProps);
-    portal.box.add(mergedMesh);
-    mergedMesh.position.set(mergedMesh.position.x, mergedMesh.position.y, mergedMesh.position.z+textProps.zOffset);
-
-    if(listConfig != undefined){
-      portal.box.name = boxProps.name;
-      createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-    }else{
-      boxProps.parent.add(portal.box);
-    }
-
-    adjustBoxScaleRatio(portal.box, boxProps.parent);
-    draggable.push(mergedMesh);
-
-    if(animProps!=undefined){
-      //anim, action, duration, ease, delay, onComplete
-      multiAnimation(portal.box, mergedMesh.children, animProps.anim, animProps.action, animProps.duration, animProps.ease, animProps.delay, animProps.callback);
-    }
-    if(onCreated!=undefined){
-      onCreated(portal.box);
-    }
-    //TEST
-    // let aConfig = animationConfig('SLIDE_RIGHT', 'OUT', 2, 'back.inOut', 0)
-    // setTimeout(() => {
-    //   multiAnimation(cBox.box, mergedMesh.children, aConfig.anim, aConfig.action, aConfig.duration, aConfig.ease, aConfig.delay, aConfig.callback);
-    // }, "4000");
-  });
-
+export function createMultiScrollableTextPortal(textBoxProps) {
+  if(typeof textBoxProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textBoxProps.textProps.font, (font) => {
+      textBoxProps.textProps.font = font;
+      MultiScrollableTextPortal(textBoxProps);
+    });
+  }else if(textBoxProps.textProps.font.isFont){
+    MultiScrollableTextPortal(textBoxProps);
+  }
 };
 
 function constructMultiMergedGeometry(obj, text, font, material, textProps, animProps, scene = undefined){
