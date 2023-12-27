@@ -1981,7 +1981,8 @@ function handleCharacterGeometry(character, font, depth, lineWidth, yPosition, t
   } else {
 
     const geometry = createTextGeometry(character, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
-    geometry.translate(lineWidth, yPosition, depth+textProps.zOffset);
+    const charSize = getGeometrySize(geometry);
+    geometry.translate(lineWidth, yPosition, depth-charSize.depth*textProps.zOffset);
 
     // Calculate the width of the letter geometry
     let { width } = getGeometrySize(geometry);
@@ -1998,14 +1999,14 @@ function handleCharacterGeometry(character, font, depth, lineWidth, yPosition, t
 
 export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, text, textProps=undefined,  animProps=undefined) {
     let lineWidth = -(cBox.width / 2 - (textProps.padding));
-    let yPosition = cBox.height / 2 - (textProps.padding*2);
+    let yPosition = cBox.height / 2 ;
     const boxSize = getGeometrySize(cBox.box.geometry);
     let letterGeometries = [];
 
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
-      let geoHandler = handleCharacterGeometry(character, font, boxSize.depth, lineWidth, yPosition, textProps, letterGeometries);
+      let geoHandler = handleCharacterGeometry(character, font, boxSize.depth/2, lineWidth, yPosition, textProps, letterGeometries);
       lineWidth = geoHandler.lineWidth;
       letterGeometries = geoHandler.letterGeometries;
 
@@ -2306,7 +2307,7 @@ function MultiTextBox(textBoxProps){
 
   let mat = getMaterial(textProps.matProps, 0);
 
-  constructMultiMergedGeometry(cBox, textBoxProps.text, textProps.font, mat, textProps, textProps.meshProps, animProps);
+  constructMultiMergedGeometry(cBox, textBoxProps.text, textProps.font, mat, textProps, animProps);
 
   if(listConfig != undefined){
     cBox.box.name = name;
@@ -2355,8 +2356,11 @@ function MultiTextPortal(textBoxProps){
   const letterMeshes = [];
 
   let mat = getMaterial(textProps.matProps, portal.stencilRef);
+  setupStencilMaterial(portal.box.material, portal.stencilRef);
+  setupStencilChildMaterial(mat, portal.stencilRef);
 
-  constructMultiMergedGeometry(portal, textBoxProps.text, textProps.font, mat, textProps, textProps.meshProps, animProps);
+
+  constructMultiMergedGeometry(portal, textBoxProps.text, textProps.font, mat, textProps, animProps);
 
   if(listConfig != undefined){
     portal.box.name = name;
@@ -2402,7 +2406,7 @@ function MultiScrollableTextBox(textBoxProps){
   let mat = getMaterial(textProps.matProps, 0);
 
 
-  const mergedMesh = constructMultiTextMerged(cBox, textBoxProps.text, textProps.font, mat, textProps, textProps.meshProps, animProps);
+  const mergedMesh = constructMultiTextMerged(cBox, textBoxProps.text, textProps.font, mat, textProps, animProps);
   cBox.box.add(mergedMesh);
 
   if(listConfig != undefined){
@@ -2449,7 +2453,7 @@ function MultiScrollableTextPortal(textBoxProps){
   const portal = portalWindow(boxProps);
   let mat = getMaterial(textProps.matProps, portal.stencilRef);
 
-  const mergedMesh = constructMultiTextMerged(portal, textBoxProps.text, textProps.font, mat, textProps, textProps.meshProps, animProps);
+  const mergedMesh = constructMultiTextMerged(portal, textBoxProps.text, textProps.font, mat, textProps, animProps);
   portal.box.add(mergedMesh);
   mergedMesh.position.set(mergedMesh.position.x, mergedMesh.position.y, mergedMesh.position.z+textProps.zOffset);
 
@@ -2543,7 +2547,7 @@ function constructMultiMergedGeometry(obj, text, font, material, textProps, anim
 
 function constructMultiMergedScrollableGeometry(obj, text, font, material, textProps, animProps, scene = undefined){
   let lineWidth = -(obj.box.userData.width / 2 - textProps.padding);
-  let yPosition = obj.box.userData.height / 2 - textProps.padding;
+  let yPosition = obj.box.userData.height / 2 - textProps.padding/2;
   const letterGeometries = [];
   const letterMeshes = [];
   const cubes = [];
@@ -2562,10 +2566,10 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
         const geometry = createTextGeometry(character, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
         const cube = new THREE.BoxGeometry(textProps.size*2, textProps.size*2, textProps.height);
 
-        cube.translate((textProps.size/2)+lineWidth, (textProps.size/2)+yPosition, 0);
+        cube.translate((textProps.size/2)+lineWidth, (textProps.size/2)+yPosition, obj.box.userData.depth/2*textProps.zOffset);
 
         const letterMesh = new THREE.Mesh(geometry, material);
-        letterMesh.position.set(lineWidth, yPosition, 0);
+        letterMesh.position.set(lineWidth, yPosition, obj.box.userData.depth/2*textProps.zOffset);
 
         if(animProps!=undefined){
           letterMesh.material.transparent=true;
@@ -2601,7 +2605,7 @@ function constructMultiMergedScrollableGeometry(obj, text, font, material, textP
 }
 
 function constructMultiTextMerged(obj, text, font, material, textProps, animProps, scene = undefined){
-    const merged = constructMultiMergedScrollableGeometry(obj, text, font, material, textProps, textProps.meshProps, animProps, scene);
+    const merged = constructMultiMergedScrollableGeometry(obj, text, font, material, textProps, animProps, scene);
     const mergedMesh = new THREE.Mesh(merged.geometry, transparentMaterial());
 
     const boxSize = getGeometrySize(obj.box.geometry);
@@ -2710,21 +2714,42 @@ function selectionText(boxProps, text, value, font, textProps, animProps=undefin
   return {textMesh, cBox}
 }
 
-export function textInputProperties(name='', btnText='Button', padding=0.01, textProps=undefined, font=undefined, matProps=undefined, buttonProps=undefined){
+function TextInputBoxProperties(parent, portal=false){
+  let matProps = phongMatProperties('black');
+  if(portal){
+    matProps = phongStencilMatProperties('black');
+  }
+  return boxProperties('input-box-properties', parent, 'black', 4, 2, 0.2, 10, 0.4, 0.25, true, matProps);
+}
+
+export function defaultTextInputBoxProps(parent=undefined){
+  return TextInputBoxProperties(parent);
+};
+
+export function defaultTextInputPortalBoxProps(parent=undefined){
+  return TextInputBoxProperties(parent, true);
+};
+
+export function textInputProperties(boxProps=defaultTextInputBoxProps(), name='', padding=0.01, textProps=undefined, matProps=undefined, buttonProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, isPortal=false){
   return {
+    'type': 'INPUT_TEXT',
+    'boxProps': boxProps,
     'name': name,
-    'btnText': btnText,
     'padding': padding,
     'textProps': textProps,
-    'font': font,
     'matProps': matProps,
-    'buttonProps': buttonProps
+    'buttonProps': buttonProps,
+    'animProps': animProps,
+    'listConfig': listConfig,
+    'onCreated': onCreated,
+    'isPortal': isPortal
   }
 };
 
-function handleTextInputSetup(inputProps, textProps, font){
+function handleTextInputSetup(inputProps){
   inputPrompts.push(inputProps.textMesh);
-  const tProps = editTextProperties(inputProps.Box, '', inputProps.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps);
+  const textProps = inputProps.Box.box.userData.properties.textProps;
+  const tProps = editTextProperties(inputProps.Box, '', inputProps.textMesh, textProps.font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps);
   inputProps.textMesh.userData.textProps = tProps;
   inputProps.Box.box.userData.mouseOverParent = true;
   inputProps.Box.box.userData.currentText = '';
@@ -2757,81 +2782,134 @@ function handleInputTextBoxProps(boxProps, widgetProps){
 function attachButton(widget, boxProps, widgetProps, baseWidth, baseHeight, baseDepth){
   boxProps.parent = widget.Box.box;
   widgetProps.buttonProps.boxProps = boxProps;
-  widgetProps.buttonProps.font = widgetProps.font;
+  widgetProps.buttonProps.font = widgetProps.textProps.font;
+
   let btn = undefined;
   if(!widgetProps.buttonProps.portal){
+    
     btn = ButtonElement(widgetProps.buttonProps);
   }else{
     btn = PortalButtonElement(widgetProps.buttonProps);
   }
+  
+  let b = btn.box;
+  if(btn.box == undefined){
+    b = btn.cBox.box;
+  }
 
   if(widgetProps.buttonProps.attach == 'RIGHT'){
-    btn.cBox.box.position.set(baseWidth/2+boxProps.width/2, btn.cBox.box.position.y, -baseDepth/2+boxProps.depth/2);
+    b.position.set(baseWidth/2+boxProps.width/2, b.position.y, -baseDepth/2+boxProps.depth/2);
   }else if(widgetProps.buttonProps.attach == 'BOTTOM'){
-    btn.box.position.set(btn.box.position.x, -(baseHeight/2+boxProps.height/2), -baseDepth/2+boxProps.depth/2);
+    
+    b.position.set(b.position.x, -(baseHeight/2+boxProps.height/2), -baseDepth/2+boxProps.depth/2);
   }
   
 }
 
-export function createTextInput(boxProps, text, textInputProps,  animProps=undefined, onCreated=undefined) {
-  loader.load(textInputProps.font, (font) => {
-    textInputProps.font = font;
+function TextInput(textInputProps){
+  let props = handleInputTextBoxProps(textInputProps.boxProps, textInputProps);
 
-    let props = handleInputTextBoxProps(boxProps, textInputProps);
+  let input = selectionTextBox(props.inputBoxProps, textInputProps.name, textInputProps.textProps.font, textInputProps.textProps, textInputProps.animProps, textInputProps.onCreated);
+  mouseOverable.push(input.textMesh);
 
-    let input = selectionTextBox(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
-    mouseOverable.push(input.textMesh);
+  if(textInputProps.buttonProps != undefined){
+    attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth);
+  }
 
-    if(textInputProps.buttonProps != undefined){
-      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth);
-    }
+  input.Box.box.userData.properties = textInputProps;
 
-    handleTextInputSetup(input, textInputProps.textProps, font);
-  });
+  handleTextInputSetup(input);
+}
+
+export function createTextInput(textInputProps) {
+  if(typeof textInputProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textInputProps.textProps.font, (font) => {
+      textInputProps.textProps.font = font;
+      TextInput(textInputProps);
+    });
+  }else if(textInputProps.textProps.font.isFont){
+    TextInput(textInputProps);
+  }
 };
 
-export function createScrollableTextInput(boxProps, text, textInputProps,  animProps=undefined, onCreated=undefined) {
-  loader.load(textInputProps.font, (font) => {
-    textInputProps.font = font;
-    let props = handleInputTextBoxProps(boxProps, textInputProps);
-    let input = selectionTextBox(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
+function ScrollableTextInput(textInputProps) {
+  let props = handleInputTextBoxProps(textInputProps.boxProps, textInputProps);
+  let input = selectionTextBox(props.inputBoxProps, textInputProps.name, textInputProps.textProps.font, textInputProps.textProps, textInputProps.animProps, textInputProps.onCreated);
 
-    if(textInputProps.buttonProps != undefined){
-      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth);
-    }
+  if(textInputProps.buttonProps != undefined){
+    attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth);
+  }
 
-    handleTextInputSetup(input, textInputProps.textProps, font);
-  });
+  input.Box.box.userData.properties = textInputProps;
+
+  handleTextInputSetup(input);
+}
+
+//TODO: Need to fix Scrolling!!
+export function createScrollableTextInput(textInputProps) {
+  if(typeof textInputProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textInputProps.textProps.font, (font) => {
+      textInputProps.textProps.font = font;
+      ScrollableTextInput(textInputProps);
+    });
+  }else if(textInputProps.textProps.font.isFont){
+    ScrollableTextInput(textInputProps);
+  }
 };
 
-export function createTextInputPortal(boxProps, text, textInputProps,  animProps=undefined, onCreated=undefined) {
-  loader.load(textInputProps.font, (font) => {
-    textInputProps.font = font;
-    let props = handleInputTextBoxProps(boxProps, textInputProps);
-    //selectionTextPortal(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined)
-    let input = selectionTextPortal(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
-    mouseOverable.push(input.textMesh);
+function TextInputPortal(textInputProps){
+  let props = handleInputTextBoxProps(textInputProps.boxProps, textInputProps);
+  let input = selectionTextPortal(props.inputBoxProps, textInputProps.name, textInputProps.textProps.font, textInputProps.textProps, textInputProps.animProps, textInputProps.onCreated);
+  mouseOverable.push(input.textMesh);
 
-    if(textInputProps.buttonProps != undefined){
-      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth)
-    }
+  if(textInputProps.buttonProps != undefined){
+    attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth);
+  }
 
-    handleTextInputSetup(input, textInputProps.textProps, font);
-  });
+  input.Box.box.userData.properties = textInputProps;
+
+  handleTextInputSetup(input);
+}
+
+export function createTextInputPortal(textInputProps) {
+  if(typeof textInputProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textInputProps.textProps.font, (font) => {
+      textInputProps.textProps.font = font;
+      TextInputPortal(textInputProps);
+    });
+  }else if(textInputProps.textProps.font.isFont){
+    TextInputPortal(textInputProps);
+  }
 };
 
-export function createScrollableTextInputPortal(boxProps, text, textInputProps,  animProps=undefined, onCreated=undefined) {
-  loader.load(textInputProps.font, (font) => {
-    textInputProps.font = font;
-    let props = handleInputTextBoxProps(boxProps, textInputProps);
-    let input = selectionTextPortal(props.inputBoxProps, text, font, textInputProps.textProps, animProps, onCreated);
+//TODO: Scrolling is broken, needs to be fixed
+function ScrollableTextInputPortal(textInputProps) {
+  let props = handleInputTextBoxProps(textInputProps.boxProps, textInputProps);
+  let input = selectionTextPortal(props.inputBoxProps, textInputProps.name, textInputProps.textProps.font, textInputProps.textProps, textInputProps.animProps, textInputProps.onCreated);
 
-    if(textInputProps.buttonProps != undefined){
-      attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth)
-    }
+  if(textInputProps.buttonProps != undefined){
+    attachButton(input, props.btnBoxProps, textInputProps, props.inputBoxProps.width, props.inputBoxProps.height, props.inputBoxProps.depth)
+  }
 
-    handleTextInputSetup(input, textInputProps.textProps, font);
-  });
+  input.Box.box.userData.properties = textInputProps;
+  input.textMesh.userData.draggable=true;
+
+  handleTextInputSetup(input);
+}
+
+export function createScrollableTextInputPortal(textInputProps) {
+  if(typeof textInputProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(textInputProps.textProps.font, (font) => {
+      textInputProps.textProps.font = font;
+      ScrollableTextInputPortal(textInputProps);
+    });
+  }else if(textInputProps.textProps.font.isFont){
+    ScrollableTextInputPortal(textInputProps);
+  }
 };
 
 function onSelectorChoice(selection){
@@ -2944,7 +3022,7 @@ function ButtonElement(buttonProps){
 function PortalButtonElement(buttonProps){
   const portal = portalWindow(buttonProps.boxProps);
   const stencilRef = portal.box.material.stencilRef;
-  setupStencilChildMaterial(portal.box.material, stencilRef);
+  setupStencilMaterial(portal.box.material, stencilRef);
   let txtMesh = ButtonElement(buttonProps);
   const textSize = getGeometrySize(txtMesh.textMesh.geometry);
 
