@@ -130,8 +130,12 @@ function RoundedBoxGeometry(width, height, depth, radius, smoothness, zOffset=1)
   geometry.computeVertexNormals();
 
 
-
   return geometry
+}
+
+function addMorphToGeometry(geometry, morphGeometry, morphName){
+  let verts  = [...morphGeometry.attributes.position.array];
+  geometry.morphAttributes[Object.keys(geometry.morphAttributes).length-1] = {name: morphName, vertices: verts};
 }
 
 export function attachToInnerTop(parent, elem, depth){
@@ -583,8 +587,10 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
     });
 
     elem.userData.open = true;
+    let portalScale = 1*(elem.userData.selectors.length+1);
     if(anim=='CLOSE'){
       elem.userData.open = false;
+      portalScale = 1;
     }
 
     if(anim=='OPEN' || anim=='CLOSE'){
@@ -594,6 +600,11 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
         gsap.to(current.position, props);
         props = { duration: duration, x: scales[i], y: scales[i], z: scales[i], ease: easeIn };
         gsap.to(current.scale, props);
+      }
+
+      if(elem.userData.properties.isPortal){
+        let props = { duration: duration, x: 1, y: portalScale, z: 1, ease: easeIn };
+        gsap.to(elem.userData.portal.scale, props);
       }
     }
 
@@ -1130,7 +1141,7 @@ function setGeometryPivot(mesh, boxProps){
       mesh.pivot = new THREE.Vector3(boxProps.width, boxProps.height, boxProps.depth/2);
       break;
     default:
-      mesh.pivot = new THREE.Vector3(-boxProps.width/2, boxProps.height/2, boxProps.depth/2);
+      //mesh.pivot = new THREE.Vector3(boxProps.width/2, boxProps.height/2, boxProps.depth/2);
   }
 }
 
@@ -1296,7 +1307,6 @@ function handleMeshViewScene(meshView, mainScene, mainCam, activate){
     mainCam.layers.set(0);
     mainScene.add(mainCam);
     mainScene.add(meshView.box.parent);
-
   }
 }
 
@@ -1445,19 +1455,19 @@ function PanelElement(panelProps){
 
   if(panelProps.attach == 'CENTER'){
 
-    panel = selectionText(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
+    panel = buttonBase(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
     panel.cBox.box.position.set(parentSize.width/2, parentSize.height/2, parentSize.depth);
     
   }else if(panelProps.attach == 'LEFT'){
 
     panelProps.boxProps.pivot = 'RIGHT';
-    panel = selectionText(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
+    panel = buttonBase(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
     panel.cBox.box.position.set(-(parentSize.width/2+panel.cBox.width/2), parentSize.height/2-panel.cBox.height/2, parentSize.depth);
 
   }else if(panelProps.attach == 'RIGHT'){
 
     panelProps.boxProps.pivot = 'LEFT';
-    panel = selectionText(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
+    panel = buttonBase(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.font, panelProps.textProps);
     panel.cBox.box.position.set(parentSize.width/2+panel.cBox.width/2, parentSize.height/2-panel.cBox.height/2, parentSize.depth);
 
   }
@@ -2688,7 +2698,7 @@ function selectionTextPortal(boxProps, text, font, textProps=undefined,  animPro
   return {textMesh, Box}
 }
 
-function selectionText(boxProps, text, value, font, textProps, animProps=undefined, onCreated=undefined){
+function buttonBase(boxProps, text, value, font, textProps, animProps=undefined, onCreated=undefined){
 
   const textGeometry = createMergedTextGeometry(font, boxProps.width, boxProps.height, text, textProps, animProps);
   textGeometry.center();
@@ -2930,46 +2940,123 @@ function onSelectorChoice(selection){
 
 }
 
-export function createListSelector(selectors, boxProps, text, textProps=undefined,  animProps=undefined, onCreated=undefined) {
-  loader.load(textProps.font, (font) => {
-    const cBox = contentBox(boxProps);
-    selectorUserData(cBox.box);
-    let idx = 0;
+export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', padding=0.01, textProps=undefined, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, isPortal=false){
+  return {
+    'type': 'LIST_SELECTOR',
+    'boxProps': boxProps,
+    'name': name,
+    'padding': padding,
+    'textProps': textProps,
+    'matProps': matProps,
+    'animProps': animProps,
+    'listConfig': listConfig,
+    'onCreated': onCreated,
+    'isPortal': isPortal
+  }
+};
 
-    for (const [key, val] of Object.entries(selectors)) {
-      let selText = selectionText(boxProps, key, val, font, textProps, animProps, onCreated);
-      const tProps = editTextProperties(selText.cBox, '', selText.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
-      selText.textMesh.userData.textProps = tProps;
-      inputPrompts.push(selText.textMesh);
-      mouseOverable.push(selText.textMesh);
-      clickable.push(selText.textMesh);
-      selText.cBox.box.name = key;
+function ListSelector(listSelectorProps, selectors){
+  const isPortal = listSelectorProps.isPortal;
+  let mainBoxProps = {...listSelectorProps.boxProps};
+  let mainMatProps = {...listSelectorProps.matProps};
+  mainBoxProps.matProps = mainMatProps;
+  let portalBoxProps = {...listSelectorProps.boxProps};
+  let portalMatProps = {...listSelectorProps.matProps};
+  portalBoxProps.matProps = portalMatProps;
+  let btnBoxProps = {...listSelectorProps.boxProps};
+  let btnMatProps = {...listSelectorProps.matProps};
+  let btnTextProps = {...listSelectorProps.textProps};
+  btnBoxProps.matProps = btnMatProps;
+  let portal = undefined;
+
+  if(isPortal){
+    portalBoxProps.matProps.userCase = 'STENCIL';
+    mainBoxProps.matProps.useCase = 'STENCIL_CHILD';
+    btnBoxProps.matProps.useCase = 'STENCIL_CHILD';
+    btnTextProps.matProps.useCase = 'STENCIL_CHILD';
+    portal = portalWindow(portalBoxProps);
+    darkenMaterial(portal.box.material, 30);
+    listSelectorProps.boxProps.parent.add(portal.box);
+  }
+
+
+  let textProps = listSelectorProps.textProps;
+  let cBox = contentBox(mainBoxProps);
+
+  selectorUserData(cBox.box);
+  let idx = 0;
+
+  for (const [key, val] of Object.entries(selectors)) {
+    let btn = buttonBase(btnBoxProps, key, val, btnTextProps.font, btnTextProps, listSelectorProps.animProps, listSelectorProps.onCreated);
+    let selector = btn.cBox;
+    let textMesh = btn.textMesh;
+
+    const tProps = editTextProperties(selector, '', btnTextProps.textMesh, btnTextProps.font, btnTextProps.size, btnTextProps.height, btnTextProps.zOffset, btnTextProps.letterSpacing, btnTextProps.lineSpacing, btnTextProps.wordSpacing, btnTextProps.padding, true, btnTextProps.meshProps);
+    textMesh.userData.textProps = tProps;
+    inputPrompts.push(textMesh);
+    mouseOverable.push(textMesh);
+    clickable.push(textMesh);
+    selector.box.name = key;
+    
+    selectorTextUserData(btn, key, val, idx, listSelectorProps.boxProps);
+    mouseOverUserData(textMesh);
+
+    cBox.box.userData.selectors.push(selector.box);
+    selectorElems.push(selector.box);
+    cBox.box.add(selector.box);
       
-      selectorTextUserData(selText, key, val, idx, boxProps);
-      mouseOverUserData(selText.textMesh);
+    textMesh.addEventListener('action', function(event) {
+      onSelectorChoice(textMesh)
+    });
 
-      cBox.box.userData.selectors.push(selText.cBox.box);
-      selectorElems.push(selText.cBox.box);
-      cBox.box.add(selText.cBox.box);
-      
-      selText.textMesh.addEventListener('action', function(event) {
-        onSelectorChoice(selText.textMesh)
-      });
+    if(idx==0){
+      textMesh.userData.selected = true;
+      selector.box.position.copy(selector.box.userData.selectedPos);
 
-      if(idx==0){
-        selText.textMesh.userData.selected = true;
-        selText.cBox.box.position.copy(selText.cBox.box.userData.selectedPos);
-
-      }else{
-        selText.cBox.box.position.copy(selText.cBox.box.userData.unselectedPos);
-        selText.cBox.box.scale.set(cBox.box.unselectedScale, cBox.box.unselectedScale, cBox.box.unselectedScale);
-      }
-
-      idx+=1;
+    }else{
+      selector.box.position.copy(selector.box.userData.unselectedPos);
+      selector.box.scale.set(cBox.box.unselectedScale, cBox.box.unselectedScale, cBox.box.unselectedScale);
     }
 
-    boxProps.parent.add(cBox.box);
-  });
+    if(portal!=undefined){
+      selector.box.material.stencilRef = portal.box.material.stencilRef;
+      selector.box.material.depthWrite = true;
+      textMesh.material.stencilRef = portal.box.material.stencilRef;
+      textMesh.material.depthWrite = true;
+    }
+
+    idx+=1;
+  }
+
+  if(portal!=undefined){
+    cBox.box.userData.portal = portal.box;
+    portal.box.position.set(portal.box.position.x, portal.box.position.y, -cBox.depth);
+    cBox.box.position.set(cBox.box.position.x, cBox.box.position.y, portal.box.position.z-(cBox.depth*2));
+  }
+
+  cBox.box.userData.properties = listSelectorProps;
+  console.log(cBox.box)
+
+  listSelectorProps.boxProps.parent.add(cBox.box);
+}
+
+export function createListSelector(listSelectorProps, selectors) {
+
+  if(typeof listSelectorProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(listSelectorProps.textProps.font, (font) => {
+      listSelectorProps.textProps.font = font;
+      ListSelector(listSelectorProps, selectors);
+    });
+  }else if(listSelectorProps.textProps.font.isFont){
+    ListSelector(listSelectorProps, selectors);
+  }
+
+};
+
+export function createListSelectorPortal(listSelectorProps, selectors) {
+  listSelectorProps.isPortal = true;
+  createListSelector(listSelectorProps, selectors);
 };
 
 function selectorTextUserData(selText, key, value, index, boxProps){
@@ -3003,7 +3090,7 @@ export function buttonProperties(boxProps, font, name='Button', value='', paddin
 };
 
 function ButtonElement(buttonProps){
-  let textMesh = selectionText(buttonProps.boxProps, buttonProps.name, buttonProps.value, buttonProps.font, buttonProps.textProps);
+  let textMesh = buttonBase(buttonProps.boxProps, buttonProps.name, buttonProps.value, buttonProps.font, buttonProps.textProps);
   let textProps = buttonProps.textProps;
   const tProps = editTextProperties(textMesh.cBox, '', textMesh.textMesh, buttonProps.font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
   textMesh.cBox.box.userData.textProps = tProps;
