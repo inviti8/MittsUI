@@ -1343,6 +1343,8 @@ export function renderMeshView(meshView, mainScene, mainCam, renderer){
 }
 
 function calculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDivisor, defaultSubOffset=0.65){
+  console.log("boxProps====")
+  console.log(boxProps)
   let subOffset = 1;
   if(useSubObject){
     subOffset = defaultSubOffset;
@@ -1558,23 +1560,23 @@ export function contentPanel(panelProps){
   });
 };
 
-export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
-  let size = calculateWidgetSize(boxProps, widgetProps.horizontal, widgetProps.useValueText, handleSize);
+export function switchWidgetBox(widgetProps, handleSize=2){
+  let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, handleSize);
   
-  let handleMat = getMaterial(boxProps.matProps, boxProps.parent.material.stencilRef);
-  let baseMat = getMaterial(boxProps.matProps, boxProps.parent.material.stencilRef);
-  let mat = boxProps.parent.material;
+  let handleMat = getMaterial(widgetProps.boxProps.matProps, widgetProps.boxProps.parent.material.stencilRef);
+  let baseMat = getMaterial(widgetProps.boxProps.matProps, widgetProps.boxProps.parent.material.stencilRef);
+  let mat = widgetProps.boxProps.parent.material;
   darkenMaterial(baseMat, 10);
 
   let handleGeometry = new THREE.BoxGeometry(size.handleWidth, size.handleHeight, size.handleDepth);
   let baseGeometry = new THREE.BoxGeometry(size.baseWidth, size.baseHeight, size.baseDepth/2);
 
-  if(boxProps.complexMesh){
-    handleGeometry = RoundedBoxGeometry(size.handleWidth, size.handleHeight, size.handleDepth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
-    if(boxProps.depth == 0){
-      baseGeometry = RoundedPlaneGeometry(size.baseWidth, size.baseHeight, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+  if(widgetProps.boxProps.complexMesh){
+    handleGeometry = RoundedBoxGeometry(size.handleWidth, size.handleHeight, size.handleDepth, widgetProps.boxProps.radius, widgetProps.boxProps.smoothness, widgetProps.boxProps.zOffset);
+    if(widgetProps.boxProps.depth == 0){
+      baseGeometry = RoundedPlaneGeometry(size.baseWidth, size.baseHeight, widgetProps.boxProps.radius, widgetProps.boxProps.smoothness, widgetProps.boxProps.zOffset);
     }else{
-      baseGeometry = RoundedBoxGeometry(size.baseWidth, size.baseHeight, size.baseDepth/2, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+      baseGeometry = RoundedBoxGeometry(size.baseWidth, size.baseHeight, size.baseDepth/2, widgetProps.boxProps.radius, widgetProps.boxProps.smoothness, widgetProps.boxProps.zOffset);
     }
   }
 
@@ -1591,7 +1593,7 @@ export function switchWidgetBox(boxProps, widgetProps, handleSize=2){
   base.userData.horizontal = widgetProps.horizontal;
   base.userData.hasSubObject = widgetProps.useValueText;
 
-  let result = { 'base': base, 'handle': handle,  'width': boxProps.width, 'height': boxProps.height, 'padding': widgetProps.padding}
+  let result = { 'base': base, 'handle': handle,  'width': widgetProps.boxProps.width, 'height': widgetProps.boxProps.height, 'padding': widgetProps.padding}
 
 
   return result
@@ -1700,7 +1702,7 @@ export function editValueTextPortal(text, font, boxProps, widgetProps, widget=un
 function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
   let valBoxProps = {...boxProps};
   let valMatProps = materialProperties('BASIC', widget.handle.material.color, false, 1, THREE.FrontSide, 'STENCIL');
-  let size = calculateWidgetSize(boxProps, widgetProps.horizontal, widgetProps.useValueText);
+  let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText);
 
   valBoxProps.matProps = valMatProps;
 
@@ -1716,9 +1718,9 @@ function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
 
   let defaultVal = widget.base.userData.valueProps.defaultValue.toString();
   if(widget.base.userData.valueProps.editable){
-    valBox = editValueTextPortal(defaultVal, widgetProps.font, valBoxProps, widgetProps, widget);
+    valBox = editValueTextPortal(defaultVal, widgetProps.textProps.font, valBoxProps, widgetProps, widget);
   }else{
-    valBox = valueTextPortal(defaultVal, widgetProps.font, valBoxProps, widgetProps, widget);
+    valBox = valueTextPortal(defaultVal, widgetProps.textProps.font, valBoxProps, widgetProps, widget);
   }
   valBox.box.userData.size = {'width': size.subWidth, 'height': size.subHeight, 'depth': size.subDepth};
   widget.base.add(valBox.box);
@@ -1734,13 +1736,13 @@ function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
 
 export function sliderBox(boxProps, sliderProps){
 
-  let slider = switchWidgetBox(boxProps, sliderProps, 8);
-  let size = calculateWidgetSize(boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
+  let slider = switchWidgetBox(sliderProps, 8);
+  let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
 
-  setSliderUserData(slider, boxProps, sliderProps);
+  setSliderUserData(slider, sliderProps.boxProps, sliderProps);
 
   if(slider.base.userData.hasSubObject){
-    attachValueBox(slider, boxProps, sliderProps, size.baseWidth, size.baseHeight)
+    attachValueBox(slider, sliderProps.boxProps, sliderProps, size.baseWidth, size.baseHeight)
   }
   
   return slider
@@ -1819,7 +1821,7 @@ function onSliderMove(slider){
 }
 
 function setSliderUserData(slider, boxProps, sliderProps){
-  let size = calculateWidgetSize(boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
+  let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
 
   slider.base.userData.type = 'SLIDER';
   //slider.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': size.baseDepth};
@@ -1862,8 +1864,10 @@ export function stringValueProperties(defaultValue='Off', onValue='On', offValue
   }
 };
 
-export function toggleProperties(name='', horizontal=true, on=false, padding=0.01, textProps=undefined, font=undefined, useValueText=true, valueProps=stringValueProperties()){
+export function toggleProperties(boxProps, name='', horizontal=true, on=false, padding=0.01, textProps=undefined, font=undefined, useValueText=true, valueProps=stringValueProperties(), matProps=undefined, animProps=undefined, listConfig=undefined){
   return {
+    'type': 'TOGGLE',
+    'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
     'on': on,
@@ -1871,19 +1875,21 @@ export function toggleProperties(name='', horizontal=true, on=false, padding=0.0
     'textProps': textProps,
     'font': font,
     'useValueText': useValueText,
-    'valueProps': valueProps
+    'valueProps': valueProps,
+    'matProps': matProps,
+    'animProps': animProps,
+    'listConfig': listConfig,
   }
 };
 
-export function toggleBox(boxProps, toggleProps){
+export function toggleBase(toggleProps){
+  let toggle = switchWidgetBox(toggleProps, 2);
+  let size = calculateWidgetSize(toggleProps.boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
 
-  let toggle = switchWidgetBox(boxProps, toggleProps, 2);
-  let size = calculateWidgetSize(boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
-
-  setToggleUserData(toggle, boxProps, toggleProps);
+  setToggleUserData(toggle, toggleProps);
 
   if(toggle.base.userData.hasSubObject){
-    attachValueBox(toggle, boxProps, toggleProps, size.baseWidth, size.baseHeight)
+    attachValueBox(toggle, toggleProps.boxProps, toggleProps, size.baseWidth, size.baseHeight)
   }
 
   return toggle
@@ -1908,11 +1914,11 @@ function handleToggleValueText(toggle){
   }
 }
 
-function setToggleUserData(toggle, boxProps, toggleProps){
-  let size = calculateWidgetSize(boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
+function setToggleUserData(toggle, toggleProps){
+  let size = calculateWidgetSize(toggleProps.boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
 
   toggle.base.userData.type = 'TOGGLE';
-  toggle.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': size.baseDepth};
+  toggle.base.userData.size = {'width': toggleProps.boxProps.width, 'height': toggleProps.boxProps.height, 'depth': size.baseDepth};
   toggle.base.userData.handle = toggle.handle;
   toggle.base.userData.horizontal = toggleProps.horizontal;
   toggle.base.userData.valueProps = toggleProps.valueProps;
@@ -3035,7 +3041,6 @@ function ListSelector(listSelectorProps, selectors){
   }
 
   cBox.box.userData.properties = listSelectorProps;
-  console.log(cBox.box)
 
   listSelectorProps.boxProps.parent.add(cBox.box);
 }
@@ -3196,37 +3201,56 @@ export function createSliderBox(boxProps, sliderProps, textProps,  animProps=und
   });
 };
 
-export function createToggleBox(boxProps, toggleProps, textProps, animProps=undefined, onCreated=undefined, horizontal=true) {
-  loader.load(textProps.font, (font) => {
-    toggleProps.font = font;
-    const parentSize = getGeometrySize(boxProps.parent.geometry);
-    let toggle = toggleBox(boxProps, toggleProps);
-    boxProps.parent.add(toggle.base);
-    toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
-    toggles.push(toggle.handle);
+function ToggleBox(toggleProps){
+  const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
+  let toggle = toggleBase(toggleProps);
+  toggleProps.boxProps.parent.add(toggle.base);
+  toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
+  toggles.push(toggle.handle);
 
-    createWidgetText(font, boxProps, toggleProps.name, textProps, animProps, onCreated, horizontal);
+  createWidgetText(toggleProps.textProps.font, toggleProps.boxProps, toggleProps.name, toggleProps.textProps, toggleProps.animProps, toggleProps.onCreated, toggleProps.horizontal);
+}
 
-  });
+export function createToggleBox(toggleProps) {
+
+  if(typeof toggleProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(toggleProps.textProps.font, (font) => {
+      toggleProps.textProps.font = font;
+      ToggleBox(toggleProps);
+
+    });
+  }else if(toggleProps.textProps.font.isFont){
+    ToggleBox(toggleProps);
+  }
 };
 
-export function createTogglePortal(boxProps, toggleProps, textProps, animProps=undefined, onCreated=undefined, horizontal=true) {
-  loader.load(textProps.font, (font) => {
-    toggleProps.font = font;
-    const parentSize = getGeometrySize(boxProps.parent.geometry);
-    let stencilRef = getStencilRef();
-    let toggle = toggleBox(boxProps, textProps.padding, horizontal);
-    setupStencilMaterial(toggle.base.material, stencilRef);
-    setupStencilChildMaterial(toggle.handle.material, stencilRef);
-    toggle.base.material.depthWrite = false;
-    toggle.handle.material.depthWrite = false;
-    boxProps.parent.add(toggle.base);
-    toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
-    toggles.push(toggle.handle);
+function TogglePortal(toggleProps) {
+  const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
+  let stencilRef = getStencilRef();
+  let toggle = toggleBase(toggleProps);
+  setupStencilMaterial(toggle.base.material, stencilRef);
+  setupStencilChildMaterial(toggle.handle.material, stencilRef);
+  toggle.base.material.depthWrite = false;
+  toggle.handle.material.depthWrite = false;
+  toggleProps.boxProps.parent.add(toggle.base);
+  toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
+  toggles.push(toggle.handle);
 
-    createWidgetText(font, boxProps, toggleProps.title, textProps, textProps.meshProps, animProps, onCreated, horizontal);
+  createWidgetText(toggleProps.textProps.font, toggleProps.boxProps, toggleProps.name, toggleProps.textProps, toggleProps.textProps.meshProps, toggleProps.animProps, toggleProps.onCreated, toggleProps.horizontal);
+}
 
-  });
+export function createTogglePortal(toggleProps) {
+
+  if(typeof toggleProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(toggleProps.textProps.font, (font) => {
+      toggleProps.textProps.font = font;
+      TogglePortal(toggleProps);
+    });
+  }else if(toggleProps.textProps.font.isFont){
+    TogglePortal(toggleProps);
+  }
 };
 
 
