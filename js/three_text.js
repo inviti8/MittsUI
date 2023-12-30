@@ -994,10 +994,6 @@ export function setupStencilChildMaterial(mat, stencilRef){
 
 export function stencilMaterial(matProps){
   let stencilRef = getStencilRef();
-
-  console.log("stencilRef")
-  console.log(stencilRef)
-
   return getMaterial(matProps, stencilRef);
 };
 
@@ -1343,8 +1339,6 @@ export function renderMeshView(meshView, mainScene, mainCam, renderer){
 }
 
 function calculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDivisor, defaultSubOffset=0.65){
-  console.log("boxProps====")
-  console.log(boxProps)
   let subOffset = 1;
   if(useSubObject){
     subOffset = defaultSubOffset;
@@ -1592,6 +1586,7 @@ export function switchWidgetBox(widgetProps, handleSize=2){
   }
   base.userData.horizontal = widgetProps.horizontal;
   base.userData.hasSubObject = widgetProps.useValueText;
+  base.userData.properties = widgetProps;
 
   let result = { 'base': base, 'handle': handle,  'width': widgetProps.boxProps.width, 'height': widgetProps.boxProps.height, 'padding': widgetProps.padding}
 
@@ -1610,8 +1605,10 @@ export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, s
   }
 };
 
-export function sliderProperties(name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined, font=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties()){
+export function sliderProperties(boxProps, name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), matProps=undefined, animProps=undefined, listConfig=undefined){
   return {
+    'type': 'SLIDER',
+    'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
     'min': min,
@@ -1620,10 +1617,12 @@ export function sliderProperties(name='', horizontal=true, min=0, max=1, places=
     'step': step,
     'padding': padding,
     'textProps': textProps,
-    'font': font,
     'useValueText': useValueText,
     'numeric': numeric,
-    'valueProps': valueProps
+    'valueProps': valueProps,
+    'matProps': matProps,
+    'animProps': animProps,
+    'listConfig': listConfig,
   }
 };
 
@@ -1676,7 +1675,7 @@ export function valueTextPortal(text, font, boxProps, widgetProps, widget=undefi
 };
 
 export function editValueTextPortal(text, font, boxProps, widgetProps, widget=undefined){
-  let base = selectionTextPortal(boxProps, text, widgetProps.font, widgetProps.textProps);
+  let base = selectionTextPortal(boxProps, text, widgetProps.textProps.font, widgetProps.textProps);
   let material = getMaterial(widgetProps.textProps.matProps, base.Box.box.material.stencilRef);
   let textProps = widgetProps.textProps;
   base.Box.box.userData.textMaterial = material;
@@ -1684,6 +1683,7 @@ export function editValueTextPortal(text, font, boxProps, widgetProps, widget=un
   base.textMesh.widget = widget;
   const tProps = editTextProperties(base.Box, '', base.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps, false);
   base.textMesh.userData.textProps = tProps;
+  base.Box.box.userData.properties = widgetProps;
 
   let params = {'base': base, 'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': widgetProps.textProps};
   handleTextInputSetup(base, widgetProps.textProps, font);
@@ -1728,13 +1728,13 @@ function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
   darkenMaterial(valBox.box.material, 30);
 
   if(widgetProps.horizontal){
-    valBox.box.position.set(baseWidth/2+valBox.width/2, valBox.box.position.y, valBox.box.position.z);
+    valBox.box.position.set(baseWidth/2+valBox.width/2, valBox.box.position.y, boxProps.parent.position.z);
   }else{
-    valBox.box.position.set(valBox.box.position.x, -baseHeight+valBox.height, valBox.box.position.z);
+    valBox.box.position.set(valBox.box.position.x, -baseHeight+valBox.height, boxProps.parent.position.z);
   }
 }
 
-export function sliderBox(boxProps, sliderProps){
+export function sliderBase(sliderProps){
 
   let slider = switchWidgetBox(sliderProps, 8);
   let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
@@ -1864,16 +1864,14 @@ export function stringValueProperties(defaultValue='Off', onValue='On', offValue
   }
 };
 
-export function toggleProperties(boxProps, name='', horizontal=true, on=false, padding=0.01, textProps=undefined, font=undefined, useValueText=true, valueProps=stringValueProperties(), matProps=undefined, animProps=undefined, listConfig=undefined){
+export function toggleProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), matProps=undefined, animProps=undefined, listConfig=undefined){
   return {
     'type': 'TOGGLE',
     'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
     'on': on,
-    'padding': padding,
     'textProps': textProps,
-    'font': font,
     'useValueText': useValueText,
     'valueProps': valueProps,
     'matProps': matProps,
@@ -1932,9 +1930,9 @@ function setToggleUserData(toggle, toggleProps){
   toggle.handle.userData.on = false;
 
   if(toggleProps.horizontal){
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+size.baseWidth/2-(toggleProps.padding*2), toggle.handle.position.y, toggle.handle.position.z+size.baseDepth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+size.baseWidth/2, toggle.handle.position.y, toggle.handle.position.z+size.baseDepth);
   }else{
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, toggle.handle.position.y+(size.baseHeight/2)-(toggleProps.padding*2), toggle.handle.position.z+size.baseDepth);
+    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, toggle.handle.position.y+(size.baseHeight/2), toggle.handle.position.z+size.baseDepth);
   }
 
   if(toggleProps.valueProps.defaultValue == toggleProps.valueProps.onValue){
@@ -3179,26 +3177,36 @@ function createWidgetText(font, boxProps, name, textProps, animProps=undefined, 
   }
 }
 
-export function createSliderBox(boxProps, sliderProps, textProps,  animProps=undefined, onCreated=undefined, horizontal=true) {
-  loader.load(textProps.font, (font) => {
-    sliderProps.font = font;
-    const parentSize = getGeometrySize(boxProps.parent.geometry);
-    let slider = sliderBox(boxProps, sliderProps);
-    let size = calculateWidgetSize(boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
+function SliderBox(sliderProps) {
+  const parentSize = getGeometrySize(sliderProps.boxProps.parent.geometry);
+  let slider = sliderBase(sliderProps);
+  let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
     
-    boxProps.parent.add(slider.base);
-    slider.base.position.set(slider.base.position.x, slider.base.position.y, slider.base.position.z+parentSize.depth/2);
-    draggable.push(slider.handle);
+  sliderProps.boxProps.parent.add(slider.base);
+  slider.base.position.set(slider.base.position.x, slider.base.position.y, slider.base.position.z+parentSize.depth/2);
+  draggable.push(slider.handle);
 
-    createWidgetText(font, boxProps, sliderProps.name, textProps, animProps, onCreated, horizontal);
-    if(sliderProps.useValueText){
-      if(sliderProps.horizontal){
-        slider.base.position.set(slider.base.position.x-size.subWidth/2, slider.base.position.y, slider.base.position.z);
-      }else{
-        slider.base.position.set(slider.base.position.x, slider.base.position.y+size.subHeight/2, slider.base.position.z);
-      }
+  createWidgetText(sliderProps.textProps.font, sliderProps.boxProps, sliderProps.name, sliderProps.textProps, sliderProps.animProps, sliderProps.onCreated, sliderProps.horizontal);
+  if(sliderProps.useValueText){
+    if(sliderProps.horizontal){
+      slider.base.position.set(slider.base.position.x-size.subWidth/2, slider.base.position.y, slider.base.position.z);
+    }else{
+      slider.base.position.set(slider.base.position.x, slider.base.position.y+size.subHeight/2, slider.base.position.z);
     }
-  });
+  }
+}
+
+export function createSliderBox(sliderProps) {
+  if(typeof sliderProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(sliderProps.textProps.font, (font) => {
+      sliderProps.textProps.font = font;
+      SliderBox(sliderProps);
+
+    });
+  }else if(sliderProps.textProps.font.isFont){
+    SliderBox(sliderProps);
+  }
 };
 
 function ToggleBox(toggleProps){
@@ -3212,7 +3220,6 @@ function ToggleBox(toggleProps){
 }
 
 export function createToggleBox(toggleProps) {
-
   if(typeof toggleProps.textProps.font === 'string'){
     // Load the font
     loader.load(toggleProps.textProps.font, (font) => {
@@ -3241,7 +3248,6 @@ function TogglePortal(toggleProps) {
 }
 
 export function createTogglePortal(toggleProps) {
-
   if(typeof toggleProps.textProps.font === 'string'){
     // Load the font
     loader.load(toggleProps.textProps.font, (font) => {
@@ -3253,30 +3259,46 @@ export function createTogglePortal(toggleProps) {
   }
 };
 
+export function imageProperties(boxProps, name='', imgUrl=undefined, padding=0.01, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, isPortal=false, zOffset=0){
+  return {
+    'type': 'IMAGE',
+    'boxProps': boxProps,
+    'name': name,
+    'imgUrl': imgUrl,
+    'padding': padding,
+    'matProps': matProps,
+    'animProps': animProps,
+    'listConfig': listConfig,
+    'onCreated': onCreated,
+    'isPortal': isPortal,
+    'zOffset': zOffset
+  }
+};
 
-export function createImageBox(boxProps, imgUrl, textProps=undefined,  animProps=undefined, listConfig=undefined, onCreated=undefined){
 
-  const cBox = contentWindow(boxProps);
+export function createImageBox(imageProps){
+
+  const cBox = contentWindow(imageProps.boxProps);
   const boxSize = getGeometrySize(cBox.box.geometry);
-  const map = new THREE.TextureLoader().load( imgUrl );
+  const map = new THREE.TextureLoader().load( imageProps.imgUrl );
   const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
   cBox.box.material = material;
 
-  if(listConfig != undefined){
-    cBox.box.name = boxProps.name;
+  if(imageProps.listConfig != undefined){
+    cBox.box.name = imageProps.boxProps.name;
     createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
   }else{
-    boxProps.parent.add(cBox.box);
+    imageProps.boxProps.parent.add(cBox.box);
   }
 
 };
 
-export function createImagePortal(boxProps, imgUrl, textProps=undefined,  animProps=undefined, listConfig=undefined, onCreated=undefined){
+export function createImagePortal(imageProps){
 
-  const portal = portalWindow(boxProps);
-  const cBox = contentWindow(boxProps);
+  const portal = portalWindow(imageProps.boxProps);
+  const cBox = contentWindow(imageProps.boxProps);
   const boxSize = getGeometrySize(cBox.box.geometry);
-  const map = new THREE.TextureLoader().load( imgUrl );
+  const map = new THREE.TextureLoader().load( imageProps.imgUrl );
   const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
   cBox.box.material = material;
   cBox.box.material.stencilWrite = true;
@@ -3285,13 +3307,13 @@ export function createImagePortal(boxProps, imgUrl, textProps=undefined,  animPr
   cBox.box.renderOrder = 2;
 
   portal.box.add(cBox.box);
-  cBox.box.position.set(cBox.box.position.x, cBox.box.position.y, cBox.box.position.z+textProps.zOffset);
+  cBox.box.position.set(cBox.box.position.x, cBox.box.position.y, cBox.box.position.z+imageProps.zOffset);
 
-  if(listConfig != undefined){
-    portal.box.name = boxProps.name;
+  if(imageProps.listConfig != undefined){
+    portal.box.name = imageProps.boxProps.name;
     createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
   }else{
-    boxProps.parent.add(portal.box);
+    imageProps.boxProps.parent.add(portal.box);
   }
 
 };
