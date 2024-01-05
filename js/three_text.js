@@ -1146,6 +1146,8 @@ function setGeometryPivot(mesh, boxProps){
   }
 }
 
+
+
 class BaseBox {
   constructor(boxProps) {
     this.parent = boxProps.parent;
@@ -1437,6 +1439,7 @@ export function CreateBasePanel(panelProps) {
       panelProps.textProps.font = font;
       let panel = new BasePanel(panelProps);
       panels.push(panel);
+      console.log(panel)
     });
   }else if(panelProps.textProps.font.isFont){
     let panel = new BasePanel(panelProps);
@@ -1445,10 +1448,70 @@ export function CreateBasePanel(panelProps) {
   
 };
 
-export class BasePanel extends BaseBox {
-  constructor(panelProps) {
-    super(panelProps.boxProps);
 
+class BaseButton extends BaseBox {
+  constructor(buttonProps) {
+    super(buttonProps.boxProps);
+
+    this.text = buttonProps.name;
+    this.textProps = buttonProps.textProps;
+    this.matProps = buttonProps.matProps;
+    this.animProps = buttonProps.animProps;
+    this.listConfig = buttonProps.listConfig;
+    this.mouseOver = buttonProps.mouseOver;
+    this.portal = buttonProps.portal;
+
+    this.textMaterial = getMaterial(this.textProps.matProps, this.box.material.stencilRef);
+    this.textMesh = this.CreateText();
+    this.textMesh.userData.value = buttonProps.value;
+    this.box.userData.value = buttonProps.value;
+    this.box.userData.properties = buttonProps;
+    adjustBoxScaleRatio(this.box, this.parent);
+
+  }
+  CreateText(){
+    let geometry = createMergedTextGeometry(this.textProps.font, this.width, this.height, this.text, this.textProps, this.animProps);
+    const geomSize = getGeometrySize(geometry);
+    const boxSize = getGeometrySize(this.box.geometry);
+    geometry.center();
+    let result = new THREE.Mesh(geometry, this.textMaterial);
+    setMergedMeshUserData(boxSize, geomSize, this.textProps.padding, result);
+    this.box.add(result);
+    result.position.set(result.position.x, result.position.y, this.depth/2+geomSize.depth/2);
+
+    return result
+  }
+  UpdateText(text){
+    this.text = text;
+    this.textMesh.geometry.dispose();
+    this.textMesh = this.CreateText();
+  }
+}
+
+export function buttonProperties(boxProps, font, name='Button', value='', padding=0.01, textProps=undefined, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, mouseOver=false, portal=false, attach='RIGHT'){
+  return {
+    'type': 'BUTTON',
+    'boxProps': boxProps,
+    'font': font,
+    'name': name,
+    'value': value,
+    'padding': padding,
+    'textProps': textProps,
+    'matProps': matProps,
+    'animProps': animProps,
+    'listConfig': listConfig,
+    'onCreated': onCreated,
+    'mouseOver': mouseOver,
+    'portal': portal,
+    'attach': attach
+  }
+};
+
+export class BasePanel extends BaseButton {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.textProps.font, panelProps.name, panelProps.value, panelProps.padding, panelProps.textProps, panelProps.matProps, panelProps.animProps, undefined, undefined, panelProps.mouseOver, panelProps.portal));
+    this.box.userData.properties = panelProps;
+    
     this.boxProps = panelProps.boxProps;
     this.name = panelProps.name;
     this.textProps = panelProps.textProps;
@@ -1459,12 +1522,12 @@ export class BasePanel extends BaseBox {
     this.isSubPanel = panelProps.isSubPanel;
 
     this.handleExpand = this.CreateHandle(panelProps);
-    this.panel = this.CreateTop();
-    this.panel.box.userData.properties = panelProps;
+    this.CreateTop();
+    
     this.bottom = this.CreateBottom();
-    this.panel.box.add(this.handleExpand);
-    this.panel.box.userData.handleExpand = this.handleExpand;
-    this.handleExpand.userData.targetElem = this.panel.box;
+    this.box.add(this.handleExpand);
+    this.box.userData.handleExpand = this.handleExpand;
+    this.handleExpand.userData.targetElem = this.box;
     this.handleExpand.position.set(this.width/2, this.height/2 - this.handleExpand.userData.size.height*2, this.depth/2);
 
     if(panelProps.expanded){
@@ -1474,7 +1537,7 @@ export class BasePanel extends BaseBox {
     this.handleOpen = undefined;
     this.SetUserData();
     if(panelProps.topPanel == undefined){
-      panelProps.topPanel = this.panel.box;
+      panelProps.topPanel = this.box;
       this.handleOpen = this.CreateTopHandle();
     }
 
@@ -1505,8 +1568,8 @@ export class BasePanel extends BaseBox {
       handle.rotation.z = handle.rotation.z+0.8;
     }
 
-    this.panel.box.userData.handleOpen = handle;
-    handle.userData.targetElem = this.panel.box;
+    this.box.userData.handleOpen = handle;
+    handle.userData.targetElem = this.box;
 
     handle.addEventListener('action', function(event) {
       panelAnimation(this.userData.targetElem);
@@ -1530,81 +1593,74 @@ export class BasePanel extends BaseBox {
   CreateBottom(){
     let boxProps = {...this.boxProps};
     boxProps.height=boxProps.height*0.5;
-    boxProps.parent = this.panel.box;
+    boxProps.parent = this.box;
     const result = new BaseBox(boxProps);
     let size = getGeometrySize(result.box.geometry);
-    result.box.material = this.panel.box.material;
-    result.box.position.set(result.box.position.x, -(this.panel.height/2+result.height/2), result.box.position.z);
-    this.panel.box.add(result.box);
-    result.box.userData.expandedPos = new THREE.Vector3().set(result.box.position.x, -(this.panel.height+result.height), result.box.position.z);
+    result.box.material = this.box.material;
+    result.box.position.set(result.box.position.x, -(this.height/2+result.height/2), result.box.position.z);
+    this.box.add(result.box);
+    result.box.userData.expandedPos = new THREE.Vector3().set(result.box.position.x, -(this.height+result.height), result.box.position.z);
     result.box.userData.closedPos = new THREE.Vector3().copy(result.box.position);
     result.box.userData.size = size;
 
     return result
   }
   CreateTop(){
-    let result = undefined;
-    let buttonProps = buttonProperties(this.boxProps, this.textProps.font, this.name, this.value, this.padding, this.textProps, this.matProps, this.animProps, undefined, undefined, this.mouseOver, this.portal);
-
     if(this.attach == 'CENTER'){
-      result = new BaseButton(buttonProps);
-      result.box.position.set(this.parentSize.width/2, this.parentSize.height/2, this.parentSize.depth);
+      this.box.position.set(this.parentSize.width/2, this.parentSize.height/2, this.parentSize.depth);
     }else if(this.attach == 'LEFT'){
-      buttonProps.boxProps.pivot = 'RIGHT';
-      result = new BaseButton(buttonProps);
-      result.box.position.set(-(this.parentSize.width/2+this.width/2), this.parentSize.height/2-this.height/2, this.parentSize.depth);
+      this.boxProps.pivot = 'RIGHT';
+      this.box.position.set(-(this.parentSize.width/2+this.width/2), this.parentSize.height/2-this.height/2, this.parentSize.depth);
     }else if(this.attach == 'RIGHT'){
-      buttonProps.boxProps.pivot = 'LEFT';
-      result = new BaseButton(buttonProps);
-      result.box.position.set(this.parentSize.width/2+this.width/2, this.parentSize.height/2-this.height/2, this.parentSize.depth);
+      this.boxProps.pivot = 'LEFT';
+      this.box.position.set(this.parentSize.width/2+this.width/2, this.parentSize.height/2-this.height/2, this.parentSize.depth);
     }
 
     if(!this.open){
-      result.box.scale.set(0,0,0);
+      this.box.scale.set(0,0,0);
     }
 
     if(this.isSubPanel){
-      result.box.position.copy(this.parent.position);
-      darkenMaterial(result.box.material, 10);
-      result.box.userData.onPos = new THREE.Vector3(result.box.position.x, -(this.parentSize.height/2-this.height/2), result.box.position.z);
-      result.box.userData.offPos = new THREE.Vector3().copy(result.box.position);
+      this.box.position.copy(this.parent.position);
+      darkenMaterial(this.box.material, 10);
+      this.box.userData.onPos = new THREE.Vector3(this.box.position.x, -(this.parentSize.height/2-this.height/2), this.box.position.z);
+      this.box.userData.offPos = new THREE.Vector3().copy(this.box.position);
     }
 
-    return result
   }
   SetUserData(){
-    this.panel.box.userData.textMesh = this.panel.textMesh;
-    this.panel.box.userData.bottom = this.bottom.box;
-    this.panel.box.userData.expandedPos = new THREE.Vector3().copy(this.panel.box.position);
-    this.panel.box.userData.closedPos = new THREE.Vector3().copy(this.panel.box.position);
-    this.panel.box.userData.onPos = new THREE.Vector3().copy(this.panel.box.position);
-    this.panel.box.userData.offPos = new THREE.Vector3().copy(this.panel.box.position);
-    this.panel.box.userData.onScale = new THREE.Vector3(0,0,0).copy(this.panel.box.scale);
-    this.panel.box.userData.offScale = new THREE.Vector3(0,0,0);
-    this.panel.box.userData.sectionElements = [];
-    this.panel.box.userData.widgetElements = [];
-    this.panel.box.userData.size = getGeometrySize(this.panel.box.geometry);
+    this.box.userData.textMesh = this.textMesh;
+    this.box.userData.bottom = this.bottom.box;
+    this.box.userData.expandedPos = new THREE.Vector3().copy(this.box.position);
+    this.box.userData.closedPos = new THREE.Vector3().copy(this.box.position);
+    this.box.userData.onPos = new THREE.Vector3().copy(this.box.position);
+    this.box.userData.offPos = new THREE.Vector3().copy(this.box.position);
+    this.box.userData.onScale = new THREE.Vector3(0,0,0).copy(this.box.scale);
+    this.box.userData.offScale = new THREE.Vector3(0,0,0);
+    this.box.userData.sectionElements = [];
+    this.box.userData.widgetElements = [];
+    this.box.userData.size = getGeometrySize(this.box.geometry);
   }
   CreateSections(panelProps){
     let index = 1;
-    for (const [name, value] of Object.entries(panelProps.sections)) {
+    for (const [name, sect] of Object.entries(panelProps.sections)) {
       let sectionProps = {...panelProps};
       sectionProps.name = name;
       sectionProps.isSubPanel = true;
       sectionProps.boxProps.parent = panelProps.topPanel;
       let parentSize = getGeometrySize(panelProps.topPanel.geometry);
 
-      sectionProps.sections = value;
+      sectionProps.sections = sect;
       let section = new BasePanel(sectionProps);
-      section.panel.box.position.set(this.width/2-section.width/2, 0, -this.depth);
+      section.box.position.set(this.width/2-section.width/2, 0, -this.depth);
 
-      let bottom = section.panel.box.userData.bottom;
+      let bottom = section.box.userData.bottom;
       let bottomHeight = this.bottom.height;
       let yPos =  bottomHeight - (this.height + bottomHeight)*index;
-      section.panel.box.userData.index = index;
-      section.panel.box.userData.expandedPos.set(section.panel.box.position.x, yPos, section.panel.box.position.z);
-      section.panel.box.userData.closedPos = new THREE.Vector3().copy(section.panel.box.position);
-      panelProps.topPanel.userData.sectionElements.push(section.panel.box);
+      section.box.userData.index = index;
+      section.box.userData.expandedPos.set(section.box.position.x, yPos, section.box.position.z);
+      section.box.userData.closedPos = new THREE.Vector3().copy(section.box.position);
+      panelProps.topPanel.userData.sectionElements.push(section.box);
       
       index += 1;
     }
@@ -3137,61 +3193,7 @@ function selectorTextUserData(selText, key, value, index, boxProps){
   selText.cBox.box.userData.currentText = key;
 }
 
-class BaseButton extends BaseBox {
-  constructor(buttonProps) {
-    super(buttonProps.boxProps);
-    this.text = buttonProps.name;
-    this.textProps = buttonProps.textProps;
-    this.matProps = buttonProps.matProps;
-    this.animProps = buttonProps.animProps;
-    this.listConfig = buttonProps.listConfig;
-    this.mouseOver = buttonProps.mouseOver;
-    this.portal = buttonProps.portal;
 
-    this.textMaterial = getMaterial(this.textProps.matProps, this.box.material.stencilRef);
-    this.textMesh = this.CreateText();
-    this.textMesh.userData.value = buttonProps.value;
-    this.box.userData.value = buttonProps.value;
-    adjustBoxScaleRatio(this.box, this.parent);
-
-  }
-  CreateText(){
-    let geometry = createMergedTextGeometry(this.textProps.font, this.width, this.height, this.text, this.textProps, this.animProps);
-    const geomSize = getGeometrySize(geometry);
-    const boxSize = getGeometrySize(this.box.geometry);
-    geometry.center();
-    let result = new THREE.Mesh(geometry, this.textMaterial);
-    setMergedMeshUserData(boxSize, geomSize, this.textProps.padding, result);
-    this.box.add(result);
-    result.position.set(result.position.x, result.position.y, this.depth/2+geomSize.depth/2);
-
-    return result
-  }
-  UpdateText(text){
-    this.text = text;
-    this.textMesh.geometry.dispose();
-    this.textMesh = this.CreateText();
-  }
-}
-
-export function buttonProperties(boxProps, font, name='Button', value='', padding=0.01, textProps=undefined, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, mouseOver=false, portal=false, attach='RIGHT'){
-  return {
-    'type': 'BUTTON',
-    'boxProps': boxProps,
-    'font': font,
-    'name': name,
-    'value': value,
-    'padding': padding,
-    'textProps': textProps,
-    'matProps': matProps,
-    'animProps': animProps,
-    'listConfig': listConfig,
-    'onCreated': onCreated,
-    'mouseOver': mouseOver,
-    'portal': portal,
-    'attach': attach
-  }
-};
 
 function ButtonElement(buttonProps){
   let textMesh = buttonBase(buttonProps.boxProps, buttonProps.name, buttonProps.value, buttonProps.font, buttonProps.textProps);
@@ -3550,6 +3552,7 @@ export function createGLTFModelPortal(gltfProps){
   if(typeof gltfProps.gltf === 'string'){
     // Instantiate a loader
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
+        console.log(gltf)
         gltfProps.gltf = gltf;
         GLTFModelPortal(gltfProps);
       },
