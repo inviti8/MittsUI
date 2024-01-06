@@ -632,8 +632,6 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
 };
 
 export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
-  console.log("elem")
-  console.log(elem)
 
   if(elem.handle.userData.anim != false && gsap.isTweening( elem.handle.userData.anim ))
   return;
@@ -1673,7 +1671,7 @@ export class BasePanel extends BaseButton {
 export class BaseWidgetBox extends BaseBox {
   constructor(widgetProps) {
     
-    let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, 2);
+    let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, widgetProps.handleSize);
     let baseBoxProps = {...widgetProps.boxProps};
     baseBoxProps.width = size.baseWidth;
     baseBoxProps.height = size.baseHeight;
@@ -1856,7 +1854,7 @@ export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, s
   }
 };
 
-export function sliderProperties(boxProps, name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), matProps=undefined, animProps=undefined, listConfig=undefined){
+export function sliderProperties(boxProps, name='', horizontal=true, min=0, max=1, places=3, step=0.001, padding=0.01, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), matProps=undefined, animProps=undefined, listConfig=undefined, handleSize=8){
   return {
     'type': 'SLIDER',
     'boxProps': boxProps,
@@ -1874,6 +1872,7 @@ export function sliderProperties(boxProps, name='', horizontal=true, min=0, max=
     'matProps': matProps,
     'animProps': animProps,
     'listConfig': listConfig,
+    'handleSize': handleSize
   }
 };
 
@@ -1985,126 +1984,123 @@ function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
   }
 }
 
-export function sliderBase(sliderProps){
+export class BaseSliderBox extends BaseWidgetBox {
+  constructor(widgetProps) {
 
-  let slider = switchWidgetBox(sliderProps, 8);
-  let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
+    super(widgetProps);
+    
+    if(this.box.userData.hasSubObject){
+      this.ValueText(this, widgetProps.boxProps, widgetProps, this.size.baseWidth, this.size.baseHeight)
+    }
 
-  setSliderUserData(slider, sliderProps.boxProps, sliderProps);
+    this.setSliderUserData();
 
-  if(slider.base.userData.hasSubObject){
-    attachValueBox(slider, sliderProps.boxProps, sliderProps, size.baseWidth, size.baseHeight)
+    this.handle.addEventListener('action', function(event) {
+      this.userData.targetElem.OnSliderMove();
+    });
+
   }
-  
-  return slider
+  setSliderUserData(){
+    let sliderProps = this.box.userData.properties;
+    let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
+
+    this.box.userData.type = 'SLIDER';
+    this.box.userData.size = {'width': size.baseWidth, 'height': size.baseHeight, 'depth': size.baseDepth};
+    this.box.userData.handle = this.handle;
+    this.box.userData.horizontal = sliderProps.horizontal;
+    this.box.userData.valueProps = sliderProps.valueProps;
+    this.box.userData.value = sliderProps.valueProps.defaultValue;
+
+    this.handle.userData.type = 'SLIDER';
+    this.handle.userData.size = {'width': size.handleWidth, 'height': size.handleHeight, 'depth': size.handleDepth};
+    this.handle.userData.horizontal = sliderProps.horizontal;
+    this.handle.userData.min = sliderProps.valueProps.min;
+    this.handle.userData.max = sliderProps.valueProps.max;
+    this.handle.userData.places = sliderProps.valueProps.places;
+
+    if(sliderProps.horizontal){
+      this.handle.userData.maxScroll = this.handle.position.x + (size.baseWidth-size.handleWidth);
+      this.handle.userData.minScroll = -size.baseWidth+(this.handle.userData.maxScroll+size.handleWidth);
+    }else{
+      this.handle.userData.maxScroll = this.handle.position.y + (size.baseHeight-size.handleHeight);
+      this.handle.userData.minScroll = -size.baseHeight+(this.handle.userData.maxScroll+size.handleHeight);
+    }
+
+    this.handle.userData.padding = sliderProps.padding;
+    this.handle.userData.draggable = true;
+    this.handle.userData.targetElem = this;
+  }
+  SliderValue(){
+    let coord = 'x';
+    let valBoxSize = this.box.userData.valueBox.userData.size;
+    let divider = (this.box.userData.size.width-this.handle.userData.padding-this.handle.userData.size.width);
+
+    if(!this.handle.userData.horizontal){
+      coord = 'y';
+      divider = (this.box.userData.size.height+this.handle.userData.padding-this.handle.userData.size.height);
+    }
+
+    let pos = this.handle.position[coord];
+    let minScroll = this.handle.userData.minScroll;
+    let max = this.handle.userData.max;
+    let min = this.handle.userData.min;
+
+    let value = (pos-minScroll)/divider*max;
+
+    if(this.handle.userData.min<0){
+      value = ((pos-minScroll)/divider*(max-min))+min;
+    }
+
+    return value.toFixed(this.handle.userData.places);
+  }
+  OnSliderMove(){
+
+    this.box.userData.value = this.SliderValue();
+
+    if(this.box.userData.valueBox != undefined){
+      this.box.userData.valueBox.currentText = this.box.userData.value;
+    }
+
+    if(this.box.userData.valueBox != undefined){
+      this.box.userData.valueBox.dispatchEvent({type:'update'});
+    }
+
+  }
+  SetSliderPosition(){
+    let minScroll = this.handle.userData.minScroll;
+    let maxScroll = this.handle.userData.maxScroll;
+    let max = this.handle.userData.max;
+    let min = this.handle.userData.min;
+    let value = this.box.userData.value;
+    if(value>max){
+      this.box.userData.value = max;
+      value = max;
+    }else if(value<min){
+      this.box.userData.value = min;
+      value = min;
+    }
+    if(isNaN(value))
+      return;
+
+    let coord = 'x';
+    let divider = (this.box.userData.size.width-this.handle.userData.padding-this.handle.userData.size.width);
+
+    if(!this.handle.userData.horizontal){
+      coord = 'y';
+      divider = (this.box.userData.size.height+this.handle.userData.padding-this.handle.userData.size.height);
+    }
+
+    let vec = ((value-min)/(max-min))*divider+minScroll;
+    let pos = new THREE.Vector3(this.handle.position.x, vec, this.handle.position.z);
+
+    if(this.box.userData.horizontal){
+      pos.set(vec, this.handle.position.y, this.handle.position.z);
+    }
+
+    this.handle.position.copy(pos);
+  }
+
 };
-
-export function calculateSliderPosition(slider){
-  let minScroll = slider.handle.userData.minScroll;
-  let maxScroll = slider.handle.userData.maxScroll;
-  let max = slider.handle.userData.max;
-  let min = slider.handle.userData.min;
-  let value = slider.base.userData.value;
-  if(value>max){
-    slider.base.userData.value = max;
-    value = max;
-  }else if(value<min){
-    slider.base.userData.value = min;
-    value = min;
-  }
-  if(isNaN(value))
-    return;
-
-  let coord = 'x';
-  let divider = (slider.base.userData.size.width-slider.handle.userData.padding-slider.handle.userData.size.width);
-
-  if(!slider.handle.userData.horizontal){
-    coord = 'y';
-    divider = (slider.base.userData.size.height+slider.handle.userData.padding-slider.handle.userData.size.height);
-  }
-
-  let vec = ((value-min)/(max-min))*divider+minScroll;
-  let pos = new THREE.Vector3(slider.handle.position.x, vec, slider.handle.position.z);
-
-  if(slider.base.userData.horizontal){
-    pos.set(vec, slider.handle.position.y, slider.handle.position.z);
-  }
-
-  return pos
-};
-
-export function calculateSliderValue(slider){
-  let coord = 'x';
-  let valBoxSize = slider.base.userData.valueBox.userData.size;
-  let divider = (slider.base.userData.size.width-slider.handle.userData.padding-slider.handle.userData.size.width);
-
-  if(!slider.handle.userData.horizontal){
-    coord = 'y';
-    divider = (slider.base.userData.size.height+slider.handle.userData.padding-slider.handle.userData.size.height);
-  }
-
-  let pos = slider.handle.position[coord];
-  let minScroll = slider.handle.userData.minScroll;
-  let max = slider.handle.userData.max;
-  let min = slider.handle.userData.min;
-
-  let value = (pos-minScroll)/divider*max;
-
-  if(slider.handle.userData.min<0){
-    value = ((pos-minScroll)/divider*(max-min))+min;
-  }
-
-  return value.toFixed(slider.handle.userData.places);
-};
-
-function onSliderMove(slider){
-
-  slider.base.userData.value = calculateSliderValue(slider);
-
-  if(slider.base.userData.valueBox != undefined){
-    slider.base.userData.valueBox.currentText = slider.base.userData.value;
-  }
-
-  if(slider.base.userData.valueBox != undefined){
-    slider.base.userData.valueBox.dispatchEvent({type:'update'});
-  }
-
-}
-
-function setSliderUserData(slider, boxProps, sliderProps){
-  let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
-
-  slider.base.userData.type = 'SLIDER';
-  //slider.base.userData.size = {'width': boxProps.width, 'height': boxProps.height, 'depth': size.baseDepth};
-  slider.base.userData.size = {'width': size.baseWidth, 'height': size.baseHeight, 'depth': size.baseDepth};
-  slider.base.userData.handle = slider.handle;
-  slider.base.userData.horizontal = sliderProps.horizontal;
-  slider.base.userData.valueProps = sliderProps.valueProps;
-  slider.base.userData.value = sliderProps.valueProps.defaultValue;
-
-  slider.handle.userData.type = 'SLIDER';
-  slider.handle.userData.size = {'width': size.handleWidth, 'height': size.handleHeight, 'depth': size.handleDepth};
-  slider.handle.userData.horizontal = sliderProps.horizontal;
-  slider.handle.userData.min = sliderProps.valueProps.min;
-  slider.handle.userData.max = sliderProps.valueProps.max;
-  slider.handle.userData.places = sliderProps.valueProps.places;
-
-  if(sliderProps.horizontal){
-    slider.handle.userData.maxScroll = slider.handle.position.x + (size.baseWidth-size.handleWidth);
-    slider.handle.userData.minScroll = -size.baseWidth+(slider.handle.userData.maxScroll+size.handleWidth);
-  }else{
-    slider.handle.userData.maxScroll = slider.handle.position.y + (size.baseHeight-size.handleHeight);
-    slider.handle.userData.minScroll = -size.baseHeight+(slider.handle.userData.maxScroll+size.handleHeight);
-  }
-
-  slider.handle.userData.padding = sliderProps.padding;
-  slider.handle.userData.draggable = true;
-
-  slider.handle.addEventListener('action', function(event) {
-    onSliderMove(slider);
-  });
-
-}
 
 export function stringValueProperties(defaultValue='Off', onValue='On', offValue='Off', editable=false){
   return {
@@ -2116,7 +2112,7 @@ export function stringValueProperties(defaultValue='Off', onValue='On', offValue
   }
 };
 
-export function toggleProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), matProps=undefined, animProps=undefined, listConfig=undefined){
+export function toggleProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), matProps=undefined, animProps=undefined, listConfig=undefined, handleSize=2 ){
   return {
     'type': 'TOGGLE',
     'boxProps': boxProps,
@@ -2129,6 +2125,7 @@ export function toggleProperties(boxProps, name='', horizontal=true, on=false, t
     'matProps': matProps,
     'animProps': animProps,
     'listConfig': listConfig,
+    'handleSize': handleSize
   }
 };
 
@@ -2141,10 +2138,30 @@ export class BaseToggleBox extends BaseWidgetBox {
       this.ValueText(this, widgetProps.boxProps, widgetProps, this.size.baseWidth, this.size.baseHeight)
     }
 
-    this.setToggleUserData(widgetProps);
+    this.setToggleUserData();
+
+    if(widgetProps.horizontal){
+      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x+this.size.baseWidth/2, this.handle.position.y, this.handle.position.z+this.size.baseDepth);
+    }else{
+      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x, this.handle.position.y+(this.size.baseHeight/2), this.handle.position.z+this.size.baseDepth);
+    }
+
+    if(widgetProps.valueProps.defaultValue == widgetProps.valueProps.onValue){
+      this.handle.position.copy(this.handle.userData.onPos);
+      this.handle.userData.on = true;
+    }
+
+    if(this.box.userData.valueBox != undefined){
+      this.box.userData.valueBox.dispatchEvent({type:'update'});
+    }
+
+    this.handle.addEventListener('action', function(event) {
+      toggleAnimation(this.userData.targetElem);
+    });
 
   }
-  setToggleUserData(toggleProps){
+  setToggleUserData(){
+    let toggleProps = this.box.userData.properties;
     let size = calculateWidgetSize(toggleProps.boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
 
     this.box.userData.type = 'TOGGLE';
@@ -2162,24 +2179,6 @@ export class BaseToggleBox extends BaseWidgetBox {
     this.handle.userData.on = false;
     this.handle.userData.targetElem = this;
 
-    if(toggleProps.horizontal){
-      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x+this.size.baseWidth/2, this.handle.position.y, this.handle.position.z+this.size.baseDepth);
-    }else{
-      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x, this.handle.position.y+(this.size.baseHeight/2), this.handle.position.z+this.size.baseDepth);
-    }
-
-    if(toggleProps.valueProps.defaultValue == toggleProps.valueProps.onValue){
-      this.handle.position.copy(this.handle.userData.onPos);
-      this.handle.userData.on = true;
-    }
-
-    if(this.box.userData.valueBox != undefined){
-      this.box.userData.valueBox.dispatchEvent({type:'update'});
-    }
-
-    this.handle.addEventListener('action', function(event) {
-      toggleAnimation(this.userData.targetElem);
-    });
   }
   handleToggleValueText(toggle){
     if(toggle.box.userData.valueBox != undefined){
@@ -2206,7 +2205,6 @@ export class BaseToggleBox extends BaseWidgetBox {
       toggle.box.userData.valueBox.dispatchEvent({type:'update'});
     }
   }
-
 };
 
 function setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh){
@@ -3412,19 +3410,18 @@ export function createMouseOverPortalButton(buttonProps){
 
 function SliderBox(sliderProps) {
   const parentSize = getGeometrySize(sliderProps.boxProps.parent.geometry);
-  let slider = sliderBase(sliderProps);
+  let slider = new BaseSliderBox(sliderProps);
   let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
     
-  sliderProps.boxProps.parent.add(slider.base);
-  slider.base.position.set(slider.base.position.x, slider.base.position.y, slider.base.position.z+parentSize.depth/2);
+  sliderProps.boxProps.parent.add(slider.box);
+  slider.box.position.set(slider.box.position.x, slider.box.position.y, slider.box.position.z+parentSize.depth/2);
   draggable.push(slider.handle);
 
-  createWidgetText(sliderProps.textProps.font, sliderProps.boxProps, sliderProps.name, sliderProps.textProps, sliderProps.animProps, sliderProps.onCreated, sliderProps.horizontal);
   if(sliderProps.useValueText){
     if(sliderProps.horizontal){
-      slider.base.position.set(slider.base.position.x-size.subWidth/2, slider.base.position.y, slider.base.position.z);
+      slider.box.position.set(slider.box.position.x-size.subWidth/2, slider.box.position.y, slider.box.position.z);
     }else{
-      slider.base.position.set(slider.base.position.x, slider.base.position.y+size.subHeight/2, slider.base.position.z);
+      slider.box.position.set(slider.box.position.x, slider.box.position.y+size.subHeight/2, slider.box.position.z);
     }
   }
 }
