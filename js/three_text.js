@@ -632,6 +632,8 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
 };
 
 export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
+  console.log("elem")
+  console.log(elem)
 
   if(elem.handle.userData.anim != false && gsap.isTweening( elem.handle.userData.anim ))
   return;
@@ -642,10 +644,10 @@ export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut
     pos=elem.handle.userData.offPos;
   }
 
-  let props = { duration: duration, x: pos.x, y: elem.handle.position.y, z: elem.handle.position.z, ease: easeIn, onComplete: updateToggleState, onCompleteParams:[elem] };
+  let props = { duration: duration, x: pos.x, y: elem.handle.position.y, z: elem.handle.position.z, ease: easeIn, onComplete: BaseToggleBox.DoToggle, onCompleteParams:[elem] };
 
   if(!elem.handle.userData.horizontal){
-    props = { duration: duration, x: elem.handle.position.x, y: pos.y, z: elem.handle.position.z, ease: easeIn, onComplete: updateToggleState, onCompleteParams:[elem] };
+    props = { duration: duration, x: elem.handle.position.x, y: pos.y, z: elem.handle.position.z, ease: easeIn, onComplete: BaseToggleBox.DoToggle, onCompleteParams:[elem] };
   }
 
   elem.handle.userData.anim = gsap.to(elem.handle.position, props);
@@ -1667,6 +1669,141 @@ export class BasePanel extends BaseButton {
   }
 };
 
+
+export class BaseWidgetBox extends BaseBox {
+  constructor(widgetProps) {
+    
+    let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, 2);
+    let baseBoxProps = {...widgetProps.boxProps};
+    baseBoxProps.width = size.baseWidth;
+    baseBoxProps.height = size.baseHeight;
+    baseBoxProps.depth = size.baseDepth/2;
+    super(baseBoxProps);
+    this.box.userData.horizontal = widgetProps.horizontal;
+    this.box.userData.hasSubObject = widgetProps.useValueText;
+    this.box.userData.properties = widgetProps;
+
+    this.name = widgetProps.name;
+    this.handleSize = 2;
+    this.baseBoxProps = baseBoxProps;
+    this.size = size;
+    this.complexMesh = widgetProps.boxProps.complexMesh;
+
+    darkenMaterial(this.box.material, 10);
+
+    this.handleMaterial = getMaterial(widgetProps.boxProps.matProps, widgetProps.boxProps.parent.material.stencilRef);
+    this.handle = this.WidgetHandle();
+    this.handle.renderOrder = 2;
+
+    this.box.add(this.handle);
+
+    if(widgetProps.horizontal){
+      this.handle.position.set(-(this.size.baseWidth/2-this.size.handleWidth/2), this.handle.position.y, this.handle.position.z+this.size.baseDepth);
+    }else{
+      this.handle.position.set(this.handle.position.x,-(this.size.baseHeight/2-this.size.handleHeight/2), this.handle.position.z+this.size.baseDepth);
+    }
+    
+
+    this.widgetText = this.WidgetText();
+
+  }
+  WidgetHandle(){
+    let geometry = new THREE.BoxGeometry(this.size.handleWidth, this.size.handleHeight, this.size.handleDepth);
+    let widgetProps = this.box.userData.properties;
+    if(widgetProps.boxProps.complexMesh){
+        geometry = RoundedBoxGeometry(this.size.handleWidth, this.size.handleHeight, this.size.handleDepth, widgetProps.boxProps.radius, widgetProps.boxProps.smoothness, widgetProps.boxProps.zOffset);
+    }
+
+    return new THREE.Mesh(geometry, this.handleMaterial);
+  }
+  WidgetSize(boxProps, horizontal, useSubObject, operatorSizeDivisor, defaultSubOffset=0.65){
+    let subOffset = 1;
+    if(useSubObject){
+      subOffset = defaultSubOffset;
+    }
+    let baseWidth = boxProps.width*subOffset;
+    let baseHeight = boxProps.height;
+    let baseDepth=boxProps.depth/2;
+    let handleWidth=boxProps.width/operatorSizeDivisor*subOffset;
+    let handleHeight=boxProps.height;
+    let handleDepth=boxProps.depth*2;
+    let subWidth=baseWidth*(1-1*subOffset);
+    let subHeight=baseHeight;
+    let subDepth=baseDepth;
+
+    if(horizontal==false){
+      baseWidth = boxProps.width;
+      baseHeight = boxProps.height*subOffset;
+      handleWidth=boxProps.width;
+      handleHeight=boxProps.height/operatorSizeDivisor*subOffset;
+      subWidth=baseWidth;
+      subHeight=baseHeight*(1-1*subOffset);
+      subDepth=baseDepth;
+    }
+
+    return {baseWidth, baseHeight, baseDepth, handleWidth, handleHeight, handleDepth, subWidth, subHeight, subDepth}
+  }
+  WidgetText(){
+    if(this.name.length>0){
+      const props = this.box.userData.properties;
+      const boxProps = props.boxProps;
+      const textProps = props.textProps;
+
+      let mat = getMaterial(textProps.matProps, boxProps.parent.material.stencilRef);
+      const geometry = createTextGeometry(this.name, textProps.font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
+      geometry.center();
+      const mergedMesh = new THREE.Mesh(geometry, mat);
+
+
+      mergedMesh.position.set(0, boxProps.height/2+textProps.padding, 0);
+      if(!props.horizontal){
+        mergedMesh.position.set(0, boxProps.height/2+textProps.padding, 0);
+      }
+      boxProps.parent.add(mergedMesh);
+
+      return mergedMesh
+    }
+  }
+  ValueText(){
+    const props = this.box.userData.properties;
+    const boxProps = props.boxProps;
+    let valBoxProps = {...boxProps};
+    let widgetProps = this.box.userData.properties;
+    let valMatProps = materialProperties('BASIC', this.handle.material.color, false, 1, THREE.FrontSide, 'STENCIL');
+    let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText);
+
+    valBoxProps.matProps = valMatProps;
+
+    if(widgetProps.horizontal){
+      valBoxProps.height=boxProps.height;
+      valBoxProps.width=size.subWidth;
+    }else{
+      valBoxProps.height=size.subHeight;
+      valBoxProps.width=boxProps.width;
+    }
+
+    let valBox = undefined;
+
+    let defaultVal = props.valueProps.defaultValue.toString();
+    if(props.valueProps.editable){
+      valBox = editValueTextPortal(defaultVal, widgetProps.textProps.font, valBoxProps, widgetProps, this);
+    }else{
+      valBox = valueTextPortal(defaultVal, widgetProps.textProps.font, valBoxProps, widgetProps, this);
+    }
+    valBox.box.userData.size = {'width': size.subWidth, 'height': size.subHeight, 'depth': size.subDepth};
+    this.box.add(valBox.box);
+    this.box.userData.valueBox = valBox.box;
+    darkenMaterial(valBox.box.material, 30);
+
+    if(widgetProps.horizontal){
+      valBox.box.position.set(this.size.baseWidth/2+valBox.width/2, valBox.box.position.y, boxProps.parent.position.z);
+    }else{
+      valBox.box.position.set(valBox.box.position.x, -this.size.baseHeight+valBox.height, boxProps.parent.position.z);
+    }
+  }
+
+};
+
 export function switchWidgetBox(widgetProps, handleSize=2){
   let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, handleSize);
   
@@ -1995,75 +2132,82 @@ export function toggleProperties(boxProps, name='', horizontal=true, on=false, t
   }
 };
 
-export function toggleBase(toggleProps){
-  let toggle = switchWidgetBox(toggleProps, 2);
-  let size = calculateWidgetSize(toggleProps.boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
+export class BaseToggleBox extends BaseWidgetBox {
+  constructor(widgetProps) {
 
-  setToggleUserData(toggle, toggleProps);
-
-  if(toggle.base.userData.hasSubObject){
-    attachValueBox(toggle, toggleProps.boxProps, toggleProps, size.baseWidth, size.baseHeight)
-  }
-
-  return toggle
-
-};
-
-function updateToggleState(toggle){
-  toggle.handle.userData.on=!toggle.handle.userData.on;
-  handleToggleValueText(toggle);
-}
-
-function handleToggleValueText(toggle){
-  if(toggle.base.userData.valueBox != undefined){
-
-    if(toggle.base.userData.value == toggle.base.userData.valueProps.onValue){
-      toggle.base.userData.value = toggle.base.userData.valueProps.offValue;
-    }else{
-      toggle.base.userData.value = toggle.base.userData.valueProps.onValue;
+    super(widgetProps);
+    
+    if(this.box.userData.hasSubObject){
+      this.ValueText(this, widgetProps.boxProps, widgetProps, this.size.baseWidth, this.size.baseHeight)
     }
 
-    toggle.base.userData.valueBox.dispatchEvent({type:'update'});
+    this.setToggleUserData(widgetProps);
+
   }
-}
+  setToggleUserData(toggleProps){
+    let size = calculateWidgetSize(toggleProps.boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
 
-function setToggleUserData(toggle, toggleProps){
-  let size = calculateWidgetSize(toggleProps.boxProps, toggleProps.horizontal, toggleProps.useValueText, 2);
+    this.box.userData.type = 'TOGGLE';
+    this.box.userData.size = {'width': toggleProps.boxProps.width, 'height': toggleProps.boxProps.height, 'depth': size.baseDepth};
+    this.box.userData.handle = this.handle;
+    this.box.userData.horizontal = toggleProps.horizontal;
+    this.box.userData.valueProps = toggleProps.valueProps;
+    this.box.userData.value = toggleProps.valueProps.defaultValue;
 
-  toggle.base.userData.type = 'TOGGLE';
-  toggle.base.userData.size = {'width': toggleProps.boxProps.width, 'height': toggleProps.boxProps.height, 'depth': size.baseDepth};
-  toggle.base.userData.handle = toggle.handle;
-  toggle.base.userData.horizontal = toggleProps.horizontal;
-  toggle.base.userData.valueProps = toggleProps.valueProps;
-  toggle.base.userData.value = toggleProps.valueProps.defaultValue;
+    this.handle.userData.type = 'TOGGLE';
+    this.handle.userData.size = {'width': this.size.handleWidth, 'height': this.size.handleHeight, 'depth': this.size.handleDepth};
+    this.handle.userData.offPos = new THREE.Vector3().copy(this.handle.position);
+    this.handle.userData.horizontal = toggleProps.horizontal;
+    this.handle.userData.anim = false;
+    this.handle.userData.on = false;
+    this.handle.userData.targetElem = this;
 
-  toggle.handle.userData.type = 'TOGGLE';
-  toggle.handle.userData.size = {'width': size.handleWidth, 'height': size.handleHeight, 'depth': size.handleDepth};
-  toggle.handle.userData.offPos = new THREE.Vector3().copy(toggle.handle.position);
-  toggle.handle.userData.horizontal = toggleProps.horizontal;
-  toggle.handle.userData.anim = false;
-  toggle.handle.userData.on = false;
+    if(toggleProps.horizontal){
+      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x+this.size.baseWidth/2, this.handle.position.y, this.handle.position.z+this.size.baseDepth);
+    }else{
+      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x, this.handle.position.y+(this.size.baseHeight/2), this.handle.position.z+this.size.baseDepth);
+    }
 
-  if(toggleProps.horizontal){
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x+size.baseWidth/2, toggle.handle.position.y, toggle.handle.position.z+size.baseDepth);
-  }else{
-    toggle.handle.userData.onPos = new THREE.Vector3(toggle.handle.position.x, toggle.handle.position.y+(size.baseHeight/2), toggle.handle.position.z+size.baseDepth);
+    if(toggleProps.valueProps.defaultValue == toggleProps.valueProps.onValue){
+      this.handle.position.copy(this.handle.userData.onPos);
+      this.handle.userData.on = true;
+    }
+
+    if(this.box.userData.valueBox != undefined){
+      this.box.userData.valueBox.dispatchEvent({type:'update'});
+    }
+
+    this.handle.addEventListener('action', function(event) {
+      toggleAnimation(this.userData.targetElem);
+    });
+  }
+  handleToggleValueText(toggle){
+    if(toggle.box.userData.valueBox != undefined){
+
+      if(toggle.box.userData.value == toggle.base.userData.valueProps.onValue){
+        toggle.box.userData.value = toggle.base.userData.valueProps.offValue;
+      }else{
+        toggle.box.userData.value = toggle.base.userData.valueProps.onValue;
+      }
+
+      toggle.box.userData.valueBox.dispatchEvent({type:'update'});
+    }
+  }
+  static DoToggle(toggle){
+    toggle.handle.userData.on=!toggle.handle.userData.on;
+    if(toggle.box.userData.valueBox != undefined){
+
+      if(toggle.box.userData.value == toggle.box.userData.valueProps.onValue){
+        toggle.box.userData.value = toggle.box.userData.valueProps.offValue;
+      }else{
+        toggle.box.userData.value = toggle.box.userData.valueProps.onValue;
+      }
+
+      toggle.box.userData.valueBox.dispatchEvent({type:'update'});
+    }
   }
 
-  if(toggleProps.valueProps.defaultValue == toggleProps.valueProps.onValue){
-    toggle.handle.position.copy(toggle.handle.userData.onPos);
-    toggle.handle.userData.on = true;
-  }
-
-  if(toggle.base.userData.valueBox != undefined){
-    toggle.base.userData.valueBox.dispatchEvent({type:'update'});
-  }
-
-  toggle.handle.addEventListener('action', function(event) {
-    toggleAnimation(toggle);
-  });
-
-}
+};
 
 function setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh){
   let extraSpace = padding*0.5;
@@ -3266,23 +3410,6 @@ export function createMouseOverPortalButton(buttonProps){
   portalButton(buttonProps);
 };
 
-function createWidgetText(font, boxProps, name, textProps, animProps=undefined, onCreated=undefined, horizontal=true){
-  if(boxProps.name.length>0){
-
-    let mat = getMaterial(textProps.matProps, boxProps.parent.material.stencilRef);
-    const geometry = createTextGeometry(name, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
-    geometry.center();
-    const mergedMesh = new THREE.Mesh(geometry, mat);
-
-
-    mergedMesh.position.set(0, boxProps.height/2+textProps.padding, 0);
-    if(!horizontal){
-      mergedMesh.position.set(0, boxProps.height/2+textProps.padding, 0);
-    }
-    boxProps.parent.add(mergedMesh);
-  }
-}
-
 function SliderBox(sliderProps) {
   const parentSize = getGeometrySize(sliderProps.boxProps.parent.geometry);
   let slider = sliderBase(sliderProps);
@@ -3317,12 +3444,10 @@ export function createSliderBox(sliderProps) {
 
 function ToggleBox(toggleProps){
   const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
-  let toggle = toggleBase(toggleProps);
-  toggleProps.boxProps.parent.add(toggle.base);
-  toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
+  let toggle = new BaseToggleBox(toggleProps);
+  toggleProps.boxProps.parent.add(toggle.box);
+  toggle.box.position.set(toggle.box.position.x, toggle.box.position.y, toggle.box.position.z+parentSize.depth/2);
   toggles.push(toggle.handle);
-
-  createWidgetText(toggleProps.textProps.font, toggleProps.boxProps, toggleProps.name, toggleProps.textProps, toggleProps.animProps, toggleProps.onCreated, toggleProps.horizontal);
 }
 
 export function createToggleBox(toggleProps) {
@@ -3341,16 +3466,15 @@ export function createToggleBox(toggleProps) {
 function TogglePortal(toggleProps) {
   const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
   let stencilRef = getStencilRef();
-  let toggle = toggleBase(toggleProps);
-  setupStencilMaterial(toggle.base.material, stencilRef);
+  let toggle = new BaseToggleBox(toggleProps);
+  setupStencilMaterial(toggle.box.material, stencilRef);
   setupStencilChildMaterial(toggle.handle.material, stencilRef);
-  toggle.base.material.depthWrite = false;
+  toggle.box.material.depthWrite = false;
   toggle.handle.material.depthWrite = false;
-  toggleProps.boxProps.parent.add(toggle.base);
-  toggle.base.position.set(toggle.base.position.x, toggle.base.position.y, toggle.base.position.z+parentSize.depth/2);
+  toggleProps.boxProps.parent.add(toggle.box);
+  toggle.box.position.set(toggle.box.position.x, toggle.box.position.y, toggle.box.position.z+parentSize.depth/2);
   toggles.push(toggle.handle);
 
-  createWidgetText(toggleProps.textProps.font, toggleProps.boxProps, toggleProps.name, toggleProps.textProps, toggleProps.textProps.meshProps, toggleProps.animProps, toggleProps.onCreated, toggleProps.horizontal);
 }
 
 export function createTogglePortal(toggleProps) {
