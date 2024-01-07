@@ -1676,6 +1676,23 @@ export class BasePanel extends BaseTextBox {
   }
 };
 
+export function widgetProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), matProps=undefined, animProps=undefined, listConfig=undefined, handleSize=2 ){
+  return {
+    'type': 'WIDGET',
+    'boxProps': boxProps,
+    'name': name,
+    'horizontal': horizontal,
+    'on': on,
+    'textProps': textProps,
+    'useValueText': useValueText,
+    'valueProps': valueProps,
+    'matProps': matProps,
+    'animProps': animProps,
+    'listConfig': listConfig,
+    'handleSize': handleSize
+  }
+};
+
 export class BaseWidget extends BaseBox {
   constructor(widgetProps) {
     
@@ -1697,18 +1714,20 @@ export class BaseWidget extends BaseBox {
 
     darkenMaterial(this.box.material, 10);
 
-    this.handleMaterial = getMaterial(widgetProps.boxProps.matProps, widgetProps.boxProps.parent.material.stencilRef);
-    this.handle = this.WidgetHandle();
-    this.handle.renderOrder = 2;
+    if(this.handleSize > 0){
+      this.handleMaterial = getMaterial(widgetProps.boxProps.matProps, widgetProps.boxProps.parent.material.stencilRef);
+      this.handle = this.WidgetHandle();
+      this.handle.renderOrder = 2;
 
-    this.box.add(this.handle);
+      this.box.add(this.handle);
 
-    if(widgetProps.horizontal){
-      this.handle.position.set(-(this.size.baseWidth/2-this.size.handleWidth/2), this.handle.position.y, this.handle.position.z+this.size.baseDepth);
-    }else{
-      this.handle.position.set(this.handle.position.x,-(this.size.baseHeight/2-this.size.handleHeight/2), this.handle.position.z+this.size.baseDepth);
+      if(widgetProps.horizontal){
+        this.handle.position.set(-(this.size.baseWidth/2-this.size.handleWidth/2), this.handle.position.y, this.handle.position.z+this.size.baseDepth);
+      }else{
+        this.handle.position.set(this.handle.position.x,-(this.size.baseHeight/2-this.size.handleHeight/2), this.handle.position.z+this.size.baseDepth);
+      }
     }
-    
+
     this.widgetText = this.WidgetText();
 
   }
@@ -1812,7 +1831,8 @@ class ValueTextWidget extends BaseTextBox{
       valBoxProps.height=size.subHeight;
       valBoxProps.width=widgetProps.boxProps.width;
     }
-    super(buttonProperties(valBoxProps, widgetProps.textProps.font, defaultVal, widgetProps.value, widgetProps.padding, textProps, valMatProps, widgetProps.animProps, undefined, undefined, false, true));
+
+    super(buttonProperties(valBoxProps, widgetProps.textProps.font, defaultVal, widgetProps.value, widgetProps.padding, textProps, valMatProps, widgetProps.animProps, undefined, undefined, false));
     this.numeric = widgetProps.numeric;
     if(this.numeric){
       this.min = widgetProps.min;
@@ -3120,6 +3140,127 @@ export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name
   }
 };
 
+// return {
+//     'type': 'BUTTON',
+//     'boxProps': boxProps,
+//     'font': font,
+//     'name': name,
+//     'value': value,
+//     'padding': padding,
+//     'textProps': textProps,
+//     'matProps': matProps,
+//     'animProps': animProps,
+//     'listConfig': listConfig,
+//     'onCreated': onCreated,
+//     'mouseOver': mouseOver,
+//     'portal': portal,
+//     'attach': attach
+//   }
+
+
+export class SelectorWidget extends BaseWidget {
+  constructor(listSelectorProps) {
+    const isPortal = listSelectorProps.isPortal;
+    const textProps = listSelectorProps.textProps;
+    const matProps = listSelectorProps.matProps;
+    let btnBoxProps = {...listSelectorProps.boxProps};
+    let btnMatProps = {...listSelectorProps.matProps};
+    let btnTextProps = {...listSelectorProps.textProps};
+    btnBoxProps.matProps = btnMatProps;
+    let baseProps = buttonProperties(listSelectorProps.boxProps, listSelectorProps.textProps.font, "", "", listSelectorProps.padding, textProps, matProps, listSelectorProps.animProps, undefined, undefined, listSelectorProps.isPortal);
+    let widgetProps = widgetProperties(btnBoxProps, listSelectorProps.name, true, true, listSelectorProps.textProps, false, undefined, listSelectorProps.matProps, listSelectorProps.animProps, listSelectorProps.listConfig, 0)
+    super(widgetProps);
+    this.box.userData.properties = widgetProps;
+    this.box.userData.selectors = [];
+    this.baseProps = baseProps;
+    this.btnBoxProps = btnBoxProps;
+    this.btnMatProps = btnMatProps;
+    this.btnTextProps = btnTextProps;
+    this.boxProps = btnBoxProps;
+    this.selectors = {};
+
+  }
+  SetSelectors(selectors){
+    this.selectors = selectors;
+    this.CreateSelectors();
+  }
+  CreateSelectors(){
+    let idx = 0;
+    for (const [key, val] of Object.entries(this.selectors)) {
+      let props = this.box.userData.properties;
+      let btnProps = buttonProperties(this.btnBoxProps, props.textProps.font, key, val, props.padding, props.textProps, props.matProps, props.animProps, undefined, undefined, props.isPortal);
+      let btn = new BaseTextBox(btnProps);
+
+      const tProps = editTextProperties(btn, '', this.btnTextProps.textMesh, this.btnTextProps.font, this.btnTextProps.size, this.btnTextProps.height, this.btnTextProps.zOffset, this.btnTextProps.letterSpacing, this.btnTextProps.lineSpacing, this.btnTextProps.wordSpacing, this.btnTextProps.padding, true, this.btnTextProps.meshProps);
+      btn.textMesh.userData.textProps = tProps;
+      inputPrompts.push(btn.textMesh);
+      mouseOverable.push(btn.textMesh);
+      clickable.push(btn.textMesh);
+      btn.box.name = key;
+      
+      this.SetUserData(btn, key, val, idx);
+      mouseOverUserData(btn.textMesh);
+
+      this.box.userData.selectors.push(btn.box);
+      selectorElems.push(btn.box);
+      this.box.add(btn.box);
+        
+      btn.textMesh.addEventListener('action', function(event) {
+        SelectorWidget.TextSelected(btn.textMesh)
+      });
+
+      if(idx==0){
+        btn.textMesh.userData.selected = true;
+        btn.box.position.copy(btn.box.userData.selectedPos);
+
+      }else{
+        btn.box.position.copy(btn.box.userData.unselectedPos);
+        btn.box.scale.set(btn.box.unselectedScale, btn.box.unselectedScale, btn.box.unselectedScale);
+      }
+
+      // if(portal!=undefined){
+      //   btn.box.material.stencilRef = portal.box.material.stencilRef;
+      //   btn.box.material.depthWrite = true;
+      //   textMesh.material.stencilRef = portal.box.material.stencilRef;
+      //   textMesh.material.depthWrite = true;
+      // }
+
+      idx+=1;
+    }
+  }
+  SetUserData(btn, key, value, index){
+    const textSize = getGeometrySize(btn.textMesh.geometry);
+    btn.textMesh.userData.draggable = false;
+    btn.textMesh.userData.key = key;
+    btn.textMesh.userData.value = value;
+    btn.textMesh.userData.index = index;
+    btn.textMesh.userData.selected = false;
+    btn.box.userData.selectedScale = 1;
+    btn.box.userData.unselectedScale = 0.9;
+    btn.box.userData.selectedPos = new THREE.Vector3(btn.box.position.x, btn.box.position.y, btn.depth+(btn.depth+textSize.depth));
+    btn.box.userData.unselectedPos = new THREE.Vector3(btn.box.position.x, btn.box.position.y, btn.depth);
+    btn.box.userData.mouseOverParent = true;
+    btn.box.userData.currentText = key;
+  }
+  static TextSelected(selection){
+    let base = selection.parent.parent;
+    base.userData.selection = selection;
+
+    base.userData.selectors.forEach((c, idx) => {
+      if(c.children[0].userData.selected){
+        base.userData.lastSelected = c;
+      }
+      c.children[0].userData.selected = false;
+    })
+
+    selection.userData.selected = true;
+    let first = selection.parent;
+    base.userData.selectors.sort(function(x,y){ return x == first ? -1 : y == first ? 1 : 0; });
+    selectorAnimation(selection.parent.parent, 'SELECT');
+
+  }
+};
+
 function ListSelector(listSelectorProps, selectors){
   const isPortal = listSelectorProps.isPortal;
   let mainBoxProps = {...listSelectorProps.boxProps};
@@ -3210,10 +3351,14 @@ export function createListSelector(listSelectorProps, selectors) {
     // Load the font
     loader.load(listSelectorProps.textProps.font, (font) => {
       listSelectorProps.textProps.font = font;
-      ListSelector(listSelectorProps, selectors);
+      //ListSelector(listSelectorProps, selectors);
+      let widget = new SelectorWidget(listSelectorProps);
+      widget.SetSelectors(selectors);
     });
   }else if(listSelectorProps.textProps.font.isFont){
-    ListSelector(listSelectorProps, selectors);
+    //ListSelector(listSelectorProps, selectors);
+    let widget = new SelectorWidget(listSelectorProps);
+      widget.SetSelectors(selectors);
   }
 
 };
