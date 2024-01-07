@@ -642,10 +642,10 @@ export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut
     pos=elem.handle.userData.offPos;
   }
 
-  let props = { duration: duration, x: pos.x, y: elem.handle.position.y, z: elem.handle.position.z, ease: easeIn, onComplete: BaseToggleBox.DoToggle, onCompleteParams:[elem] };
+  let props = { duration: duration, x: pos.x, y: elem.handle.position.y, z: elem.handle.position.z, ease: easeIn, onComplete: ToggleWidget.DoToggle, onCompleteParams:[elem] };
 
   if(!elem.handle.userData.horizontal){
-    props = { duration: duration, x: elem.handle.position.x, y: pos.y, z: elem.handle.position.z, ease: easeIn, onComplete: BaseToggleBox.DoToggle, onCompleteParams:[elem] };
+    props = { duration: duration, x: elem.handle.position.x, y: pos.y, z: elem.handle.position.z, ease: easeIn, onComplete: ToggleWidget.DoToggle, onCompleteParams:[elem] };
   }
 
   elem.handle.userData.anim = gsap.to(elem.handle.position, props);
@@ -1170,7 +1170,11 @@ class BaseBox {
   CreateBoxGeometry(boxProps) {
     let result = undefined;
     if(boxProps.complexMesh){
-      result = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+      if(boxProps.isPortal){
+        result = RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+      }else{
+        result = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+      }
     }else{
       result = new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth);
     }
@@ -1179,7 +1183,7 @@ class BaseBox {
   }
   UpdateBoxGeometry(boxProps) {
     this.geometry.dispose();
-    this.BoxGeometry(boxProps);
+    this.CreateBoxGeometry(boxProps);
     setGeometryPivot(this.box, boxProps);
   }
   UpdateMaterial(matProps){
@@ -1449,7 +1453,7 @@ export function CreateBasePanel(panelProps) {
 };
 
 
-class BaseButton extends BaseBox {
+class BaseTextBox extends BaseBox {
   constructor(buttonProps) {
     super(buttonProps.boxProps);
 
@@ -1469,11 +1473,16 @@ class BaseButton extends BaseBox {
     adjustBoxScaleRatio(this.box, this.parent);
 
   }
-  CreateText(){
+  CreateTextGeometry(){
     let geometry = createMergedTextGeometry(this.textProps.font, this.width, this.height, this.text, this.textProps, this.animProps);
+    geometry.center();
+
+    return geometry
+  }
+  CreateText(){
+    let geometry = this.CreateTextGeometry();
     const geomSize = getGeometrySize(geometry);
     const boxSize = getGeometrySize(this.box.geometry);
-    geometry.center();
     let result = new THREE.Mesh(geometry, this.textMaterial);
     setMergedMeshUserData(boxSize, geomSize, this.textProps.padding, result);
     this.box.add(result);
@@ -1484,7 +1493,7 @@ class BaseButton extends BaseBox {
   UpdateText(text){
     this.text = text;
     this.textMesh.geometry.dispose();
-    this.textMesh = this.CreateText();
+    this.textMesh.geometry = this.CreateTextGeometry();
   }
 }
 
@@ -1507,7 +1516,7 @@ export function buttonProperties(boxProps, font, name='Button', value='', paddin
   }
 };
 
-export class BasePanel extends BaseButton {
+export class BasePanel extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.textProps.font, panelProps.name, panelProps.value, panelProps.padding, panelProps.textProps, panelProps.matProps, panelProps.animProps, undefined, undefined, panelProps.mouseOver, panelProps.portal));
     this.box.userData.properties = panelProps;
@@ -1667,8 +1676,7 @@ export class BasePanel extends BaseButton {
   }
 };
 
-
-export class BaseWidgetBox extends BaseBox {
+export class BaseWidget extends BaseBox {
   constructor(widgetProps) {
     
     let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, widgetProps.handleSize);
@@ -1701,7 +1709,6 @@ export class BaseWidgetBox extends BaseBox {
       this.handle.position.set(this.handle.position.x,-(this.size.baseHeight/2-this.size.handleHeight/2), this.handle.position.z+this.size.baseDepth);
     }
     
-
     this.widgetText = this.WidgetText();
 
   }
@@ -1713,33 +1720,6 @@ export class BaseWidgetBox extends BaseBox {
     }
 
     return new THREE.Mesh(geometry, this.handleMaterial);
-  }
-  WidgetSize(boxProps, horizontal, useSubObject, operatorSizeDivisor, defaultSubOffset=0.65){
-    let subOffset = 1;
-    if(useSubObject){
-      subOffset = defaultSubOffset;
-    }
-    let baseWidth = boxProps.width*subOffset;
-    let baseHeight = boxProps.height;
-    let baseDepth=boxProps.depth/2;
-    let handleWidth=boxProps.width/operatorSizeDivisor*subOffset;
-    let handleHeight=boxProps.height;
-    let handleDepth=boxProps.depth*2;
-    let subWidth=baseWidth*(1-1*subOffset);
-    let subHeight=baseHeight;
-    let subDepth=baseDepth;
-
-    if(horizontal==false){
-      baseWidth = boxProps.width;
-      baseHeight = boxProps.height*subOffset;
-      handleWidth=boxProps.width;
-      handleHeight=boxProps.height/operatorSizeDivisor*subOffset;
-      subWidth=baseWidth;
-      subHeight=baseHeight*(1-1*subOffset);
-      subDepth=baseDepth;
-    }
-
-    return {baseWidth, baseHeight, baseDepth, handleWidth, handleHeight, handleDepth, subWidth, subHeight, subDepth}
   }
   WidgetText(){
     if(this.name.length>0){
@@ -1763,35 +1743,13 @@ export class BaseWidgetBox extends BaseBox {
     }
   }
   ValueText(){
-    const props = this.box.userData.properties;
-    const boxProps = props.boxProps;
-    let valBoxProps = {...boxProps};
-    let widgetProps = this.box.userData.properties;
-    let valMatProps = materialProperties('BASIC', this.handle.material.color, false, 1, THREE.FrontSide, 'STENCIL');
-    let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText);
+    const widgetProps = this.box.userData.properties;
+    const boxProps = widgetProps.boxProps;
+    const valBox = new ValueTextWidget(widgetProps);
 
-    valBoxProps.matProps = valMatProps;
-
-    if(widgetProps.horizontal){
-      valBoxProps.height=boxProps.height;
-      valBoxProps.width=size.subWidth;
-    }else{
-      valBoxProps.height=size.subHeight;
-      valBoxProps.width=boxProps.width;
-    }
-
-    let valBox = undefined;
-
-    let defaultVal = props.valueProps.defaultValue.toString();
-    if(props.valueProps.editable){
-      valBox = editValueTextPortal(defaultVal, widgetProps.textProps.font, valBoxProps, widgetProps, this);
-    }else{
-      valBox = valueTextPortal(defaultVal, widgetProps.textProps.font, valBoxProps, widgetProps, this);
-    }
-    valBox.box.userData.size = {'width': size.subWidth, 'height': size.subHeight, 'depth': size.subDepth};
     this.box.add(valBox.box);
-    this.box.userData.valueBox = valBox.box;
     darkenMaterial(valBox.box.material, 30);
+    this.box.userData.valueBox = valBox.box;
 
     if(widgetProps.horizontal){
       valBox.box.position.set(this.size.baseWidth/2+valBox.width/2, valBox.box.position.y, boxProps.parent.position.z);
@@ -1800,46 +1758,6 @@ export class BaseWidgetBox extends BaseBox {
     }
   }
 
-};
-
-export function switchWidgetBox(widgetProps, handleSize=2){
-  let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, handleSize);
-  
-  let handleMat = getMaterial(widgetProps.boxProps.matProps, widgetProps.boxProps.parent.material.stencilRef);
-  let baseMat = getMaterial(widgetProps.boxProps.matProps, widgetProps.boxProps.parent.material.stencilRef);
-  let mat = widgetProps.boxProps.parent.material;
-  darkenMaterial(baseMat, 10);
-
-  let handleGeometry = new THREE.BoxGeometry(size.handleWidth, size.handleHeight, size.handleDepth);
-  let baseGeometry = new THREE.BoxGeometry(size.baseWidth, size.baseHeight, size.baseDepth/2);
-
-  if(widgetProps.boxProps.complexMesh){
-    handleGeometry = RoundedBoxGeometry(size.handleWidth, size.handleHeight, size.handleDepth, widgetProps.boxProps.radius, widgetProps.boxProps.smoothness, widgetProps.boxProps.zOffset);
-    if(widgetProps.boxProps.depth == 0){
-      baseGeometry = RoundedPlaneGeometry(size.baseWidth, size.baseHeight, widgetProps.boxProps.radius, widgetProps.boxProps.smoothness, widgetProps.boxProps.zOffset);
-    }else{
-      baseGeometry = RoundedBoxGeometry(size.baseWidth, size.baseHeight, size.baseDepth/2, widgetProps.boxProps.radius, widgetProps.boxProps.smoothness, widgetProps.boxProps.zOffset);
-    }
-  }
-
-  const handle = new THREE.Mesh(handleGeometry, handleMat);
-  handle.renderOrder = 2;
-  const base = new THREE.Mesh(baseGeometry, baseMat);
-  base.add(handle);
-
-  if(widgetProps.horizontal){
-    handle.position.set(-(size.baseWidth/2-size.handleWidth/2), handle.position.y, handle.position.z+size.baseDepth);
-  }else{
-    handle.position.set(handle.position.x,-(size.baseHeight/2-size.handleHeight/2), handle.position.z+size.baseDepth);
-  }
-  base.userData.horizontal = widgetProps.horizontal;
-  base.userData.hasSubObject = widgetProps.useValueText;
-  base.userData.properties = widgetProps;
-
-  let result = { 'base': base, 'handle': handle,  'width': widgetProps.boxProps.width, 'height': widgetProps.boxProps.height, 'padding': widgetProps.padding}
-
-
-  return result
 };
 
 export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, step=0.001, editable=true){
@@ -1876,115 +1794,96 @@ export function sliderProperties(boxProps, name='', horizontal=true, min=0, max=
   }
 };
 
-function updateSliderUI(params){
-  if(isNaN(params.box.parent.userData.value))
-    return;
+class ValueTextWidget extends BaseTextBox{
+  constructor(widgetProps) {
+    let valBoxProps = {...widgetProps.boxProps};
+    valBoxProps.isPortal = true;
+    let textProps = widgetProps.textProps;
+    let valMatProps = materialProperties('BASIC', widgetProps.textProps.matProps.color, false, 1, THREE.FrontSide, 'STENCIL');
+    let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText);
+    let defaultVal = widgetProps.valueProps.defaultValue.toString();
 
-  let widget = params.base.textMesh.widget;
-  let pos = calculateSliderPosition(widget);
+    valBoxProps.matProps = valMatProps;
 
-  widget.handle.position.copy(pos);
-}
+    if(widgetProps.horizontal){
+      valBoxProps.height=widgetProps.boxProps.height;
+      valBoxProps.width=size.subWidth;
+    }else{
+      valBoxProps.height=size.subHeight;
+      valBoxProps.width=widgetProps.boxProps.width;
+    }
+    super(buttonProperties(valBoxProps, widgetProps.textProps.font, defaultVal, widgetProps.value, widgetProps.padding, textProps, valMatProps, widgetProps.animProps, undefined, undefined, false, true));
+    this.numeric = widgetProps.numeric;
+    if(this.numeric){
+      this.min = widgetProps.min;
+      this.max = widgetProps.max;
+    }
+    this.box.userData.targetElem = this;
+    this.SetValueTextPosition();
 
-function updateValueText(params){
+    darkenMaterial(this.box.material, 30);
 
-  if(params.base.textMesh.numeric && isNaN(params.box.parent.userData.value))
-    return;
+    if(widgetProps.valueProps.editable){
+      this.EditableSetup();
+    }
 
-  let mergedGeometry = createMergedTextGeometry(params.font, params.boxProps.width, params.boxProps.height, params.box.parent.userData.value, params.textProps);
-  params.base.textMesh.geometry.dispose();
-  params.base.textMesh.geometry = mergedGeometry;
+    this.box.addEventListener('update', function(event) {
+      this.userData.targetElem.UpdateValue();
+    });
 
-  params.base.textMesh.position.set(-params.boxProps.width/2+params.textProps.size/2, -params.boxProps.height/2+params.textProps.height, -params.textProps.size/2);
+  }
+  SetValue(val){
+    if(this.box.parent.userData.value == undefined)
+      return;
 
-}
+    if(this.numeric){
+      if(!this.NumericValueValid(val))
+        return;
+      this.box.parent.userData.value = val;
 
+    }else{
+      this.box.parent.userData.value = val;
+    }
+    this.UpdateValue();
+    this.box.parent.dispatchEvent({type:'update'});
+  }
+  UpdateValue(){
+    if(this.box.parent.userData.value == undefined)
+      return;
 
-export function valueTextPortal(text, font, boxProps, widgetProps, widget=undefined){
-  let Box = portalWindow(boxProps);
-  
-  let material = getMaterial(widgetProps.textProps.matProps, Box.box.material.stencilRef);
-  const textGeometry = createMergedTextGeometry(font, boxProps.width, boxProps.height, text, widgetProps.textProps);
+    this.UpdateText(this.box.parent.userData.value);
+    this.SetValueTextPosition();
+  }
+  SetValueTextPosition(){
+    this.textMesh.position.set(this.textMesh.position.x, this.textMesh.position.y, -this.depth/2);
+  }
+  EditableSetup(){
+    inputPrompts.push(this.textMesh);
+    const textProps = this.box.userData.properties.textProps;
+    const tProps = editTextProperties(this, '', this.textMesh, textProps.font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps);
+    this.textMesh.userData.textProps = tProps;
+    this.box.userData.mouseOverParent = true;
+    this.box.userData.currentText = '';
+    this.textMesh.userData.numeric = this.box.userData.properties.numeric;
+    this.textMesh.widget = this;
+    mouseOverable.push(this.box);
+    mouseOverUserData(this.textMesh);
+  }
+  NumericValueValid(val){
+    let result = true;
+    if(val < this.min && val > this.max){
+      result = false;
+    }
+    if(isNaN(val)){
+      result = false;
+    }
 
-  const textMesh = new THREE.Mesh(textGeometry, material);
-  textMesh.position.set(-boxProps.width/2+widgetProps.textProps.size/2, -boxProps.height/2+widgetProps.textProps.height, -widgetProps.textProps.size/2);
-  let base = {textMesh, Box}
-  base.Box.box.userData.textMaterial = material;
-  base.textMesh.userData.numeric = widgetProps.numeric;
-  base.textMesh.widget = widget;
-
-  Box.box.add(textMesh);
-
-  let params = {'base': base,'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': widgetProps.textProps};
-
-  base.Box.box.addEventListener('update', function(event) {
-    updateValueText(params);
-  });
-
-  return base.Box
-};
-
-export function editValueTextPortal(text, font, boxProps, widgetProps, widget=undefined){
-  let base = selectionTextPortal(boxProps, text, widgetProps.textProps.font, widgetProps.textProps);
-  let material = getMaterial(widgetProps.textProps.matProps, base.Box.box.material.stencilRef);
-  let textProps = widgetProps.textProps;
-  base.Box.box.userData.textMaterial = material;
-  base.textMesh.userData.numeric = widgetProps.numeric;
-  base.textMesh.widget = widget;
-  const tProps = editTextProperties(base.Box, '', base.textMesh, font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps, false);
-  base.textMesh.userData.textProps = tProps;
-  base.Box.box.userData.properties = widgetProps;
-
-  let params = {'base': base, 'box': base.Box.box, 'material': material, 'font': font, 'boxProps': boxProps, 'textProps': widgetProps.textProps};
-  handleTextInputSetup(base, widgetProps.textProps, font);
-
-  base.Box.box.addEventListener('update', function(event) {
-    updateValueText(params);
-  });
-
-  base.textMesh.addEventListener('update', function(event) {
-    updateSliderUI(params);
-  });
-
-  return base.Box 
-};
-
-function attachValueBox(widget, boxProps, widgetProps, baseWidth, baseHeight){
-  let valBoxProps = {...boxProps};
-  let valMatProps = materialProperties('BASIC', widget.handle.material.color, false, 1, THREE.FrontSide, 'STENCIL');
-  let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText);
-
-  valBoxProps.matProps = valMatProps;
-
-  if(widgetProps.horizontal){
-    valBoxProps.height=boxProps.height;
-    valBoxProps.width=size.subWidth;
-  }else{
-    valBoxProps.height=size.subHeight;
-    valBoxProps.width=boxProps.width;
+    return result
   }
 
-  let valBox = undefined;
-
-  let defaultVal = widget.base.userData.valueProps.defaultValue.toString();
-  if(widget.base.userData.valueProps.editable){
-    valBox = editValueTextPortal(defaultVal, widgetProps.textProps.font, valBoxProps, widgetProps, widget);
-  }else{
-    valBox = valueTextPortal(defaultVal, widgetProps.textProps.font, valBoxProps, widgetProps, widget);
-  }
-  valBox.box.userData.size = {'width': size.subWidth, 'height': size.subHeight, 'depth': size.subDepth};
-  widget.base.add(valBox.box);
-  widget.base.userData.valueBox = valBox.box;
-  darkenMaterial(valBox.box.material, 30);
-
-  if(widgetProps.horizontal){
-    valBox.box.position.set(baseWidth/2+valBox.width/2, valBox.box.position.y, boxProps.parent.position.z);
-  }else{
-    valBox.box.position.set(valBox.box.position.x, -baseHeight+valBox.height, boxProps.parent.position.z);
-  }
 }
 
-export class BaseSliderBox extends BaseWidgetBox {
+export class SliderWidget extends BaseWidget {
   constructor(widgetProps) {
 
     super(widgetProps);
@@ -1999,6 +1898,10 @@ export class BaseSliderBox extends BaseWidgetBox {
       this.userData.targetElem.OnSliderMove();
     });
 
+    this.box.addEventListener('update', function(event) {
+      this.userData.targetElem.UpdateSliderPosition();
+    });
+
   }
   setSliderUserData(){
     let sliderProps = this.box.userData.properties;
@@ -2010,6 +1913,7 @@ export class BaseSliderBox extends BaseWidgetBox {
     this.box.userData.horizontal = sliderProps.horizontal;
     this.box.userData.valueProps = sliderProps.valueProps;
     this.box.userData.value = sliderProps.valueProps.defaultValue;
+    this.box.userData.targetElem = this;
 
     this.handle.userData.type = 'SLIDER';
     this.handle.userData.size = {'width': size.handleWidth, 'height': size.handleHeight, 'depth': size.handleDepth};
@@ -2066,7 +1970,7 @@ export class BaseSliderBox extends BaseWidgetBox {
     }
 
   }
-  SetSliderPosition(){
+  UpdateSliderPosition(){
     let minScroll = this.handle.userData.minScroll;
     let maxScroll = this.handle.userData.maxScroll;
     let max = this.handle.userData.max;
@@ -2129,7 +2033,7 @@ export function toggleProperties(boxProps, name='', horizontal=true, on=false, t
   }
 };
 
-export class BaseToggleBox extends BaseWidgetBox {
+export class ToggleWidget extends BaseWidget {
   constructor(widgetProps) {
 
     super(widgetProps);
@@ -2951,7 +2855,6 @@ function selectionTextPortal(boxProps, text, font, textProps=undefined,  animPro
   setMergedMeshUserData(boxSize, geomSize, textProps.padding, textMesh);
 
   Box.box.add(textMesh);
-  //textMesh.position.set(Box.width/2-geomSize.width/2-textProps.padding, -Box.height/2+geomSize.height/2+textProps.padding, textMesh.position.z);
   textMesh.position.set(textMesh.position.x, textMesh.position.y-textProps.padding, textMesh.position.z);
   boxProps.parent.add(Box.box);
   Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
@@ -3410,7 +3313,7 @@ export function createMouseOverPortalButton(buttonProps){
 
 function SliderBox(sliderProps) {
   const parentSize = getGeometrySize(sliderProps.boxProps.parent.geometry);
-  let slider = new BaseSliderBox(sliderProps);
+  let slider = new SliderWidget(sliderProps);
   let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
     
   sliderProps.boxProps.parent.add(slider.box);
@@ -3441,7 +3344,7 @@ export function createSliderBox(sliderProps) {
 
 function ToggleBox(toggleProps){
   const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
-  let toggle = new BaseToggleBox(toggleProps);
+  let toggle = new ToggleWidget(toggleProps);
   toggleProps.boxProps.parent.add(toggle.box);
   toggle.box.position.set(toggle.box.position.x, toggle.box.position.y, toggle.box.position.z+parentSize.depth/2);
   toggles.push(toggle.handle);
@@ -3463,7 +3366,7 @@ export function createToggleBox(toggleProps) {
 function TogglePortal(toggleProps) {
   const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
   let stencilRef = getStencilRef();
-  let toggle = new BaseToggleBox(toggleProps);
+  let toggle = new ToggleWidget(toggleProps);
   setupStencilMaterial(toggle.box.material, stencilRef);
   setupStencilChildMaterial(toggle.handle.material, stencilRef);
   toggle.box.material.depthWrite = false;
@@ -4091,8 +3994,8 @@ function onEnterKey(event, textMesh, currentText, boxSize, padding){
       draggable.push(textMesh);
     }
   }else{
-    textMesh.widget.base.userData.value = currentText;
-    textMesh.dispatchEvent({type:'update'});
+    //textMesh.widget.base.userData.value = currentText;
+    //textMesh.dispatchEvent({type:'update'});
   }
 }
 
@@ -4118,10 +4021,10 @@ function onHandleTypingText(event, textMesh, currentText, boxSize, padding){
 
     textMesh.userData.textProps.cBox.box.userData.currentText = currentText;
   }else{
-    if(textMesh.userData.numeric && !isNaN(currentText)){
-      textMesh.widget.base.userData.value = currentText;
-      textMesh.userData.textProps.cBox.box.userData.currentText = currentText;
-      textMesh.widget.base.userData.valueBox.dispatchEvent({type:'update'});
+
+    if(!isNaN(currentText)){
+      textMesh.widget.box.userData.currentText = currentText;
+      textMesh.widget.SetValue(currentText);
     }
   } 
 }
@@ -4158,6 +4061,7 @@ export function doubleClickHandler(raycaster){
         } else if (event.key === 'Backspace') {
             // Handle backspace
             currentText = currentText.slice(0, -1);
+            onHandleTypingText(event, textMesh, currentText, boxSize, padding);
         } else if (event.key === 'Shift' || event.key === 'Control' || event.key === 'Capslock') {
 
         } else if (event.key === 'ArrowDown' ) {
