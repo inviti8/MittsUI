@@ -135,7 +135,7 @@ function RoundedBoxGeometry(width, height, depth, radius, smoothness, zOffset=1)
 
 function addMorphToGeometry(geometry, morphGeometry, morphName){
   let verts  = [...morphGeometry.attributes.position.array];
-  geometry.morphAttributes[Object.keys(geometry.morphAttributes).length-1] = {name: morphName, vertices: verts};
+  geometry.morphAttributes[Object.keys(geometry.morphAttributes).length] = {name: morphName, vertices: verts};
 }
 
 export function attachToInnerTop(parent, elem, depth){
@@ -561,6 +561,15 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
     let scales = [];
     let selected = undefined;
 
+    function selectorOnUpdate(elem, props){
+      if(elem.userData.open){
+
+      }else{
+
+      }
+      //gsap.to(elem.scale, props);
+    }
+
     elem.userData.selectors.forEach((c, idx) => {
       let size = getGeometrySize(c.geometry);
       let parentSize = getGeometrySize(c.parent.geometry);
@@ -601,13 +610,17 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
         let current = elem.userData.selectors[i];
         let props = { duration: duration, x: current.position.x, y: yPositions[i], z: zPositions[i], ease: easeIn };
         gsap.to(current.position, props);
-        props = { duration: duration, x: scales[i], y: scales[i], z: scales[i], ease: easeIn };
+        props = { duration: duration, x: scales[i], y: scales[i], z: scales[i], ease: easeIn};
         gsap.to(current.scale, props);
       }
 
       if(elem.userData.properties.isPortal){
-        let props = { duration: duration, x: 1, y: portalScale, z: 1, ease: easeIn };
-        gsap.to(elem.userData.portal.scale, props);
+        console.log('HERE')
+        let props = { duration: duration, 0: 0, ease: easeIn };
+        if(elem.userData.open){
+          props = { duration: duration, 0: 1, ease: easeIn };
+        }
+        gsap.to(elem.morphTargetInfluences, props);
       }
     }
 
@@ -958,7 +971,7 @@ export function getMaterial(props, stencilRef=0){
   mat.opacity = props.opacity;
 
   if(props.useCase == 'STENCIL'){
-    setupStencilMaterial(mat, stencilRef);
+    setupStencilMaterial(mat, getStencilRef());
   }else if(props.useCase == 'STENCIL_CHILD'){
     setupStencilChildMaterial(mat, stencilRef);
   }
@@ -1179,6 +1192,8 @@ class BaseBox {
       result = new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth);
     }
 
+    result.morphAttributes.position = [];
+
     return result
   }
   UpdateBoxGeometry(boxProps) {
@@ -1190,6 +1205,32 @@ class BaseBox {
     this.material.dispose();
     this.material = getMaterial(matProps);
     this.box.material = this.material;
+  }
+  CreateHeightExpandedMorph(sizeMult){
+    if(this.box.geometry == undefined)
+      return;
+
+    this.material.morphTargets = true;
+    const morphGeometry = this.box.geometry.clone();
+    const expansionY = (this.height/2)*sizeMult;
+    //move the top verts upward, and the bottom verts downward.
+    morphGeometry.attributes.position.array.forEach((v, i) => {
+      let x = morphGeometry.attributes.position.getX(i);
+      let y = morphGeometry.attributes.position.getY(i);
+      let z = morphGeometry.attributes.position.getZ(i);
+      if(y>0){
+        morphGeometry.attributes.position.setXYZ(i, x, y+expansionY, z);
+      }else if(y<0){
+        morphGeometry.attributes.position.setXYZ(i, x, y-expansionY, z);
+      }
+    });
+
+    this.box.geometry.morphAttributes.position[ 0 ] = new THREE.Float32BufferAttribute( morphGeometry.attributes.position.array, 3 );
+    this.box.updateMorphTargets();
+
+  }
+  static MorphBox(box, index, val){
+    box.morphTargetInfluences[ index ] = val;
   }
 }
 
@@ -1695,7 +1736,7 @@ export function widgetProperties(boxProps, name='', horizontal=true, on=false, t
 
 export class BaseWidget extends BaseBox {
   constructor(widgetProps) {
-    
+
     let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, widgetProps.handleSize);
     let baseBoxProps = {...widgetProps.boxProps};
     baseBoxProps.width = size.baseWidth;
@@ -2145,11 +2186,6 @@ function mouseOverUserData(elem){
   elem.userData.mouseOver =  false;
   elem.userData.mouseOverActive = false;
   elem.userData.hoverAnim = undefined;
-}
-
-function selectorUserData(elem){
-  elem.userData.selectors = [];
-  elem.userData.open = false;
 }
 
 function adjustBoxScaleRatio(box, parent){
@@ -3107,24 +3143,6 @@ export function createScrollableTextInputPortal(textInputProps) {
   }
 };
 
-function onSelectorChoice(selection){
-  let base = selection.parent.parent;
-  base.userData.selection = selection;
-
-  base.userData.selectors.forEach((c, idx) => {
-    if(c.children[0].userData.selected){
-      base.userData.lastSelected = c;
-    }
-    c.children[0].userData.selected = false;
-  })
-
-  selection.userData.selected = true;
-  let first = selection.parent;
-  base.userData.selectors.sort(function(x,y){ return x == first ? -1 : y == first ? 1 : 0; });
-  selectorAnimation(selection.parent.parent, 'SELECT');
-
-}
-
 export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', padding=0.01, textProps=undefined, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, isPortal=false){
   return {
     'type': 'LIST_SELECTOR',
@@ -3140,23 +3158,6 @@ export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name
   }
 };
 
-// return {
-//     'type': 'BUTTON',
-//     'boxProps': boxProps,
-//     'font': font,
-//     'name': name,
-//     'value': value,
-//     'padding': padding,
-//     'textProps': textProps,
-//     'matProps': matProps,
-//     'animProps': animProps,
-//     'listConfig': listConfig,
-//     'onCreated': onCreated,
-//     'mouseOver': mouseOver,
-//     'portal': portal,
-//     'attach': attach
-//   }
-
 
 export class SelectorWidget extends BaseWidget {
   constructor(listSelectorProps) {
@@ -3167,12 +3168,20 @@ export class SelectorWidget extends BaseWidget {
     let btnMatProps = {...listSelectorProps.matProps};
     let btnTextProps = {...listSelectorProps.textProps};
     btnBoxProps.matProps = btnMatProps;
-    let baseProps = buttonProperties(listSelectorProps.boxProps, listSelectorProps.textProps.font, "", "", listSelectorProps.padding, textProps, matProps, listSelectorProps.animProps, undefined, undefined, listSelectorProps.isPortal);
-    let widgetProps = widgetProperties(btnBoxProps, listSelectorProps.name, true, true, listSelectorProps.textProps, false, undefined, listSelectorProps.matProps, listSelectorProps.animProps, listSelectorProps.listConfig, 0)
+    if(isPortal){
+      btnBoxProps.isPortal = isPortal;
+      btnBoxProps.matProps.useCase = 'STENCIL';
+      btnTextProps.matProps.useCase = 'STENCIL_CHILD';
+      btnMatProps.useCase = 'STENCIL';
+      listSelectorProps.boxProps.matProps.useCase = 'STENCIL_CHILD';
+      listSelectorProps.matProps.useCase = 'STENCIL_CHILD';
+      listSelectorProps.textProps.matProps.useCase = 'STENCIL_CHILD';
+    }
+    let widgetProps = widgetProperties(btnBoxProps, listSelectorProps.name, true, true, btnTextProps, false, undefined, btnMatProps, listSelectorProps.animProps, listSelectorProps.listConfig, 0)
     super(widgetProps);
-    this.box.userData.properties = widgetProps;
+    this.isPortal = isPortal;
+    this.box.userData.properties = listSelectorProps;
     this.box.userData.selectors = [];
-    this.baseProps = baseProps;
     this.btnBoxProps = btnBoxProps;
     this.btnMatProps = btnMatProps;
     this.btnTextProps = btnTextProps;
@@ -3190,9 +3199,10 @@ export class SelectorWidget extends BaseWidget {
       let props = this.box.userData.properties;
       let btnProps = buttonProperties(this.btnBoxProps, props.textProps.font, key, val, props.padding, props.textProps, props.matProps, props.animProps, undefined, undefined, props.isPortal);
       let btn = new BaseTextBox(btnProps);
+      btn.box.userData.properties = props;
 
-      const tProps = editTextProperties(btn, '', this.btnTextProps.textMesh, this.btnTextProps.font, this.btnTextProps.size, this.btnTextProps.height, this.btnTextProps.zOffset, this.btnTextProps.letterSpacing, this.btnTextProps.lineSpacing, this.btnTextProps.wordSpacing, this.btnTextProps.padding, true, this.btnTextProps.meshProps);
-      btn.textMesh.userData.textProps = tProps;
+      const editProps = editTextProperties(btn, '', this.btnTextProps.textMesh, this.btnTextProps.font, this.btnTextProps.size, this.btnTextProps.height, this.btnTextProps.zOffset, this.btnTextProps.letterSpacing, this.btnTextProps.lineSpacing, this.btnTextProps.wordSpacing, this.btnTextProps.padding, true, this.btnTextProps.meshProps);
+      btn.textMesh.userData.textProps = editProps;
       inputPrompts.push(btn.textMesh);
       mouseOverable.push(btn.textMesh);
       clickable.push(btn.textMesh);
@@ -3218,18 +3228,33 @@ export class SelectorWidget extends BaseWidget {
         btn.box.scale.set(btn.box.unselectedScale, btn.box.unselectedScale, btn.box.unselectedScale);
       }
 
-      // if(portal!=undefined){
-      //   btn.box.material.stencilRef = portal.box.material.stencilRef;
-      //   btn.box.material.depthWrite = true;
-      //   textMesh.material.stencilRef = portal.box.material.stencilRef;
-      //   textMesh.material.depthWrite = true;
-      // }
+      if(this.isPortal){
+        setupStencilChildMaterial(btn.box.material, this.box.material.stencilRef);
+        setupStencilChildMaterial(btn.textMesh.material, this.box.material.stencilRef);
+        btn.box.material.stencilRef = this.box.material.stencilRef;
+        btn.box.material.depthWrite = true;
+        btn.textMesh.material.stencilRef = this.box.material.stencilRef;
+        btn.textMesh.material.depthWrite = true;
+        btn.box.renderOrder = 2;
+        btn.textMesh.renderOrder = 2;
+        btn.box.position.set(btn.box.position.x, btn.box.position.y, -btn.depth)
+      }
 
       idx+=1;
     }
+    if(this.isPortal){
+      this.CreateHeightExpandedMorph(Object.keys(this.selectors).length);
+    }
+
   }
   SetUserData(btn, key, value, index){
     const textSize = getGeometrySize(btn.textMesh.geometry);
+    let selectedZ = btn.depth+(btn.depth+textSize.depth);
+    let unselectedZ = btn.depth;
+    if(btn.box.userData.properties.isPortal){
+      selectedZ = -btn.depth;
+      unselectedZ = -(btn.depth+(btn.depth+textSize.depth));
+    }
     btn.textMesh.userData.draggable = false;
     btn.textMesh.userData.key = key;
     btn.textMesh.userData.value = value;
@@ -3237,8 +3262,8 @@ export class SelectorWidget extends BaseWidget {
     btn.textMesh.userData.selected = false;
     btn.box.userData.selectedScale = 1;
     btn.box.userData.unselectedScale = 0.9;
-    btn.box.userData.selectedPos = new THREE.Vector3(btn.box.position.x, btn.box.position.y, btn.depth+(btn.depth+textSize.depth));
-    btn.box.userData.unselectedPos = new THREE.Vector3(btn.box.position.x, btn.box.position.y, btn.depth);
+    btn.box.userData.selectedPos = new THREE.Vector3(btn.box.position.x, btn.box.position.y, selectedZ);
+    btn.box.userData.unselectedPos = new THREE.Vector3(btn.box.position.x, btn.box.position.y, unselectedZ);
     btn.box.userData.mouseOverParent = true;
     btn.box.userData.currentText = key;
   }
@@ -3261,102 +3286,16 @@ export class SelectorWidget extends BaseWidget {
   }
 };
 
-function ListSelector(listSelectorProps, selectors){
-  const isPortal = listSelectorProps.isPortal;
-  let mainBoxProps = {...listSelectorProps.boxProps};
-  let mainMatProps = {...listSelectorProps.matProps};
-  mainBoxProps.matProps = mainMatProps;
-  let portalBoxProps = {...listSelectorProps.boxProps};
-  let portalMatProps = {...listSelectorProps.matProps};
-  portalBoxProps.matProps = portalMatProps;
-  let btnBoxProps = {...listSelectorProps.boxProps};
-  let btnMatProps = {...listSelectorProps.matProps};
-  let btnTextProps = {...listSelectorProps.textProps};
-  btnBoxProps.matProps = btnMatProps;
-  let portal = undefined;
-
-  if(isPortal){
-    portalBoxProps.matProps.userCase = 'STENCIL';
-    mainBoxProps.matProps.useCase = 'STENCIL_CHILD';
-    btnBoxProps.matProps.useCase = 'STENCIL_CHILD';
-    btnTextProps.matProps.useCase = 'STENCIL_CHILD';
-    portal = portalWindow(portalBoxProps);
-    darkenMaterial(portal.box.material, 30);
-    listSelectorProps.boxProps.parent.add(portal.box);
-  }
-
-
-  let textProps = listSelectorProps.textProps;
-  let cBox = contentBox(mainBoxProps);
-
-  selectorUserData(cBox.box);
-  let idx = 0;
-
-  for (const [key, val] of Object.entries(selectors)) {
-    let btn = buttonBase(btnBoxProps, key, val, btnTextProps.font, btnTextProps, listSelectorProps.animProps, listSelectorProps.onCreated);
-    let selector = btn.cBox;
-    let textMesh = btn.textMesh;
-
-    const tProps = editTextProperties(selector, '', btnTextProps.textMesh, btnTextProps.font, btnTextProps.size, btnTextProps.height, btnTextProps.zOffset, btnTextProps.letterSpacing, btnTextProps.lineSpacing, btnTextProps.wordSpacing, btnTextProps.padding, true, btnTextProps.meshProps);
-    textMesh.userData.textProps = tProps;
-    inputPrompts.push(textMesh);
-    mouseOverable.push(textMesh);
-    clickable.push(textMesh);
-    selector.box.name = key;
-    
-    selectorTextUserData(btn, key, val, idx, listSelectorProps.boxProps);
-    mouseOverUserData(textMesh);
-
-    cBox.box.userData.selectors.push(selector.box);
-    selectorElems.push(selector.box);
-    cBox.box.add(selector.box);
-      
-    textMesh.addEventListener('action', function(event) {
-      onSelectorChoice(textMesh)
-    });
-
-    if(idx==0){
-      textMesh.userData.selected = true;
-      selector.box.position.copy(selector.box.userData.selectedPos);
-
-    }else{
-      selector.box.position.copy(selector.box.userData.unselectedPos);
-      selector.box.scale.set(cBox.box.unselectedScale, cBox.box.unselectedScale, cBox.box.unselectedScale);
-    }
-
-    if(portal!=undefined){
-      selector.box.material.stencilRef = portal.box.material.stencilRef;
-      selector.box.material.depthWrite = true;
-      textMesh.material.stencilRef = portal.box.material.stencilRef;
-      textMesh.material.depthWrite = true;
-    }
-
-    idx+=1;
-  }
-
-  if(portal!=undefined){
-    cBox.box.userData.portal = portal.box;
-    portal.box.position.set(portal.box.position.x, portal.box.position.y, -cBox.depth);
-    cBox.box.position.set(cBox.box.position.x, cBox.box.position.y, portal.box.position.z-(cBox.depth*2));
-  }
-
-  cBox.box.userData.properties = listSelectorProps;
-
-  listSelectorProps.boxProps.parent.add(cBox.box);
-}
-
 export function createListSelector(listSelectorProps, selectors) {
 
   if(typeof listSelectorProps.textProps.font === 'string'){
     // Load the font
     loader.load(listSelectorProps.textProps.font, (font) => {
       listSelectorProps.textProps.font = font;
-      //ListSelector(listSelectorProps, selectors);
       let widget = new SelectorWidget(listSelectorProps);
       widget.SetSelectors(selectors);
     });
   }else if(listSelectorProps.textProps.font.isFont){
-    //ListSelector(listSelectorProps, selectors);
     let widget = new SelectorWidget(listSelectorProps);
       widget.SetSelectors(selectors);
   }
@@ -3367,22 +3306,6 @@ export function createListSelectorPortal(listSelectorProps, selectors) {
   listSelectorProps.isPortal = true;
   createListSelector(listSelectorProps, selectors);
 };
-
-function selectorTextUserData(selText, key, value, index, boxProps){
-  const textSize = getGeometrySize(selText.textMesh.geometry);
-  selText.textMesh.userData.draggable = false;
-  selText.textMesh.userData.key = key;
-  selText.textMesh.userData.value = value;
-  selText.textMesh.userData.index = index;
-  selText.textMesh.userData.selected = false;
-  selText.cBox.box.userData.selectedScale = 1;
-  selText.cBox.box.userData.unselectedScale = 0.9;
-  selText.cBox.box.userData.selectedPos = new THREE.Vector3(selText.cBox.box.position.x, selText.cBox.box.position.y, selText.cBox.depth+(boxProps.depth+textSize.depth));
-  selText.cBox.box.userData.unselectedPos = new THREE.Vector3(selText.cBox.box.position.x, selText.cBox.box.position.y, selText.cBox.depth);
-  selText.cBox.box.userData.mouseOverParent = true;
-  selText.cBox.box.userData.currentText = key;
-}
-
 
 
 function ButtonElement(buttonProps){
