@@ -72,15 +72,16 @@ loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
   DEFAULT_TEXT_PROPS.font = font;
 });
 
+
 //CUSTOM GEOMOETRIES
 function RoundedPlaneGeometry( width, height, radius, smoothness ) {
     
-    const pi2 = Math.PI * 2;
-    const n = ( smoothness + 1 ) * 4; // number of segments    
-    let indices = [];
-    let positions = [];
+  const pi2 = Math.PI * 2;
+  const n = ( smoothness + 1 ) * 4; // number of segments    
+  let indices = [];
+  let positions = [];
   let uvs = [];   
-    let qu, sgx, sgy, x, y;
+  let qu, sgx, sgy, x, y;
     
   for ( let j = 1; j < n + 1; j ++ ) indices.push( 0, j, j + 1 ); // 0 is center
     indices.push( 0, n, 1 );   
@@ -90,11 +91,13 @@ function RoundedPlaneGeometry( width, height, radius, smoothness ) {
     
     const geometry = new THREE.BufferGeometry( );
     geometry.setIndex( new THREE.BufferAttribute( new Uint32Array( indices ), 1 ) );
+
   geometry.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array( positions ), 3 ) );
   geometry.setAttribute( 'uv', new THREE.BufferAttribute( new Float32Array( uvs ), 2 ) );
   geometry.center();
+
     
-    return geometry;
+  return geometry;
     
     function contour( j ) {
         
@@ -1160,6 +1163,7 @@ class BaseBox {
     this.width = boxProps.width;
     this.height = boxProps.height;
     this.depth = boxProps.depth;
+    this.matProps = boxProps.matProps;
     this.padding = boxProps.padding;
     this.complexMesh = boxProps.complexMesh;
     this.isPortal = boxProps.isPortal;
@@ -1229,10 +1233,12 @@ class BaseBox {
       this.box.name = listConfig.boxProps.name;
       this.listItem = new ListItemBox(listConfig);
       this.listItem.SetContent(this);
-      //createListItem(listConfig.boxProps, this.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
     }else{
       this.parent.add(this.box);
     }
+  }
+  NewBoxStencilMaterial(stencilRef){
+    this.box.material = getMaterial(this.matProps, stencilRef);
   }
   SetStencilRef(stencilRef){
     this.box.material.stencilRef = stencilRef;
@@ -1826,8 +1832,6 @@ export function widgetProperties(boxProps, name='', horizontal=true, on=false, t
 
 export class BaseWidget extends BaseBox {
   constructor(widgetProps) {
-    console.log("widgetProps.name")
-    console.log(widgetProps.name)
     let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, widgetProps.handleSize);
     let baseBoxProps = {...widgetProps.boxProps};
     baseBoxProps.width = size.baseWidth;
@@ -2428,7 +2432,7 @@ export class TextBoxWidget extends BaseWidget {
     }
 
   }
-  NewStencilMaterial(stencilRef){
+  NewTextMeshStencilMaterial(stencilRef){
     this.textMesh.material = getMaterial(this.textProps.matProps, stencilRef);
   }
   SetTextMeshMaterialStencilRef(stencilRef){
@@ -3152,7 +3156,7 @@ export function createTogglePortal(toggleProps) {
   }
 };
 
-export function imageProperties(boxProps, name='', imgUrl=undefined, padding=0.01, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, isPortal=false, zOffset=0){
+export function imageProperties(boxProps, name='', imgUrl=undefined, padding=0.01, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, zOffset=0){
   return {
     'type': 'IMAGE',
     'boxProps': boxProps,
@@ -3163,53 +3167,56 @@ export function imageProperties(boxProps, name='', imgUrl=undefined, padding=0.0
     'animProps': animProps,
     'listConfig': listConfig,
     'onCreated': onCreated,
-    'isPortal': isPortal,
     'zOffset': zOffset
   }
 };
 
-export function createImageBox(imageProps){
+export class ImageWidget extends BaseWidget {
+  constructor(imageProps) {
+    let textProps = {...DEFAULT_TEXT_PROPS};
+    imageProps.boxProps.isPortal = true;
+    let widgetProps = widgetProperties(imageProps.boxProps, imageProps.name, true, true, textProps, false, undefined, imageProps.boxProps.matProps, imageProps.animProps, imageProps.listConfig, 0);
+    super(widgetProps);
+    this.map = new THREE.TextureLoader().load( imageProps.imgUrl );
+    this.imageMaterial = new THREE.MeshBasicMaterial( { color: 'white', map: this.map } );
+    this.box.material = this.imageMaterial;
 
-  const cBox = contentWindow(imageProps.boxProps);
-  const boxSize = getGeometrySize(cBox.box.geometry);
-  const map = new THREE.TextureLoader().load( imageProps.imgUrl );
-  const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
-  cBox.box.material = material;
-  let listConfig = imageProps.listConfig;
+    this.HandleListConfig(imageProps.listConfig);
 
-  if(listConfig != undefined){
-    cBox.box.name = imageProps.boxProps.name;
-    createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-  }else{
-    imageProps.boxProps.parent.add(cBox.box);
+  }
+  NewImageBoxStencilMaterial(stencilRef){
+    this.imageMaterial = new THREE.MeshBasicMaterial( { color: 'white', map: this.map } );
+    this.box.material = this.imageMaterial;
+    setupStencilChildMaterial(this.box.material, stencilRef);
+  }
+  ConvertToPortalChild(stencilRef){
+    setupStencilChildMaterial(this.box.material, stencilRef);
+    this.MakeModelPortalChild(stencilRef);
+  }
+  static SetupPortalProps(imageProps){
+    imageProps.isPortal = true;
+    imageProps.boxProps.isPortal = true;
+    imageProps.matProps.useCase = 'STENCIL';
+    imageProps.boxProps.matProps.useCase = 'STENCIL';
+
+    return imageProps
   }
 
 };
 
-export function createImagePortal(imageProps){
+export function createImageBox(imageProps){
 
-  const portal = portalWindow(imageProps.boxProps);
-  const cBox = contentWindow(imageProps.boxProps);
-  const boxSize = getGeometrySize(cBox.box.geometry);
-  const map = new THREE.TextureLoader().load( imageProps.imgUrl );
-  const material = new THREE.MeshBasicMaterial( { color: 'white', map: map } );
-  cBox.box.material = material;
-  cBox.box.material.stencilWrite = true;
-  cBox.box.material.stencilRef = portal.stencilRef;
-  cBox.box.material.stencilFunc = THREE.EqualStencilFunc;
-  cBox.box.renderOrder = 2;
-  let listConfig = imageProps.listConfig;
-
-  portal.box.add(cBox.box);
-  cBox.box.position.set(cBox.box.position.x, cBox.box.position.y, cBox.box.position.z+imageProps.zOffset);
-
-  if(listConfig != undefined){
-    portal.box.name = imageProps.boxProps.name;
-    createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-  }else{
-    imageProps.boxProps.parent.add(portal.box);
+  if(typeof DEFAULT_TEXT_PROPS.font === 'string'){
+    // Load the font
+    loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
+      DEFAULT_TEXT_PROPS.font = font;
+      SetListConfigFont(imageProps.listConfig, font);
+      new ImageWidget(imageProps);
+    });
+  }else if(DEFAULT_TEXT_PROPS.font.isFont){
+    SetListConfigFont(imageProps.listConfig, DEFAULT_TEXT_PROPS.font);
+    new ImageWidget(imageProps);
   }
-
 };
 
 export function gltfProperties(boxProps, name='', gltf=undefined, padding=0.01, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, isPortal=false, zOffset=0){
@@ -3333,52 +3340,6 @@ export function createGLTFModel(gltfProps){
 
 };
 
-function GLTFModelPortal(gltfProps){
-  const portal = portalWindow(gltfProps.boxProps);
-  const boxSize = getGeometrySize(portal.box.geometry);
-  const parentSize = getGeometrySize(gltfProps.boxProps.parent.geometry);
-  let gltf = gltfProps.gltf;
-
-  const box = new THREE.Box3().setFromObject( gltf.scene ); 
-  const sceneSize = box.getSize(new THREE.Vector3());
-  let listConfig = gltfProps.listConfig;
-
-  gltf.scene.traverse( function( object ) {
-      if(object.isMesh){
-            object.material.stencilWrite = true;
-            object.material.stencilRef = portal.stencilRef;
-            object.material.stencilFunc = THREE.EqualStencilFunc;
-      }
-  } );
-
-  let axis = 'y';
-  let prop = 'height';
-  if(sceneSize.x > sceneSize.y){
-    axis = 'x';
-    prop = 'width';
-  }
-
-  let ratio = boxSize[prop]/sceneSize[axis];
-
-  if(boxSize[prop]>sceneSize[axis]){
-    ratio = sceneSize[axis]/boxSize[prop];
-  }
-
-  gltf.scene.scale.set(gltf.scene.scale.x*ratio, gltf.scene.scale.y*ratio, gltf.scene.scale.z*ratio);
-  gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z-boxSize.depth-(sceneSize.z*ratio))
-  gltf.scene.renderOrder = 2;
-  portal.box.add(gltf.scene);
-
-  if(listConfig != undefined){
-    portal.box.name = gltfProps.boxProps.name;
-    createListItem(listConfig.boxProps, portal.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-  }else{
-    gltfProps.boxProps.parent.add(portal.box);
-    portal.box.position.set(portal.box.position.x, portal.box.position.y, portal.box.position.z+(parentSize.depth/2))
-  }
-}
-
-
 export function createGLTFModelPortal(gltfProps){
   gltfProps = GLTFModelWidget.SetupPortalProps(gltfProps);
   if(typeof gltfProps.gltf === 'string'){
@@ -3446,7 +3407,7 @@ export class ListItemBox extends BaseBox {
       const size = this.titleText.userData.size;
       this.box.add(this.titleText);
 
-      this.titleText.position.set(0, (this.height/2)-(size.height/2)-(this.textProps.padding*2), ((this.depth*2)+size.depth*2));
+      this.titleText.position.set(0, (this.height/2)-(size.height/2)-(this.textProps.padding*2), ((this.depth*2)+size.depth*2)*textMeshOffset);
       this.box.userData.title = this.titleText;
     }
 
@@ -3471,24 +3432,21 @@ export class ListItemBox extends BaseBox {
 
     this.box.position.set(this.box.position.x, (this.parent.userData.height-this.spacing)/2-this.height/2-((this.height+this.spacing)*this.index), this.box.position.z+this.parentSize.depth);
 
-    console.log("content")
-    console.log(this.box)
-    console.log(listConfig.textProps.matProps)
-
   }
   SetContent(content){
     this.listTextMaterial.depthWrite = true;
     if(this.titleText!=undefined && content.widgetText!=undefined){
       content.box.parent.remove(content.widgetText);
     }
+    let boxZOffset = 1;
     this.box.add(content.box);
-    content.box.position.set(0, 0, this.depth/2+0.1);
-    content.box.scale.set(content.box.scale.x*this.childInset, content.box.scale.y*this.childInset, content.box.scale.z*this.childInset);
+    
     if(content.box.userData.properties.boxProps.isPortal && !this.isPortal){
       this.box.material.stencilWrite = false;
       this.box.material.depthWrite = false;
     }
     if(this.isPortal){
+      let boxZOffset = -1;
       if(content.gltf!=undefined){
         this.box.add(content.gltf.scene)
         content.MakeModelPortalChild(this.box.material.stencilRef);
@@ -3498,11 +3456,17 @@ export class ListItemBox extends BaseBox {
       if(content.textMesh!=undefined){
         this.box.material.depthWrite = false;
         this.box.add(content.textMesh);
-        content.NewStencilMaterial(this.box.material.stencilRef);
+        content.NewTextMeshStencilMaterial(this.box.material.stencilRef);
         content.textMesh.translateZ(-content.textMeshSize.depth);
         content.textMesh.material.depthWrite = true;
         content.MakeBoxMaterialInvisible();
       }
+      if(content.imageMaterial!=undefined){
+        content.NewImageBoxStencilMaterial(this.box.material.stencilRef);
+      }
+
+      content.box.position.set(0, 0, this.depth/2+0.125*boxZOffset);
+      content.box.scale.set(content.box.scale.x*this.childInset, content.box.scale.y*this.childInset, content.box.scale.z*this.childInset);
       
       this.box.material.stencilWrite = true;
       this.box.material.depthWrite = false;
@@ -3513,6 +3477,9 @@ export class ListItemBox extends BaseBox {
   CreateListTextGeometry(text, sizeMult=1){
     console.log(text)
     return createTextGeometry(text, this.textProps.font, this.textProps.size*sizeMult, this.textProps.height, this.textProps.meshProps.curveSegments, this.textProps.meshProps.bevelEnabled, this.textProps.meshProps.bevelThickness, this.textProps.meshProps.bevelSize, this.textProps.meshProps.bevelOffset, this.textProps.meshProps.bevelSegments);
+  }
+  NewTextMeshStencilMaterial(stencilRef){
+    this.listTextMaterial = getMaterial(this.box.userData.properties.textProps.matProps, stencilRef);
   }
   ListText(text, sizeMult=1){
     const geometry = this.CreateListTextGeometry(text, sizeMult);
@@ -3554,7 +3521,6 @@ export function createListItem( boxProps, content, textProps=undefined,  animPro
 
     loader.load(textProps.font, (font) => {
 
-      //let mat = new THREE.MeshBasicMaterial({color: Math.random() * 0xff00000 - 0xff00000});
       let mat = getMaterial(textProps.matProps, 0);
 
       if(infoProps.title.length>0){
