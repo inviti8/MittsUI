@@ -66,6 +66,12 @@ let dragDistY = 0;
 let lastClick = 0;
 let mouseOver = [];
 
+const DEFAULT_FONT = 'fonts/Generic_Techno_Regular.json';
+let DEFAULT_TEXT_PROPS = textProperties( DEFAULT_FONT, 0.02, 0.1, 0.1, 0.1, 0.05, 0.05, 1);
+loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
+  DEFAULT_TEXT_PROPS.font = font;
+});
+
 //CUSTOM GEOMOETRIES
 function RoundedPlaneGeometry( width, height, radius, smoothness ) {
     
@@ -131,11 +137,6 @@ function RoundedBoxGeometry(width, height, depth, radius, smoothness, zOffset=1)
 
 
   return geometry
-}
-
-function addMorphToGeometry(geometry, morphGeometry, morphName){
-  let verts  = [...morphGeometry.attributes.position.array];
-  geometry.morphAttributes[Object.keys(geometry.morphAttributes).length] = {name: morphName, vertices: verts};
 }
 
 export function attachToInnerTop(parent, elem, depth){
@@ -313,20 +314,6 @@ function* range(from, to, step = 1) {
   while (value <= to) {
     yield value;
     value += step;
-  }
-}
-
-export function listItemConfig(boxProps, textProps=undefined,  animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, childInset=0.9, index=0){
-  return {
-    'type': 'LIST_CONFIG',
-    'boxProps': boxProps,
-    'textProps': textProps,
-    'animProps': animProps,
-    'infoProps': infoProps,
-    'useTimeStamp': true,
-    'spacing': spacing,
-    'childInset': childInset,
-    'index': index
   }
 }
 
@@ -1161,7 +1148,6 @@ function setGeometryPivot(mesh, boxProps){
 }
 
 
-
 class BaseBox {
   constructor(boxProps) {
     this.parent = boxProps.parent;
@@ -1169,6 +1155,8 @@ class BaseBox {
     this.height = boxProps.height;
     this.depth = boxProps.depth;
     this.padding = boxProps.padding;
+    this.complexMesh = boxProps.complexMesh;
+    this.isPortal = boxProps.isPortal;
     this.material = getMaterial(boxProps.matProps);
     this.geometry = this.CreateBoxGeometry(boxProps);
     this.parentSize = getGeometrySize(boxProps.parent.geometry);
@@ -1178,16 +1166,17 @@ class BaseBox {
     this.box.userData.height = this.height;
     this.box.userData.depth = this.depth;
     this.box.userData.padding = this.padding;
+    this.parentSize = getGeometrySize(this.parent.geometry);
 
     boxProps.parent.add(this.box);
   }
   CreateBoxGeometry(boxProps) {
     let result = undefined;
-    if(boxProps.complexMesh){
-      if(boxProps.isPortal){
-        result = RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+    if(this.complexMesh){
+      if(this.isPortal){
+        result = BaseBox.RoundedPlaneGeometry(boxProps.width, boxProps.height, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
       }else{
-        result = RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
+        result = BaseBox.RoundedBoxGeometry(boxProps.width, boxProps.height, boxProps.depth, boxProps.radius, boxProps.smoothness, boxProps.zOffset);
       }
     }else{
       result = new THREE.BoxGeometry(boxProps.width, boxProps.height, boxProps.depth);
@@ -1228,7 +1217,81 @@ class BaseBox {
 
     this.box.geometry.morphAttributes.position[ 0 ] = new THREE.Float32BufferAttribute( morphGeometry.attributes.position.array, 3 );
     this.box.updateMorphTargets();
+  }
+  HandleListConfig(listConfig){
+    if(listConfig != undefined){
+      this.box.name = listConfig.boxProps.name;
+      this.listItem = new ListItemBox(listConfig);
+      this.listItem.SetContent(this);
+      //createListItem(listConfig.boxProps, this.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
+    }else{
+      this.parent.add(this.box);
+    }
+  }
+  static RoundedBoxGeometry(width, height, depth, radius, smoothness, zOffset=1){
+    const shape = new THREE.Shape();
+    let eps = 0.00001;
+    let _radius = radius - eps;
+    shape.absarc( eps, eps, eps, -Math.PI / 2, -Math.PI, true );
+    shape.absarc( eps, height -  radius * 2, eps, Math.PI, Math.PI / 2, true );
+    shape.absarc( width - radius * 2, height -  radius * 2, eps, Math.PI / 2, 0, true );
+    shape.absarc( width - radius * 2, eps, eps, 0, -Math.PI / 2, true );
 
+    const extrudeSettings = {
+      depth: depth,
+      bevelEnabled: true,
+      bevelSegments: smoothness * 2,
+      steps: 1,
+      bevelSize: _radius,
+      bevelThickness: zOffset*radius,
+      curveSegments: smoothness
+    };
+
+    const geometry = new THREE.ExtrudeGeometry( shape, extrudeSettings );
+    geometry.center();
+    BufferGeometryUtils.mergeVertices(geometry);
+    geometry.computeVertexNormals();
+
+
+    return geometry
+  }
+  static RoundedPlaneGeometry( width, height, radius, smoothness ) {
+    
+    const pi2 = Math.PI * 2;
+    const n = ( smoothness + 1 ) * 4; // number of segments    
+    let indices = [];
+    let positions = [];
+    let uvs = [];   
+    let qu, sgx, sgy, x, y;
+      
+    for ( let j = 1; j < n + 1; j ++ ) indices.push( 0, j, j + 1 ); // 0 is center
+      indices.push( 0, n, 1 );   
+      positions.push( 0, 0, 0 ); // rectangle center
+      uvs.push( 0.5, 0.5 );   
+      for ( let j = 0; j < n ; j ++ ) contour( j );
+      
+      const geometry = new THREE.BufferGeometry( );
+      geometry.setIndex( new THREE.BufferAttribute( new Uint32Array( indices ), 1 ) );
+
+    geometry.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array( positions ), 3 ) );
+    geometry.setAttribute( 'uv', new THREE.BufferAttribute( new Float32Array( uvs ), 2 ) );
+    geometry.center();
+      
+      return geometry;
+      
+      function contour( j ) {
+          
+          qu = Math.trunc( 4 * j / n ) + 1 ;      // quadrant  qu: 1..4         
+          sgx = ( qu === 1 || qu === 4 ? 1 : -1 ) // signum left/right
+          sgy =  qu < 3 ? 1 : -1;                 // signum  top / bottom
+          x = sgx * ( width / 2 - radius ) + radius * Math.cos( pi2 * ( j - qu + 1 ) / ( n - 4 ) ); // corner center + circle
+          y = sgy * ( height / 2 - radius ) + radius * Math.sin( pi2 * ( j - qu + 1 ) / ( n - 4 ) );   
+   
+          positions.push( x, y, 0 );       
+          uvs.push( 0.5 + x / width, 0.5 + y / height );       
+          
+      }
+      
   }
 
 }
@@ -1735,7 +1798,8 @@ export function widgetProperties(boxProps, name='', horizontal=true, on=false, t
 
 export class BaseWidget extends BaseBox {
   constructor(widgetProps) {
-
+    console.log("widgetProps.name")
+    console.log(widgetProps.name)
     let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, widgetProps.handleSize);
     let baseBoxProps = {...widgetProps.boxProps};
     baseBoxProps.width = size.baseWidth;
@@ -2317,13 +2381,8 @@ export class TextBoxWidget extends BaseWidget {
     
     this.box.add(this.textMesh);
 
-    if(textBoxProps.listConfig != undefined){
-      this.box.name = textBoxProps.boxProps.name;
-      let listConfig = textBoxProps.listConfig;
-      createListItem(listConfig.boxProps, this.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-    }else{
-      textBoxProps.boxProps.parent.add(this.box);
-    }
+    this.HandleListConfig(textBoxProps.listConfig);
+
     if(textProps.draggable){
       draggable.push(this.textMesh);
     }
@@ -2351,7 +2410,6 @@ export class TextBoxWidget extends BaseWidget {
   }
 
 };
-
 
 export function createStaticTextBox(textBoxProps) {
   textBoxProps.MultiLetterMeshes = false;
@@ -2593,9 +2651,6 @@ export class InputTextWidget extends BaseWidget {
     }
 
     this.HandleTextInputSetup();
-
-    console.log(this.box)
-    
   }
   HandleTextInputSetup(){
     inputPrompts.push(this.inputText);
@@ -2664,48 +2719,6 @@ export class InputTextWidget extends BaseWidget {
     return textInputProps
   }
 };
-
-function selectionTextBox(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined){
-
-  const Box = contentBox(boxProps);
-  let mat = getMaterial(textProps.matProps, 0);
-
-  const promptGeometry = createMergedTextBoxGeometry(Box, font, boxProps.width, boxProps.height, text, textProps, animProps);
-  const textMesh = new THREE.Mesh(promptGeometry, mat);
-  textMesh.layers.set(0);
-  const boxSize = getGeometrySize(Box.box.geometry);
-  const geomSize = getGeometrySize(promptGeometry);
-  const parentSize = getGeometrySize(boxProps.parent.geometry);
-  setMergedMeshUserData(boxSize, geomSize, textProps.padding, textMesh);
-
-  Box.box.add(textMesh);
-  textMesh.position.set(textMesh.position.x, textMesh.position.y-textProps.padding, boxSize.depth/2+geomSize.depth/2);
-  boxProps.parent.add(Box.box);
-  Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
-  adjustBoxScaleRatio(Box.box, boxProps.parent);
-
-  return {textMesh, Box}
-}
-
-function selectionTextPortal(boxProps, text, font, textProps=undefined,  animProps=undefined, onCreated=undefined){
-  const Box = portalWindow(boxProps);
-  let mat = getMaterial(textProps.matProps, Box.stencilRef);
-
-  const promptGeometry = createMergedTextBoxGeometry(Box, font, boxProps.width, boxProps.height, text, textProps, animProps);
-  const textMesh = new THREE.Mesh(promptGeometry, mat);
-  const boxSize = getGeometrySize(Box.box.geometry);
-  const geomSize = getGeometrySize(promptGeometry);
-  const parentSize = getGeometrySize(boxProps.parent.geometry);
-  setMergedMeshUserData(boxSize, geomSize, textProps.padding, textMesh);
-
-  Box.box.add(textMesh);
-  textMesh.position.set(textMesh.position.x, textMesh.position.y-textProps.padding, textMesh.position.z);
-  boxProps.parent.add(Box.box);
-  Box.box.position.set(Box.box.position.x, Box.box.position.y, parentSize.depth/2+boxSize.depth/2);
-  adjustBoxScaleRatio(Box.box, boxProps.parent);
-
-  return {textMesh, Box}
-}
 
 
 function TextInputBoxProperties(parent, portal=false){
@@ -2785,7 +2798,6 @@ export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name
     'isPortal': isPortal
   }
 };
-
 
 export class SelectorWidget extends BaseWidget {
   constructor(listSelectorProps) {
@@ -3173,41 +3185,89 @@ export function gltfProperties(boxProps, name='', gltf=undefined, padding=0.01, 
   }
 };
 
-function GLTFModel(gltfProps){
-  const cBox = contentBox(gltfProps.boxProps);
-  const boxSize = getGeometrySize(cBox.box.geometry);
-  let gltf = gltfProps.gltf;
+export class GLTFModelWidget extends BaseWidget {
+  constructor(gltfProps) {
+    let textProps = {...DEFAULT_TEXT_PROPS};
+    let widgetProps = widgetProperties(gltfProps.boxProps, gltfProps.name, true, true, textProps, false, undefined, gltfProps.boxProps.matProps, gltfProps.animProps, gltfProps.listConfig, 0);
+    super(widgetProps);
+    this.box.properties = gltfProps;
+    const boxSize = getGeometrySize(this.box.geometry);
+    const parentSize = getGeometrySize(gltfProps.boxProps.parent.geometry);
 
-  const box = new THREE.Box3().setFromObject( gltf.scene ); 
-  const sceneSize = box.getSize(new THREE.Vector3());
-  let listConfig = gltfProps.listConfig;
+    this.gltf = gltfProps.gltf;
+    this.sceneBox = new THREE.Box3().setFromObject( this.gltf.scene );
+    this.sceneSize = this.sceneBox.getSize(new THREE.Vector3());
 
-  let axis = 'y';
-  let prop = 'height';
-  if(sceneSize.x > sceneSize.y){
-    axis = 'x';
-    prop = 'width';
+    let axis = 'y';
+    let prop = 'height';
+    if(this.sceneSize.x > this.sceneSize.y){
+      axis = 'x';
+      prop = 'width';
+    }
+
+    this.ratio = boxSize[prop]/this.sceneSize[axis];
+
+    if(boxSize[prop]>this.sceneSize[axis]){
+      this.ratio = this.sceneSize[axis]/boxSize[prop];
+    }
+    if(this.isPortal){
+      let stencilRef = this.box.material.stencilRef;
+      this.MakeModelPortalChild(stencilRef);
+      this.gltf.scene.scale.set(this.gltf.scene.scale.x*this.ratio, this.gltf.scene.scale.y*this.ratio, this.gltf.scene.scale.z*this.ratio);
+      this.gltf.scene.position.set(this.gltf.scene.position.x, this.gltf.scene.position.y, this.gltf.scene.position.z-this.depth-(this.sceneSize.z*this.ratio));
+      this.gltf.scene.renderOrder = 2;
+      this.box.position.set(this.box.position.x, this.box.position.y, this.parentSize.depth/2)
+    }else{
+      this.box.material.opacity = 0;
+      this.box.material.transparent = true;
+      this.gltf.scene.scale.set(this.gltf.scene.scale.x*this.ratio, this.gltf.scene.scale.y*this.ratio, this.gltf.scene.scale.z*this.ratio);
+      this.gltf.scene.position.set(this.gltf.scene.position.x, this.gltf.scene.position.y, this.gltf.scene.position.z+this.depth+(this.sceneSize.z/2*this.ratio));
+    }
+    
+    this.box.add( this.gltf.scene );
+
+    this.HandleListConfig(gltfProps.listConfig);
+
+  }
+  MakeModelPortalChild(stencilRef){
+    this.gltf.scene.traverse( function( object ) {
+        if(object.isMesh){
+          object.material.stencilWrite = true;
+          object.material.stencilRef = stencilRef;
+          object.material.stencilFunc = THREE.EqualStencilFunc;
+        }
+    } );
+  }
+  ConvertToPortalChild(stencilRef){
+    setupStencilChildMaterial(this.box.material, stencilRef);
+    this.MakeModelPortalChild(stencilRef);
+  }
+  static SetupPortalProps(gltfProps){
+    gltfProps.isPortal = true;
+    gltfProps.boxProps.isPortal = true;
+    gltfProps.matProps.useCase = 'STENCIL';
+    gltfProps.boxProps.matProps.useCase = 'STENCIL';
+
+    return gltfProps
   }
 
-  cBox.box.material.opacity = 0;
-  cBox.box.material.transparent = true;
+};
 
-  let ratio = boxSize[prop]/sceneSize[axis];
-
-  if(boxSize[prop]>sceneSize[axis]){
-    ratio = sceneSize[axis]/boxSize[prop];
-  }
-
-  gltf.scene.scale.set(gltf.scene.scale.x*ratio, gltf.scene.scale.y*ratio, gltf.scene.scale.z*ratio);
-  gltf.scene.position.set(gltf.scene.position.x, gltf.scene.position.y, gltf.scene.position.z+boxSize.depth+(sceneSize.z/2*ratio));
-
-  cBox.box.add( gltf.scene );
-
-  if(listConfig != undefined){
-    cBox.box.name = gltfProps.boxProps.name;
-    createListItem(listConfig.boxProps, cBox.box, listConfig.textProps, listConfig.animProps, listConfig.infoProps, true, listConfig.spacing, listConfig.childInset, listConfig.index);
-  }else{
-    gltfProps.boxProps.parent.add(cBox.box);
+function GLTFModelLoader(gltfProps){
+  if(typeof DEFAULT_TEXT_PROPS.font === 'string'){
+    // Load the font
+    loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
+      DEFAULT_TEXT_PROPS.font = font;
+      if(gltfProps.listConfig!=undefined){
+        gltfProps.listConfig.textProps.font = font;
+      }
+      new GLTFModelWidget(gltfProps);
+    });
+  }else if(DEFAULT_TEXT_PROPS.font.isFont){
+    if(gltfProps.listConfig!=undefined){
+      gltfProps.listConfig.textProps.font = DEFAULT_TEXT_PROPS.font;
+    }
+    new GLTFModelWidget(gltfProps);
   }
 }
 
@@ -3217,7 +3277,7 @@ export function createGLTFModel(gltfProps){
     // Instantiate a loader
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
         gltfProps.gltf = gltf;
-        GLTFModel(gltfProps);
+        GLTFModelLoader(gltfProps);
       },
       // called while loading is progressing
       function ( xhr ) {
@@ -3229,7 +3289,7 @@ export function createGLTFModel(gltfProps){
       }
     );
   }else if(gltfProps.gltf.scene != undefined){
-    GLTFModel(gltfProps);
+    GLTFModelLoader(gltfProps);
   }
 
 };
@@ -3281,12 +3341,14 @@ function GLTFModelPortal(gltfProps){
 
 
 export function createGLTFModelPortal(gltfProps){
+  gltfProps = GLTFModelWidget.SetupPortalProps(gltfProps);
   if(typeof gltfProps.gltf === 'string'){
     // Instantiate a loader
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
         console.log(gltf)
         gltfProps.gltf = gltf;
-        GLTFModelPortal(gltfProps);
+        GLTFModelLoader(gltfProps);
+        //GLTFModelPortal(gltfProps);
       },
       // called while loading is progressing
       function ( xhr ) {
@@ -3298,9 +3360,132 @@ export function createGLTFModelPortal(gltfProps){
       }
     );
   }else if(gltfProps.gltf.scene != undefined){
-    GLTFModelPortal(gltfProps);
+    GLTFModelLoader(gltfProps);
+    //GLTFModelPortal(gltfProps);
   }
 }
+
+export function listItemConfig(boxProps, textProps=undefined,  animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, childInset=0.9, index=0){
+  return {
+    'type': 'LIST_CONFIG',
+    'boxProps': boxProps,
+    'textProps': textProps,
+    'animProps': animProps,
+    'infoProps': infoProps,
+    'useTimeStamp': true,
+    'spacing': spacing,
+    'childInset': childInset,
+    'index': index
+  }
+}
+
+export class ListItemBox extends BaseBox {
+  constructor(listConfig) {
+
+    super(listConfig.boxProps);
+    this.textProps = listConfig.textProps;
+    this.listTextMaterial = getMaterial(listConfig.textProps.matProps);
+    this.childInset = listConfig.childInset;
+    this.spacing = listConfig.spacing;
+    this.index = listConfig.index;
+    let textMeshOffset = 1;
+
+    if(this.isPortal){
+      setupStencilMaterial(this.box.material, getStencilRef());
+      setupStencilChildMaterial(this.listTextMaterial, this.box.material.stencilRef);
+
+      textMeshOffset = -1;
+    }
+
+    let infoProps = listConfig.infoProps;
+    let date = this.NewDate();
+
+    if(infoProps.title.length>0){
+      this.titleText = this.ListText(infoProps.title);
+      const size = this.titleText.userData.size;
+      this.box.add(this.titleText);
+
+      this.titleText.position.set(0, (this.height/2)-(size.height/2)-(this.textProps.padding*2), ((this.depth/2)+size.depth/2)*textMeshOffset);
+      this.box.userData.title = this.titleText;
+    }
+
+    if(infoProps.author.length>0){
+      this.authorText = this.ListText(infoProps.author);
+      const size = this.authorText.userData.size;
+      this.box.add(this.authorText);
+
+      this.authorText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), ((this.depth/2)+size.depth/2)*textMeshOffset);
+      this.box.userData.author = this.authorText;
+    }
+
+    this.dateText = this.ListText(date, 0.5);
+    let size = this.dateText.userData.size;
+    this.box.add(this.dateText);
+    this.dateText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), ((this.depth/2)+size.depth/2)*textMeshOffset);
+
+    this.box.userData.date = this.dateText;
+    if( this.authorText != undefined){
+      this.authorText.position.set(this.box.userData.author.position.x, this.authorText.position.y+size.height+(this.textProps.padding*2), this.authorText.position.z);
+    }
+
+    this.box.position.set(this.box.position.x, (this.parent.userData.height-this.spacing)/2-this.height/2-((this.height+this.spacing)*this.index), this.box.position.z+this.parentSize.depth);
+
+    console.log("content")
+    console.log(this.box)
+
+  }
+  SetContent(content){
+    this.listTextMaterial.depthWrite = true;
+    if(content.widgetText!=undefined){
+      content.box.parent.remove(content.widgetText);
+    }
+    this.box.add(content.box);
+    content.box.position.set(0, 0, this.depth/2+0.1);
+    content.box.scale.set(content.box.scale.x*this.childInset, content.box.scale.y*this.childInset, content.box.scale.z*this.childInset);
+    if(content.box.userData.properties.boxProps.isPortal){
+      this.box.material.stencilWrite = false;
+      this.box.material.depthWrite = false;
+    }
+    if(this.isPortal){
+      this.box.add(content.gltf.scene)
+      content.MakeModelPortalChild(this.box.material.stencilRef);
+      content.box.material.opacity = 0;
+      content.box.material.transparent = true;
+      content.box.material.depthWrite = false;
+      this.box.material.stencilWrite = true;
+      this.box.material.depthWrite = false;
+      this.box.material.stencilFunc = THREE.AlwaysStencilFunc;
+      this.box.material.stencilZPass = THREE.ReplaceStencilOp;
+    }
+  }
+  CreateListTextGeometry(text, sizeMult=1){
+    return createTextGeometry(text, this.textProps.font, this.textProps.size*sizeMult, this.textProps.height, this.textProps.meshProps.curveSegments, this.textProps.meshProps.bevelEnabled, this.textProps.meshProps.bevelThickness, this.textProps.meshProps.bevelSize, this.textProps.meshProps.bevelOffset, this.textProps.meshProps.bevelSegments);
+  }
+  ListText(text, sizeMult=1){
+    const geometry = this.CreateListTextGeometry(text, sizeMult);
+    geometry.center();
+    let mesh = new THREE.Mesh(geometry, this.listTextMaterial);
+    mesh.userData.size = getGeometrySize(geometry);
+    return  mesh
+  }
+  UpdateTitleText(text){
+    this.titleText.geometry.dispose();
+    this.titleText.geometry = this.CreateListTextGeometry(text);
+  }
+  UpdateAuthorText(text){
+    this.authorText.geometry.dispose();
+    this.authorText.geometry = this.CreateListTextGeometry(text);
+  }
+  UpdateDateText(){
+    this.titleText.geometry.dispose();
+    this.titleText.geometry = this.CreateListTextGeometry(this.NewDate());
+  }
+  NewDate(){
+    let timestamp = Number(new Date());
+    return new Date(timestamp).toString();
+  }
+
+};
 
 export function createListItem( boxProps, content, textProps=undefined,  animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, childInset=0.9, index=0) {
   const parentSize = getGeometrySize(boxProps.parent.geometry);
