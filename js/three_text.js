@@ -317,6 +317,12 @@ function* range(from, to, step = 1) {
   }
 }
 
+function SetListConfigFont(listConfig, font){
+  if(listConfig!=undefined){
+    listConfig.textProps.font = font;
+  }
+}
+
 export function animationProperties(anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
   return {
     'type': 'ANIMATION_PROPS',
@@ -1227,6 +1233,28 @@ class BaseBox {
     }else{
       this.parent.add(this.box);
     }
+  }
+  SetStencilRef(stencilRef){
+    this.box.material.stencilRef = stencilRef;
+  }
+  ConvertBoxMaterialToPortalMaterial(){
+    this.box.material.stencilWrite = true;
+    this.box.material.depthWrite = false;
+    this.box.material.stencilFunc = THREE.AlwaysStencilFunc;
+    this.box.material.stencilZPass = THREE.ReplaceStencilOp;
+  }
+  ConvertBoxMaterialToPortalChildMaterial(){
+    this.box.material.depthWrite = false;
+    this.box.material.stencilWrite = true;
+    this.box.material.stencilFunc = THREE.EqualStencilFunc;
+  }
+  MakeBoxMaterialInvisible(){
+    this.box.material.opacity = 0;
+    this.box.material.transparent = true;
+  }
+  MakeBoxMaterialVisible(){
+    this.box.material.opacity = 1;
+    this.box.material.transparent = false;
   }
   static RoundedBoxGeometry(width, height, depth, radius, smoothness, zOffset=1){
     const shape = new THREE.Shape();
@@ -2291,22 +2319,22 @@ function handleCharacterGeometry(character, font, depth, lineWidth, yPosition, t
   return { letterGeometries, lineWidth }
 }
 
-export function createMergedTextBoxGeometry(cBox, font, boxWidth, boxHeight, text, textProps=undefined,  animProps=undefined) {
-    let lineWidth = -(cBox.width / 2 - (textProps.padding));
-    let yPosition = cBox.height / 2 ;
-    const boxSize = getGeometrySize(cBox.box.geometry);
+export function createMergedTextBoxGeometry(elem, font, boxWidth, boxHeight, text, textProps=undefined,  animProps=undefined) {
+    let lineWidth = -(elem.width / 2 - (textProps.padding));
+    let yPosition = elem.height / 2 ;
+    const boxSize = getGeometrySize(elem.box.geometry);
     let letterGeometries = [];
 
     for (let i = 0; i < text.length; i++) {
       const character = text[i];
 
-      let geoHandler = handleCharacterGeometry(character, font, boxSize.depth/2, lineWidth, yPosition, textProps, letterGeometries);
+      let geoHandler = handleCharacterGeometry(character, font, (elem.depth+boxSize.depth), lineWidth, yPosition, textProps, letterGeometries);
       lineWidth = geoHandler.lineWidth;
       letterGeometries = geoHandler.letterGeometries;
 
       // Check if lineWidth exceeds cBox width - padding
-      if (lineWidth > cBox.width / 2 - textProps.padding) {
-        lineWidth = -(cBox.width / 2) + textProps.padding; // Reset x position to the upper-left corner
+      if (lineWidth > elem.width / 2 - textProps.padding) {
+        lineWidth = -(elem.width / 2) + textProps.padding; // Reset x position to the upper-left corner
         yPosition -= textProps.lineSpacing; // Move to the next line
       }
     }
@@ -2356,6 +2384,7 @@ export class TextBoxWidget extends BaseWidget {
     let widgetProps = widgetProperties(textBoxProps.boxProps, "", true, true, textProps, false, undefined, textBoxProps.boxProps.matProps, textBoxProps.animProps, textBoxProps.listConfig, 0);
     super(widgetProps);
     this.textMeshMaterial = getMaterial(textProps.matProps);
+    this.textProps = textProps;
     this.textMesh = undefined;
     if(textBoxProps.MultiLetterMeshes){
       this.textMesh = constructMultiTextMerged(this, textBoxProps.text, textProps.font, this.textMeshMaterial, textProps, textBoxProps.animProps);
@@ -2368,13 +2397,13 @@ export class TextBoxWidget extends BaseWidget {
         this.textMesh.material.opacity=0;
       }
       const boxSize = getGeometrySize(this.box.geometry);
-      const geomSize = getGeometrySize(this.textMesh.geometry);
+      this.textMeshSize = getGeometrySize(this.textMesh.geometry);
       if(textBoxProps.boxProps.name==''){
         textBoxProps.boxProps.name='text-'+this.box.id;
       }
       this.box.name = textBoxProps.boxProps.name;
 
-      setMergedMeshUserData(boxSize, geomSize, textProps.padding, this.textMesh);
+      setMergedMeshUserData(boxSize, this.textMeshSize, textProps.padding, this.textMesh);
       this.textMesh.userData.draggable=textBoxProps.textProps.draggable;
       this.textMesh.userData.horizontal=false;
     }
@@ -2399,6 +2428,18 @@ export class TextBoxWidget extends BaseWidget {
     }
 
   }
+  NewStencilMaterial(stencilRef){
+    this.textMesh.material = getMaterial(this.textProps.matProps, stencilRef);
+  }
+  SetTextMeshMaterialStencilRef(stencilRef){
+    this.textMesh.material.stencilRef = stencilRef;
+  }
+  ConvertTextMeshMaterialToPortalChildMaterial(){
+    this.textMesh.material.depthWrite = false;
+    this.textMesh.material.stencilWrite = true;
+    this.textMesh.material.stencilFunc = THREE.EqualStencilFunc;
+    //this.textMesh.material.stencilZPass = undefined;
+  }
   static SetupPortalProps(textBoxProps){
     textBoxProps.isPortal = true;
     textBoxProps.boxProps.isPortal = true;
@@ -2417,9 +2458,11 @@ export function createStaticTextBox(textBoxProps) {
     // Load the font
     loader.load(textBoxProps.textProps.font, (font) => {
       textBoxProps.textProps.font = font;
+      SetListConfigFont(textBoxProps.listConfig, font);
       new TextBoxWidget(textBoxProps);
     });
   }else if(textBoxProps.textProps.font.isFont){
+    SetListConfigFont(textBoxProps.listConfig, font);
     new TextBoxWidget(textBoxProps);
   }  
 };
@@ -3258,15 +3301,11 @@ function GLTFModelLoader(gltfProps){
     // Load the font
     loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
       DEFAULT_TEXT_PROPS.font = font;
-      if(gltfProps.listConfig!=undefined){
-        gltfProps.listConfig.textProps.font = font;
-      }
+      SetListConfigFont(gltfProps.listConfig, font);
       new GLTFModelWidget(gltfProps);
     });
   }else if(DEFAULT_TEXT_PROPS.font.isFont){
-    if(gltfProps.listConfig!=undefined){
-      gltfProps.listConfig.textProps.font = DEFAULT_TEXT_PROPS.font;
-    }
+    SetListConfigFont(gltfProps.listConfig, DEFAULT_TEXT_PROPS.font);
     new GLTFModelWidget(gltfProps);
   }
 }
@@ -3383,6 +3422,7 @@ export class ListItemBox extends BaseBox {
   constructor(listConfig) {
 
     super(listConfig.boxProps);
+    this.box.userData.properties = listConfig;
     this.textProps = listConfig.textProps;
     this.listTextMaterial = getMaterial(listConfig.textProps.matProps);
     this.childInset = listConfig.childInset;
@@ -3391,11 +3431,12 @@ export class ListItemBox extends BaseBox {
     let textMeshOffset = 1;
 
     if(this.isPortal){
-      setupStencilMaterial(this.box.material, getStencilRef());
+      this.SetStencilRef(getStencilRef());
+      this.ConvertBoxMaterialToPortalMaterial();
       setupStencilChildMaterial(this.listTextMaterial, this.box.material.stencilRef);
 
       textMeshOffset = -1;
-    }
+    }  
 
     let infoProps = listConfig.infoProps;
     let date = this.NewDate();
@@ -3405,7 +3446,7 @@ export class ListItemBox extends BaseBox {
       const size = this.titleText.userData.size;
       this.box.add(this.titleText);
 
-      this.titleText.position.set(0, (this.height/2)-(size.height/2)-(this.textProps.padding*2), ((this.depth/2)+size.depth/2)*textMeshOffset);
+      this.titleText.position.set(0, (this.height/2)-(size.height/2)-(this.textProps.padding*2), ((this.depth*2)+size.depth*2));
       this.box.userData.title = this.titleText;
     }
 
@@ -3414,14 +3455,14 @@ export class ListItemBox extends BaseBox {
       const size = this.authorText.userData.size;
       this.box.add(this.authorText);
 
-      this.authorText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), ((this.depth/2)+size.depth/2)*textMeshOffset);
+      this.authorText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), (this.depth*2+size.depth*2)*textMeshOffset);
       this.box.userData.author = this.authorText;
     }
 
     this.dateText = this.ListText(date, 0.5);
     let size = this.dateText.userData.size;
     this.box.add(this.dateText);
-    this.dateText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), ((this.depth/2)+size.depth/2)*textMeshOffset);
+    this.dateText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), ((this.depth*2)+size.depth*2)*textMeshOffset);
 
     this.box.userData.date = this.dateText;
     if( this.authorText != undefined){
@@ -3432,26 +3473,37 @@ export class ListItemBox extends BaseBox {
 
     console.log("content")
     console.log(this.box)
+    console.log(listConfig.textProps.matProps)
 
   }
   SetContent(content){
     this.listTextMaterial.depthWrite = true;
-    if(content.widgetText!=undefined){
+    if(this.titleText!=undefined && content.widgetText!=undefined){
       content.box.parent.remove(content.widgetText);
     }
     this.box.add(content.box);
     content.box.position.set(0, 0, this.depth/2+0.1);
     content.box.scale.set(content.box.scale.x*this.childInset, content.box.scale.y*this.childInset, content.box.scale.z*this.childInset);
-    if(content.box.userData.properties.boxProps.isPortal){
+    if(content.box.userData.properties.boxProps.isPortal && !this.isPortal){
       this.box.material.stencilWrite = false;
       this.box.material.depthWrite = false;
     }
     if(this.isPortal){
-      this.box.add(content.gltf.scene)
-      content.MakeModelPortalChild(this.box.material.stencilRef);
-      content.box.material.opacity = 0;
-      content.box.material.transparent = true;
-      content.box.material.depthWrite = false;
+      if(content.gltf!=undefined){
+        this.box.add(content.gltf.scene)
+        content.MakeModelPortalChild(this.box.material.stencilRef);
+        content.MakeBoxMaterialInvisible();
+        content.box.material.depthWrite = false;
+      }
+      if(content.textMesh!=undefined){
+        this.box.material.depthWrite = false;
+        this.box.add(content.textMesh);
+        content.NewStencilMaterial(this.box.material.stencilRef);
+        content.textMesh.translateZ(-content.textMeshSize.depth);
+        content.textMesh.material.depthWrite = true;
+        content.MakeBoxMaterialInvisible();
+      }
+      
       this.box.material.stencilWrite = true;
       this.box.material.depthWrite = false;
       this.box.material.stencilFunc = THREE.AlwaysStencilFunc;
@@ -3459,6 +3511,7 @@ export class ListItemBox extends BaseBox {
     }
   }
   CreateListTextGeometry(text, sizeMult=1){
+    console.log(text)
     return createTextGeometry(text, this.textProps.font, this.textProps.size*sizeMult, this.textProps.height, this.textProps.meshProps.curveSegments, this.textProps.meshProps.bevelEnabled, this.textProps.meshProps.bevelThickness, this.textProps.meshProps.bevelSize, this.textProps.meshProps.bevelOffset, this.textProps.meshProps.bevelSegments);
   }
   ListText(text, sizeMult=1){
