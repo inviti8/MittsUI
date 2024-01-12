@@ -1436,42 +1436,29 @@ class BaseTextBox extends BaseBox {
 
     this.BaseText = new BaseText(this.textProps);
     this.BaseText.SetParent(this.box);
-    //this.BaseText.SetMaterial(this.textMaterial);
+    this.BaseText.SetMaterial(this.textMaterial);
 
     this.textMaterial = getMaterial(this.textProps.matProps, this.box.material.stencilRef);
-    //this.textMesh = this.CreateText();
-    this.textMesh = this.BaseText.NewTextMesh(this.box.id, this.text);
-    this.box.add(this.textMesh )
-    console.log(this.textMesh)
-    console.log(this.BaseText)
+    this.textMesh = this.CreateText();
     this.textMesh.userData.value = buttonProps.value;
     this.box.userData.value = buttonProps.value;
     this.box.userData.properties = buttonProps;
     adjustBoxScaleRatio(this.box, this.parent);
 
   }
-  CreateTextGeometry(){
-    let geometry = createMergedTextGeometry(this.textProps.font, this.width, this.height, this.text, this.textProps, this.animProps);
-    geometry.center();
-
-    return geometry
-  }
   CreateText(){
-    // let geometry = this.CreateTextGeometry();
-    // const geomSize = getGeometrySize(geometry);
     const boxSize = getGeometrySize(this.box.geometry);
-    //let result = new THREE.Mesh(geometry, this.textMaterial);
-    let result = this.BaseText.NewTextMesh(this.box.id, this.text);
+    let result = this.BaseText.NewSingleTextMesh('btn_text', this.text);
     setMergedMeshUserData(boxSize, result.userData.size, this.textProps.padding, result);
     this.box.add(result);
-    result.position.set(result.position.x, result.position.y, this.depth/2+result.userData.size.depth/2);
+    result.position.set(result.position.x, result.position.y, this.parentSize.depth/2+result.userData.size.depth/2);
 
     return result
   }
   UpdateText(text){
     this.text = text;
     this.textMesh.geometry.dispose();
-    this.textMesh.geometry = this.CreateTextGeometry();
+    this.textMesh.geometry = this.BaseText.SingleTextGeometry(this.text);
   }
 }
 
@@ -1729,7 +1716,7 @@ export class BaseWidget extends BaseBox {
 
       const mergedMesh = this.BaseText.NewTextMesh('widgetText', this.name);
 
-      mergedMesh.position.set(0, boxProps.height/2, this.parentSize.depth/2+mergedMesh.userData.size.depth);
+      mergedMesh.position.set(0, boxProps.height/2, this.parentSize.depth/2);
       // if(!props.horizontal){
       //   mergedMesh.position.set(0, boxProps.height/2, this.parentSize.depth/2+this.depth/2+mergedMesh.userData.size.depth);
       // }
@@ -2139,72 +2126,6 @@ function adjustBoxScaleRatio(box, parent){
   box.userData.defaultScale = new THREE.Vector3().copy(box.scale);
 }
 
-function handleCharacterGeometry(character, font, depth, lineWidth, yPosition, textProps, letterGeometries){
-
-  if (character === ' ') {
-    // Handle spaces by adjusting the x position
-    lineWidth += textProps.wordSpacing;
-  } else {
-
-    const geometry = createTextGeometry(character, font, textProps.size, textProps.height, textProps.meshProps.curveSegments, textProps.meshProps.bevelEnabled, textProps.meshProps.bevelThickness, textProps.meshProps.bevelSize, textProps.meshProps.bevelOffset, textProps.meshProps.bevelSegments);
-    const charSize = getGeometrySize(geometry);
-    geometry.translate(lineWidth, yPosition, depth-charSize.depth*textProps.zOffset);
-
-    // Calculate the width of the letter geometry
-    let { width } = getGeometrySize(geometry);
-    width+=textProps.letterSpacing;
-
-    letterGeometries.push(geometry);
-
-    // Update lineWidth
-    lineWidth += width;
-  }
-
-  return { letterGeometries, lineWidth }
-}
-
-export function createMergedTextBoxGeometry(elem, font, boxWidth, boxHeight, text, textProps=undefined,  animProps=undefined) {
-    let lineWidth = -(elem.width / 2 - (textProps.padding));
-    let yPosition = elem.height / 2 ;
-    const boxSize = getGeometrySize(elem.box.geometry);
-    let letterGeometries = [];
-
-    for (let i = 0; i < text.length; i++) {
-      const character = text[i];
-
-      let geoHandler = handleCharacterGeometry(character, font, (elem.depth+boxSize.depth), lineWidth, yPosition, textProps, letterGeometries);
-      lineWidth = geoHandler.lineWidth;
-      letterGeometries = geoHandler.letterGeometries;
-
-      // Check if lineWidth exceeds cBox width - padding
-      if (lineWidth > elem.width / 2 - textProps.padding) {
-        lineWidth = -(elem.width / 2) + textProps.padding; // Reset x position to the upper-left corner
-        yPosition -= textProps.lineSpacing; // Move to the next line
-      }
-    }
-
-    // Merge the individual letter geometries into a single buffer geometry
-    return BufferGeometryUtils.mergeGeometries(letterGeometries);
-}
-
-export function createMergedTextGeometry(font, boxWidth, boxHeight, text, textProps, animProps=undefined) {
-    let lineWidth = 0;
-    let yPosition = boxHeight / 2 - textProps.padding;
-    let letterGeometries = [];
-
-    for (let i = 0; i < text.length; i++) {
-      const character = text[i];
-
-      let geoHandler = handleCharacterGeometry(character, font, 0, lineWidth, yPosition, textProps, letterGeometries);
-      lineWidth = geoHandler.lineWidth;
-      letterGeometries = geoHandler.letterGeometries;
-
-    }
-
-    // Merge the individual letter geometries into a single buffer geometry
-    return BufferGeometryUtils.mergeGeometries(letterGeometries);
-}
-
 export function textBoxProperties( boxProps, text, textProps, matProps, animProps=undefined, listConfig=undefined, onCreated=undefined, padding=0.01, isPortal=false, scrollable=false, MultiLetterMeshes=false){
   return {
     'type': 'TEXT_BOX',
@@ -2245,6 +2166,8 @@ export class BaseText {
     }
     
     this.meshes[key].userData.size = getGeometrySize(this.meshes[key].geometry);
+    this.meshes[key].userData.key = key;
+    this.meshes[key].userData.controller = this;
 
     return this.meshes[key]
   }
@@ -2253,6 +2176,8 @@ export class BaseText {
     geometry.center();
     this.meshes[key] = new THREE.Mesh(geometry, this.material);
     this.meshes[key].userData.size = getGeometrySize(geometry);
+    this.meshes[key].userData.key = key;
+    this.meshes[key].userData.controller = this;
 
     return this.meshes[key]
   }
@@ -2269,12 +2194,6 @@ export class BaseText {
   MergedTextMesh(text){
     const geometry = this.MergedTextGeometry(text);
     return new THREE.Mesh(geometry, this.material);
-  }
-  UpdateTextMesh(key, text){
-    const geometry = this.GeometryText(text);
-
-    this.mesh.geometry.dispose();
-    this.mesh.geometry = geometry;
   }
   GeometryText(text){
     let geometry = undefined;
@@ -2725,15 +2644,12 @@ export class InputTextWidget extends BaseWidget {
     let widgetProps = widgetProperties(inputBoxProps, textInputProps.name, true, true, textProps, false, undefined, textInputProps.boxProps.matProps, textInputProps.animProps, textInputProps.listConfig, 0)
     super(widgetProps);
     textInputProps.buttonProps.boxProps.parent = this.box;
-    const inputGeometry = createMergedTextBoxGeometry(this, textProps.font, this.width, this.height, 'Enter Text', textProps, textInputProps.animProps);
-    const boxSize = getGeometrySize(this.box.geometry);
-    const geomSize = getGeometrySize(inputGeometry);
     this.inputTextMaterial = getMaterial(textProps.matProps, 0);
-    //this.inputText = new THREE.Mesh(inputGeometry, this.inputTextMaterial);
     this.inputText = this.BaseText.NewTextMesh('inputText', 'Enter Text');
-    setMergedMeshUserData(boxSize, geomSize, textProps.padding, this.inputText);
+    this.BaseText.SetMergedTextUserData('inputText');
+    this.inputTextSize = this.inputText.userData.size;
     this.box.add(this.inputText);
-    this.inputText.position.set(this.inputText.position.x, this.inputText.position.y-this.height/2-geomSize.height/2, boxSize.depth/2+geomSize.depth/2);
+    this.inputText.position.set(this.inputText.position.x, this.inputText.position.y-this.height/2-this.inputTextSize.height/2, this.depth/2);
     this.box.userData.properties = textInputProps;
     this.inputBoxProps = inputBoxProps;
     this.btnBoxProps = btnBoxProps;
@@ -2742,6 +2658,10 @@ export class InputTextWidget extends BaseWidget {
 
     if(textInputProps.buttonProps != undefined){
       this.button = this.AttachButton();
+    }
+
+    if(textInputProps.boxProps.isPortal){
+      this.parent.material.depthWrite = false;
     }
 
     this.box.position.set(this.box.position.x, this.box.position.y, this.parentSize.depth/2+this.depth/2)
@@ -3905,8 +3825,7 @@ function onHandleTextGeometry(textMesh, currentText, boxSize){
   let textProps = textMesh.userData.textProps;
   if(currentText.length > 0){
     textMesh.scale.copy(textMesh.userData.defaultScale);
-    textMesh.geometry.dispose(); // Clear the previous text
-    textMesh.geometry = createMergedTextBoxGeometry(textProps.cBox, textProps.font, boxSize.Width, boxSize.height, currentText, textProps);
+    textMesh.userData.controller.UpdateTextMesh(textMesh.userData.key, currentText);
   }
 }
 
