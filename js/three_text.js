@@ -72,38 +72,6 @@ loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
   DEFAULT_TEXT_PROPS.font = font;
 });
 
-export function attachToInnerTop(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x, elem.box.position.y+parent.height/2, depth);
-};
-
-export function attachToOuterTop(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x, elem.box.position.y+parent.height/2+elem.height/2, depth);
-};
-
-export function attachToInnerBottom(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x, elem.box.position.y-parent.height/2, depth);
-};
-
-export function attachToOuterBottom(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x, elem.box.position.y-parent.height/2-elem.height/2, depth);
-};
-
-export function attachToInnerLeft(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x-parent.height/2, elem.box.position.y, elem.box.position.z);
-};
-
-export function attachToOuterLeft(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x-parent.height/2-elem.height/2, elem.box.position.y, elem.box.position.z);
-};
-
-export function attachToInnerRight(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x+parent.width/2, elem.box.position.y, elem.box.position.z);
-};
-
-export function attachToOuterRight(parent, elem, depth){
-  elem.box.position.set(elem.box.position.x+parent.width/2+elem.width/2, elem.box.position.y, elem.box.position.z);
-};
-
 export function createMainSceneLighting(scene){
   const ambientLight = new THREE.AmbientLight(0x404040);
   ambientLight.name = 'MAIN_AMBIENT_LIGHT'
@@ -1019,7 +987,15 @@ export function getScenePool(){
   return scenePool;
 };
 
-export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties(), meshProps=textMeshProperties()) {
+export function centerPos(parentSize, childSize, zMult=1){
+  return new THREE.Vector3(0, -parentSize.height/2+(childSize.height*2), parentSize.depth/2+childSize.depth/2*zMult);
+}
+
+export function leftPos(parentSize, childSize, zMult=1){
+  return new THREE.Vector3(-parentSize.width/2+childSize.width/2, -parentSize.height/2+(childSize.height*2)-(childSize.height/2), parentSize.depth/2+childSize.depth/2*zMult);
+}
+
+export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties(), meshProps=textMeshProperties(), align='CENTER') {
   return {
     'font': font,
     'letterSpacing': letterSpacing,
@@ -1030,7 +1006,8 @@ export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, pa
     'height': height,
     'zOffset': zOffset,
     'matProps': matProps,
-    'meshProps': meshProps
+    'meshProps': meshProps,
+    'align': align
   }
 };
 
@@ -1043,6 +1020,9 @@ export class BaseText {
   }
   SetMaterial(material){
     this.material = material;
+    if(this.parent.userData.isPortal){
+      setupStencilChildMaterial(this.material, this.parent.material.stencilRef);
+    }
   }
   SetParent(parent){
     this.parent = parent;
@@ -1063,7 +1043,7 @@ export class BaseText {
     this.meshes[key].userData.key = key;
     this.meshes[key].userData.controller = this;
     this.ParentText(key);
-    this.CenterTextPos(key);
+    this.AlignTextPos(key);
 
     return this.meshes[key]
   }
@@ -1075,18 +1055,30 @@ export class BaseText {
     this.meshes[key].userData.key = key;
     this.meshes[key].userData.controller = this;
     this.ParentText(key);
-    this.CenterTextPos(key);
+    this.AlignTextPos(key);
 
     return this.meshes[key]
   }
+  AlignTextPos(key){
+    if(this.textProps.align == 'CENTER'){
+      this.CenterTextPos(key)
+    }else if(this.textProps.align == 'LEFT'){
+      this.LeftTextPos(key)
+    }
+  }
   CenterTextPos(key){
-    this.meshes[key].position.set(this.meshes[key].position.x, this.meshes[key].position.y, this.parentSize.depth/2+this.meshes[key].userData.size.depth/2);
+    this.meshes[key].position.copy(centerPos(this.parentSize, this.meshes[key].userData.size));
+  }
+  LeftTextPos(key){
+    this.meshes[key].position.copy(leftPos(this.parentSize, this.meshes[key].userData.size));
   }
   UpdateTextMesh(key, text){
     if(this.meshes[key]==undefined)
       return;
     this.meshes[key].geometry.dispose();
     this.meshes[key].geometry = this.GeometryText(text);
+    this.meshes[key].userData.size = getGeometrySize(this.meshes[key].geometry);
+    AlignTextPos(key);
   }
   MergedMultiTextMesh(text){
     const geometry = this.MergedMultiGeometry(text);
@@ -1327,16 +1319,20 @@ export class BaseBox {
     this.box.userData.height = boxProps.height;
     this.box.userData.depth = boxProps.depth;
     this.box.userData.padding = boxProps.padding;
+    this.box.userData.isPortal = boxProps.isPortal;
+
+    this.zPos = this.depth/2;
 
     if(this.isPortal){
       this.parent.material.depthWrite = false;
+      this.zPos = 0;
     }
 
     
     if(!this.parent.isScene){
       this.parent.add(this.box);
       this.parentSize = getGeometrySize(boxProps.parent.geometry);
-      this.box.position.set(this.box.position.x, this.box.position.y, this.parentSize.depth/2+this.depth/2);
+      this.box.position.set(this.box.position.x, this.box.position.y, this.parentSize.depth/2+this.zPos);
     }
   }
   CreateBoxGeometry(boxProps) {
@@ -1490,123 +1486,9 @@ export class BaseBox {
 
 }
 
-export function meshViewBox(boxProps, scene){
-  const box = new THREE.Mesh(new THREE.PlaneGeometry(boxProps.width, boxProps.height), new THREE.MeshBasicMaterial() );
-  box.userData.width = boxProps.width;
-  box.userData.height = boxProps.height;
-  box.userData.depth = boxProps.depth;
-  box.userData.padding = boxProps.padding;
-  const boundingBox = new THREE.Box2();
-
-  let result = { 'box': box, 'width': boxProps.width, 'height': boxProps.height, 'boundingBox': boundingBox, 'scene': scene, 'padding': boxProps.padding  };
-
-  meshViews.push(result);
-
-
-  return result
-};
-
 export function roundedBox(boxProps){
   return new BaseBox(boxProps).box
 };
-
-//Manage lighting, to be put into object scene, or to be put back for the main scene
-function handleSceneLightSwap(object, mainScene, activate){
-  const ambientLight = getMainAmbientLight(mainScene);
-  const directionalLight = getMainDirectionalLight(mainScene);
-
-  if(ambientLight == undefined || directionalLight == undefined)
-    return;
-
-  if(activate){
-    object.scene.add(ambientLight);
-    ambientLight.layers.set(object.box.layers.mask);
-    object.scene.add(directionalLight);
-    directionalLight.layers.set(object.box.layers.mask);
-
-  }else{
-    mainScene.add(ambientLight);
-    ambientLight.layers.set(0);
-    mainScene.add(directionalLight);
-    directionalLight.layers.set(0);
-  }
-}
-
-//Manage putting meshView and main camera on appropriate layers and scenes
-function handleMeshViewScene(meshView, mainScene, mainCam, activate){
-  if(meshView.box.parent == undefined || meshView.scene == undefined)
-    return;
-
-  if(activate){
-    meshView.scene.add(mainCam);
-    meshView.scene.add(meshView.box.parent);
-    mainCam.layers.set(meshView.box.layers.mask);
-  }else{
-    mainCam.layers.set(0);
-    mainScene.add(mainCam);
-    mainScene.add(meshView.box.parent);
-  }
-}
-
-export function renderMeshView(meshView, mainScene, mainCam, renderer){
-  computeScreenSpaceBoundingBox(meshView.boundingBox, meshView, mainCam);
-
-  let n = normalizedToPixels(meshView.boundingBox);
-
-  renderer.setViewport(0, 0, window.innerWidth, 
-  window.innerHeight);
-  //renderer.autoClear = false;
-  renderer.render(mainScene, mainCam);
-  //renderer.clearDepth();
-  renderer.setScissorTest(true);
-  renderer.setScissor(
-      n.x,
-      n.y,
-      n.w,
-      n.h
-  );
-  renderer.setViewport(
-      0,
-      0,
-      window.innerWidth,
-      window.innerHeight
-  );
-  
-  handleSceneLightSwap(meshView, mainScene, true);
-  handleMeshViewScene(meshView, mainScene, mainCam, true);
-  renderer.render(meshView.scene, mainCam);
-  handleMeshViewScene(meshView, mainScene, mainCam, false);
-  handleSceneLightSwap(meshView, mainScene, false);
-  renderer.setScissorTest(false);
-}
-
-function calculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDivisor, defaultSubOffset=0.65){
-  let subOffset = 1;
-  if(useSubObject){
-    subOffset = defaultSubOffset;
-  }
-  let baseWidth = boxProps.width*subOffset;
-  let baseHeight = boxProps.height;
-  let baseDepth=boxProps.depth/2;
-  let handleWidth=boxProps.width/operatorSizeDivisor*subOffset;
-  let handleHeight=boxProps.height;
-  let handleDepth=boxProps.depth;
-  let subWidth=baseWidth*(1-1*subOffset);
-  let subHeight=baseHeight;
-  let subDepth=baseDepth;
-
-  if(horizontal==false){
-    baseWidth = boxProps.width;
-    baseHeight = boxProps.height*subOffset;
-    handleWidth=boxProps.width;
-    handleHeight=boxProps.height/operatorSizeDivisor*subOffset;
-    subWidth=baseWidth;
-    subHeight=baseHeight*(1-1*subOffset);
-    subDepth=baseDepth;
-  }
-
-  return {baseWidth, baseHeight, baseDepth, handleWidth, handleHeight, handleDepth, subWidth, subHeight, subDepth}
-}
 
 export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined){
   return {
@@ -1655,9 +1537,9 @@ class BaseTextBox extends BaseBox {
 
     this.BaseText = new BaseText(this.textProps);
     this.BaseText.SetParent(this.box);
-    this.BaseText.SetMaterial(this.textMaterial);
 
     this.textMaterial = getMaterial(this.textProps.matProps, this.box.material.stencilRef);
+    this.BaseText.SetMaterial(this.textMaterial);
     this.textMesh = this.CreateText();
     this.textMesh.userData.value = buttonProps.value;
     this.box.userData.value = buttonProps.value;
@@ -1869,7 +1751,7 @@ export function widgetProperties(boxProps, name='', horizontal=true, on=false, t
 
 export class BaseWidget extends BaseBox {
   constructor(widgetProps) {
-    let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, widgetProps.handleSize);
+    let size = BaseWidget.CalculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, widgetProps.handleSize);
     let baseBoxProps = {...widgetProps.boxProps};
     baseBoxProps.width = size.baseWidth;
     baseBoxProps.height = size.baseHeight;
@@ -1960,6 +1842,33 @@ export class BaseWidget extends BaseBox {
       valBox.box.position.set(valBox.box.position.x, -this.size.baseHeight+valBox.height, boxProps.parent.position.z);
     }
   }
+  static CalculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDivisor, defaultSubOffset=0.65){
+    let subOffset = 1;
+    if(useSubObject){
+      subOffset = defaultSubOffset;
+    }
+    let baseWidth = boxProps.width*subOffset;
+    let baseHeight = boxProps.height;
+    let baseDepth=boxProps.depth/2;
+    let handleWidth=boxProps.width/operatorSizeDivisor*subOffset;
+    let handleHeight=boxProps.height;
+    let handleDepth=boxProps.depth;
+    let subWidth=baseWidth*(1-1*subOffset);
+    let subHeight=baseHeight;
+    let subDepth=baseDepth;
+
+    if(horizontal==false){
+      baseWidth = boxProps.width;
+      baseHeight = boxProps.height*subOffset;
+      handleWidth=boxProps.width;
+      handleHeight=boxProps.height/operatorSizeDivisor*subOffset;
+      subWidth=baseWidth;
+      subHeight=baseHeight*(1-1*subOffset);
+      subDepth=baseDepth;
+    }
+
+    return {baseWidth, baseHeight, baseDepth, handleWidth, handleHeight, handleDepth, subWidth, subHeight, subDepth}
+  }
 };
 
 export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, step=0.001, editable=true){
@@ -1998,7 +1907,7 @@ class ValueTextWidget extends BaseTextBox{
     valBoxProps.isPortal = true;
     let textProps = widgetProps.textProps;
     let valMatProps = materialProperties('BASIC', widgetProps.textProps.matProps.color, false, 1, THREE.FrontSide, 'STENCIL');
-    let size = calculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText);
+    let size = BaseWidget.CalculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText);
     let defaultVal = widgetProps.valueProps.defaultValue.toString();
 
     valBoxProps.matProps = valMatProps;
@@ -2084,7 +1993,7 @@ class ValueTextWidget extends BaseTextBox{
 
 export class SliderWidget extends BaseWidget {
   constructor(widgetProps) {
-
+    widgetProps.textProps.align = 'LEFT';
     super(widgetProps);
     draggable.push(this.handle);
     
@@ -2099,7 +2008,7 @@ export class SliderWidget extends BaseWidget {
 
     }
 
-    this.setSliderUserData();
+    this.SetSliderUserData();
 
     this.handle.addEventListener('action', function(event) {
       this.userData.targetElem.OnSliderMove();
@@ -2110,9 +2019,9 @@ export class SliderWidget extends BaseWidget {
     });
 
   }
-  setSliderUserData(){
+  SetSliderUserData(){
     let sliderProps = this.box.userData.properties;
-    let size = calculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
+    let size = BaseWidget.CalculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
 
     this.box.userData.type = 'SLIDER';
     this.box.userData.size = {'width': size.baseWidth, 'height': size.baseHeight, 'depth': size.baseDepth};
@@ -2582,7 +2491,7 @@ export class InputTextWidget extends BaseWidget {
     if(hasButton && inputTextProps.buttonProps.attach == 'BOTTOM'){
       horizontal = false;
     }
-    let size = calculateWidgetSize(inputTextProps.boxProps, horizontal, hasButton, 2);
+    let size = BaseWidget.CalculateWidgetSize(inputTextProps.boxProps, horizontal, hasButton, 2);
 
     inputBoxProps.width = size.baseWidth;
     inputBoxProps.height = size.baseHeight;
@@ -3034,7 +2943,7 @@ export function createImageBox(imageProps){
 
   if(typeof DEFAULT_TEXT_PROPS.font === 'string'){
     // Load the font
-    loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
+    loader.load(DEFAULT_TEXT_PROPS.font, (DEFAULT_FONT) => {
       DEFAULT_TEXT_PROPS.font = font;
       SetListConfigFont(imageProps.listConfig, font);
       new ImageWidget(imageProps);
@@ -3087,7 +2996,7 @@ export class GLTFModelWidget extends BaseWidget {
       this.gltf.scene.scale.set(this.gltf.scene.scale.x*this.ratio, this.gltf.scene.scale.y*this.ratio, this.gltf.scene.scale.z*this.ratio);
       this.gltf.scene.position.set(this.gltf.scene.position.x, this.gltf.scene.position.y, this.gltf.scene.position.z-this.depth-(this.sceneSize.z*this.ratio));
       this.gltf.scene.renderOrder = 2;
-      this.box.position.set(this.box.position.x, this.box.position.y, this.parentSize.depth/2)
+
     }else{
       this.box.material.opacity = 0;
       this.box.material.transparent = true;
@@ -3125,7 +3034,7 @@ export class GLTFModelWidget extends BaseWidget {
 function GLTFModelLoader(gltfProps){
   if(typeof DEFAULT_TEXT_PROPS.font === 'string'){
     // Load the font
-    loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
+    loader.load(DEFAULT_TEXT_PROPS.font, (DEFAULT_FONT) => {
       DEFAULT_TEXT_PROPS.font = font;
       SetListConfigFont(gltfProps.listConfig, font);
       new GLTFModelWidget(gltfProps);
@@ -3137,7 +3046,8 @@ function GLTFModelLoader(gltfProps){
 }
 
 export function createGLTFModel(gltfProps){
-  
+    gltfProps.boxProps.isPortal = false;
+    console.log(gltfProps)
   if(typeof gltfProps.gltf === 'string'){
     // Instantiate a loader
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
@@ -3167,7 +3077,6 @@ export function createGLTFModelPortal(gltfProps){
         console.log(gltf)
         gltfProps.gltf = gltf;
         GLTFModelLoader(gltfProps);
-        //GLTFModelPortal(gltfProps);
       },
       // called while loading is progressing
       function ( xhr ) {
@@ -3180,7 +3089,6 @@ export function createGLTFModelPortal(gltfProps){
     );
   }else if(gltfProps.gltf.scene != undefined){
     GLTFModelLoader(gltfProps);
-    //GLTFModelPortal(gltfProps);
   }
 }
 
@@ -3253,8 +3161,6 @@ export class ListItemBox extends BaseBox {
       this.authorText.position.set(this.box.userData.author.position.x, this.authorText.position.y+size.height+(this.textProps.padding*2), this.authorText.position.z);
     }
 
-    this.box.position.set(this.box.position.x, (this.parent.userData.height-this.spacing)/2-this.height/2-((this.height+this.spacing)*this.index), this.box.position.z+this.parentSize.depth);
-
   }
   SetContent(content){
     this.listTextMaterial.depthWrite = true;
@@ -3272,9 +3178,12 @@ export class ListItemBox extends BaseBox {
       let boxZOffset = -1;
       if(content.gltf!=undefined){
         this.box.add(content.gltf.scene)
-        content.MakeModelPortalChild(this.box.material.stencilRef);
-        content.MakeBoxMaterialInvisible();
-        content.box.material.depthWrite = false;
+        if(content.isPortal){
+          content.MakeModelPortalChild(this.box.material.stencilRef);
+          content.MakeBoxMaterialInvisible();
+          content.box.material.depthWrite = false;
+        }
+        
       }
       if(content.textMesh!=undefined){
         this.box.material.depthWrite = false;
@@ -3298,7 +3207,6 @@ export class ListItemBox extends BaseBox {
     }
   }
   CreateListTextGeometry(text, sizeMult=1){
-    console.log(text)
     return createTextGeometry(text, this.textProps.font, this.textProps.size*sizeMult, this.textProps.height, this.textProps.meshProps.curveSegments, this.textProps.meshProps.bevelEnabled, this.textProps.meshProps.bevelThickness, this.textProps.meshProps.bevelSize, this.textProps.meshProps.bevelOffset, this.textProps.meshProps.bevelSegments);
   }
   NewTextMeshStencilMaterial(stencilRef){
