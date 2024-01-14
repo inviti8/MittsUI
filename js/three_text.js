@@ -2600,18 +2600,14 @@ export function createScrollableTextInputPortal(textInputProps) {
   createTextInput(textInputProps);
 };
 
-export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', padding=0.01, textProps=undefined, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, isPortal=false){
+export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', textProps=undefined, animProps=undefined, listConfig=undefined){
   return {
     'type': 'LIST_SELECTOR',
     'boxProps': boxProps,
     'name': name,
-    'padding': padding,
     'textProps': textProps,
-    'matProps': matProps,
     'animProps': animProps,
-    'listConfig': listConfig,
-    'onCreated': onCreated,
-    'isPortal': isPortal
+    'listConfig': listConfig
   }
 };
 
@@ -2619,18 +2615,16 @@ export class SelectorWidget extends BaseWidget {
   constructor(listSelectorProps) {
     const isPortal = listSelectorProps.isPortal;
     const textProps = listSelectorProps.textProps;
-    const matProps = listSelectorProps.matProps;
     let btnBoxProps = {...listSelectorProps.boxProps};
-    let btnMatProps = {...listSelectorProps.matProps};
+    let btnMatProps = {...listSelectorProps.boxProps.matProps};
     let btnTextProps = {...listSelectorProps.textProps};
     btnBoxProps.matProps = btnMatProps;
     if(isPortal){
       btnBoxProps.isPortal = isPortal;
-      btnBoxProps.matProps.useCase = 'STENCIL';
+      btnBoxProps.matProps.useCase = 'STENCIL_CHILD';
       btnTextProps.matProps.useCase = 'STENCIL_CHILD';
       btnMatProps.useCase = 'STENCIL';
       listSelectorProps.boxProps.matProps.useCase = 'STENCIL_CHILD';
-      listSelectorProps.matProps.useCase = 'STENCIL_CHILD';
       listSelectorProps.textProps.matProps.useCase = 'STENCIL_CHILD';
     }
     let widgetProps = widgetProperties(btnBoxProps, listSelectorProps.name, true, true, btnTextProps, false, undefined, listSelectorProps.listConfig, 0)
@@ -3115,7 +3109,7 @@ export function listItemConfig(boxProps, textProps=undefined,  animProps=undefin
     'textProps': textProps,
     'animProps': animProps,
     'infoProps': infoProps,
-    'useTimeStamp': true,
+    'useTimeStamp': useTimeStamp,
     'spacing': spacing,
     'childInset': childInset,
     'index': index
