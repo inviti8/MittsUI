@@ -987,12 +987,12 @@ export function getScenePool(){
   return scenePool;
 };
 
-export function centerPos(parentSize, childSize, zMult=1){
-  return new THREE.Vector3(0, -parentSize.height/2+(childSize.height*2), parentSize.depth/2+childSize.depth/2*zMult);
+export function centerPos(parentSize, childSize, zPosDir=1, padding=0.05){
+  return new THREE.Vector3(0, 0, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
-export function leftPos(parentSize, childSize, zMult=1){
-  return new THREE.Vector3(-parentSize.width/2+childSize.width/2, -parentSize.height/2+(childSize.height*2)-(childSize.height/2), parentSize.depth/2+childSize.depth/2*zMult);
+export function leftPos(parentSize, childSize, zPosDir=1, padding=0.05){
+  return new THREE.Vector3(parentSize.depth-childSize.width+padding, 0, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
 export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties(), meshProps=textMeshProperties(), align='CENTER') {
@@ -1014,7 +1014,9 @@ export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, pa
 export class BaseText {
   constructor(textProps){
     this.textProps = textProps;
+    this.zPosDir = 1;
     this.MultiLetterMeshes = textProps.MultiLetterMeshes;
+    this.multiTextArray = [];
     this.material = getMaterial(textProps.matProps);
     this.meshes = {};
   }
@@ -1027,6 +1029,10 @@ export class BaseText {
   SetParent(parent){
     this.parent = parent;
     this.parentSize = getGeometrySize(this.parent.geometry);
+
+    if(this.parent.userData.isPortal){
+      this.zPosDir = -1;
+    }
   }
   ParentText(key){
     this.parent.add(this.meshes[key]);
@@ -1034,6 +1040,7 @@ export class BaseText {
   NewTextMesh(key, text){
     const geometry = this.GeometryText(text);
     if(this.MultiLetterMeshes){
+      this.multiTextArray = geometry.letterMeshes;
       this.meshes[key] = this.MergedMultiText(geometry);
     }else{
       this.meshes[key] = new THREE.Mesh(geometry, this.material);
@@ -1067,10 +1074,10 @@ export class BaseText {
     }
   }
   CenterTextPos(key){
-    this.meshes[key].position.copy(centerPos(this.parentSize, this.meshes[key].userData.size));
+    this.meshes[key].position.copy(centerPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir));
   }
   LeftTextPos(key){
-    this.meshes[key].position.copy(leftPos(this.parentSize, this.meshes[key].userData.size));
+    this.meshes[key].position.copy(leftPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir));
   }
   UpdateTextMesh(key, text){
     if(this.meshes[key]==undefined)
@@ -1144,7 +1151,7 @@ export class BaseText {
 
       const geometry = this.SingleTextGeometry(character);
       const charSize = getGeometrySize(geometry);
-      geometry.translate(lineWidth, yPosition, (this.parentSize.depth+boxSize.depth)-charSize.depth*this.textProps.zOffset);
+      geometry.translate(lineWidth, yPosition, (this.parentSize.depth+boxSize.depth)-charSize.depth*this.zPosDir);
 
       // Calculate the width of the letter geometry
       let { width } = getGeometrySize(geometry);
@@ -1176,6 +1183,9 @@ export class BaseText {
       mergedMesh.add(m);
     });
 
+    console.log('mergedMesh')
+    console.log(mergedMesh.material)
+
     return mergedMesh
   }
   MergedMultiGeometry(text){
@@ -1200,10 +1210,10 @@ export class BaseText {
           const geometry = this.SingleTextGeometry(character);
           const cube = new THREE.BoxGeometry(this.textProps.size*2, this.textProps.size*2, this.textProps.height);
 
-          cube.translate((this.textProps.size/2)+lineWidth, (this.textProps.size/2)+yPosition, this.parent.userData.depth/2*this.textProps.zOffset);
+          cube.translate((this.textProps.size/2)+lineWidth, (this.textProps.size/2)+yPosition, this.parent.userData.depth/2*this.zPosDir);
 
           const letterMesh = new THREE.Mesh(geometry, this.material);
-          letterMesh.position.set(lineWidth, yPosition, this.parent.userData.depth/2*this.textProps.zOffset);
+          letterMesh.position.set(lineWidth, yPosition, this.parent.userData.depth/2*this.zPosDir);
 
           // Calculate the width of the letter geometry
           let { width } = getGeometrySize(geometry);
@@ -1308,7 +1318,7 @@ export class BaseBox {
     this.material = getMaterial(boxProps.matProps);
     this.geometry = this.CreateBoxGeometry(boxProps);
     this.box = new THREE.Mesh(this.geometry, this.material);
-    setGeometryPivot(this.box, boxProps);
+    //setGeometryPivot(this.box, boxProps);
     this.box.userData.width = this.width;
     this.box.userData.height = this.height;
     this.box.userData.depth = this.depth;
@@ -1541,6 +1551,7 @@ class BaseTextBox extends BaseBox {
     this.textMaterial = getMaterial(this.textProps.matProps, this.box.material.stencilRef);
     this.BaseText.SetMaterial(this.textMaterial);
     this.textMesh = this.CreateText();
+    this.UpdateText(this.text);
     this.textMesh.userData.value = buttonProps.value;
     this.box.userData.value = buttonProps.value;
     this.box.userData.properties = buttonProps;
@@ -1558,6 +1569,9 @@ class BaseTextBox extends BaseBox {
     this.text = text;
     this.textMesh.geometry.dispose();
     this.textMesh.geometry = this.BaseText.SingleTextGeometry(this.text);
+    this.textMesh.geometry.center();
+    this.BaseText.ParentText('btn_text');
+    this.BaseText.AlignTextPos('btn_text');
   }
 }
 
@@ -1819,9 +1833,9 @@ export class BaseWidget extends BaseBox {
       const padding = this.BaseText.textProps.padding;
 
       text.position.set(0, this.height/2+textSize.height/2+padding, this.parentSize.depth/2);
-      // if(!props.horizontal){
-      //   mergedMesh.position.set(0, boxProps.height/2, this.parentSize.depth/2+this.depth/2+mergedMesh.userData.size.depth);
-      // }
+      if(!props.horizontal){
+        mergedMesh.position.set(0, this.height/2, this.parentSize.depth/2+this.depth/2+mergedMesh.userData.size.depth);
+      }
       boxProps.parent.add(text);
 
       return text
@@ -1927,7 +1941,6 @@ class ValueTextWidget extends BaseTextBox{
       this.max = widgetProps.max;
     }
     this.box.userData.targetElem = this;
-    this.SetValueTextPosition();
 
     darkenMaterial(this.box.material, 30);
 
@@ -1960,10 +1973,6 @@ class ValueTextWidget extends BaseTextBox{
       return;
 
     this.UpdateText(this.box.parent.userData.value);
-    this.SetValueTextPosition();
-  }
-  SetValueTextPosition(){
-    this.textMesh.position.set(this.textMesh.position.x, this.textMesh.position.y, -this.depth/2);
   }
   EditableSetup(){
     inputPrompts.push(this.textMesh);
@@ -2255,13 +2264,12 @@ function adjustBoxScaleRatio(box, parent){
   box.userData.defaultScale = new THREE.Vector3().copy(box.scale);
 }
 
-export function textBoxProperties( boxProps, text, textProps, matProps, animProps=undefined, listConfig=undefined, scrollable=false, MultiLetterMeshes=false){
+export function textBoxProperties( boxProps, text, textProps, animProps=undefined, listConfig=undefined, scrollable=false, MultiLetterMeshes=false){
   return {
     'type': 'TEXT_BOX',
     'boxProps': boxProps,
     'text': text,
     'textProps': textProps,
-    'matProps': matProps,
     'animProps': animProps,
     'listConfig': listConfig,
     'scrollable': scrollable,
@@ -2294,6 +2302,9 @@ export class TextBoxWidget extends BaseWidget {
     this.textMeshSize = getGeometrySize(this.textMesh.geometry);
     this.box.add(this.textMesh);
 
+    console.log('this.textMesh')
+    console.log(this.textMesh)
+
     this.HandleListConfig(textBoxProps.listConfig);
 
     if(textProps.draggable){
@@ -2310,10 +2321,17 @@ export class TextBoxWidget extends BaseWidget {
       setupStencilMaterial(this.box.material, this.box.material.stencilRef);
       setupStencilChildMaterial(this.textMeshMaterial, this.box.material.stencilRef);
     }
-
   }
   NewTextMeshStencilMaterial(stencilRef){
-    this.textMesh.material = getMaterial(this.textProps.matProps, stencilRef);
+    const material = getMaterial(this.textProps.matProps, stencilRef);
+    if(this.BaseText.multiTextArray.length>0){
+      this.BaseText.multiTextArray.forEach((text, index) =>{
+        text.material = material;
+      });
+
+    }else{
+      this.textMesh.material = material;
+    }
   }
   SetTextMeshMaterialStencilRef(stencilRef){
     this.textMesh.material.stencilRef = stencilRef;
@@ -2325,9 +2343,7 @@ export class TextBoxWidget extends BaseWidget {
     //this.textMesh.material.stencilZPass = undefined;
   }
   static SetupPortalProps(textBoxProps){
-    textBoxProps.isPortal = true;
     textBoxProps.boxProps.isPortal = true;
-    textBoxProps.matProps.useCase = 'STENCIL';
     textBoxProps.boxProps.matProps.useCase = 'STENCIL';
     textBoxProps.textProps.matProps.useCase = 'STENCIL_CHILD';
 
@@ -3121,6 +3137,8 @@ export class ListItemBox extends BaseBox {
     this.BaseText.SetMaterial(this.listTextMaterial);
 
     let textMeshOffset = 1;
+    this.textZPos = (this.depth*2)+this.textProps.size*2;
+
 
     if(this.isPortal){
       this.SetStencilRef(getStencilRef());
@@ -3138,7 +3156,7 @@ export class ListItemBox extends BaseBox {
       const size = this.titleText.userData.size;
       this.box.add(this.titleText);
 
-      this.titleText.position.set(0, (this.height/2)-(size.height/2)-(this.textProps.padding*2), ((this.depth*2)+size.depth*2)*textMeshOffset);
+      this.titleText.position.set(0, (this.height/2)-(size.height/2)-(this.textProps.padding*2), this.textZPos*textMeshOffset);
       this.box.userData.title = this.titleText;
     }
 
@@ -3147,14 +3165,14 @@ export class ListItemBox extends BaseBox {
       const size = this.authorText.userData.size;
       this.box.add(this.authorText);
 
-      this.authorText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), (this.depth*2+size.depth*2)*textMeshOffset);
+      this.authorText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), this.textZPos*textMeshOffset);
       this.box.userData.author = this.authorText;
     }
 
     this.dateText = this.BaseText.NewSingleTextMesh('dateText', date, 0.5);
     let size = this.dateText.userData.size;
     this.box.add(this.dateText);
-    this.dateText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), ((this.depth*2)+size.depth*2)*textMeshOffset);
+    this.dateText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), this.textZPos*textMeshOffset);
 
     this.box.userData.date = this.dateText;
     if( this.authorText != undefined){
@@ -3168,6 +3186,7 @@ export class ListItemBox extends BaseBox {
       content.box.parent.remove(content.widgetText);
     }
     let boxZOffset = 1;
+    let zPos = content.textMeshSize.depth*2;
     this.box.add(content.box);
     
     if(content.box.userData.properties.boxProps.isPortal && !this.isPortal){
@@ -3176,6 +3195,7 @@ export class ListItemBox extends BaseBox {
     }
     if(this.isPortal){
       let boxZOffset = -1;
+      zPos = -(this.textZPos+(content.textMeshSize.depth*3));
       if(content.gltf!=undefined){
         this.box.add(content.gltf.scene)
         if(content.isPortal){
@@ -3189,7 +3209,7 @@ export class ListItemBox extends BaseBox {
         this.box.material.depthWrite = false;
         this.box.add(content.textMesh);
         content.NewTextMeshStencilMaterial(this.box.material.stencilRef);
-        content.textMesh.translateZ(-content.textMeshSize.depth);
+        content.textMesh.translateZ(zPos);
         content.textMesh.material.depthWrite = true;
         content.MakeBoxMaterialInvisible();
       }
