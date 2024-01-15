@@ -1015,6 +1015,7 @@ export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, pa
 export class BaseText {
   constructor(textProps){
     this.textProps = textProps;
+    this.padding = textProps.padding;
     this.zPosDir = 1;
     this.MultiLetterMeshes = textProps.MultiLetterMeshes;
     this.multiTextArray = [];
@@ -1860,9 +1861,9 @@ export class BaseWidget extends BaseBox {
       const textSize = text.userData.size;
       const padding = this.BaseText.textProps.padding;
 
-      text.position.set(0, this.height/2+textSize.height/2+padding, this.parentSize.depth/2);
+      text.position.set(0, this.height+textSize.height/2+padding, this.parentSize.depth/2);
       if(!props.horizontal){
-        mergedMesh.position.set(0, this.height/2, this.parentSize.depth/2+this.depth/2+mergedMesh.userData.size.depth);
+        text.position.set(0, this.height/2, this.parentSize.depth/2+this.depth/2+text.userData.size.depth);
       }
       boxProps.parent.add(text);
 
@@ -1883,6 +1884,8 @@ export class BaseWidget extends BaseBox {
     }else{
       valBox.box.position.set(valBox.box.position.x, -this.size.baseHeight+valBox.height, boxProps.parent.position.z);
     }
+
+    return valBox
   }
   static CalculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDivisor, defaultSubOffset=0.65){
     let subOffset = 1;
@@ -1925,16 +1928,12 @@ export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, s
   }
 };
 
-export function sliderProperties(boxProps, name='', horizontal=true, min=0, max=1, places=3, step=0.001, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8){
+export function sliderProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8){
   return {
     'type': 'SLIDER',
     'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
-    'min': min,
-    'max': max,
-    'places': places,
-    'step': step,
     'textProps': textProps,
     'useValueText': useValueText,
     'numeric': numeric,
@@ -1964,9 +1963,11 @@ class ValueTextWidget extends BaseTextBox{
     super(buttonProperties(valBoxProps, defaultVal, widgetProps.value, textProps, false));
     this.widgetSize = size;
     this.numeric = widgetProps.numeric;
+    this.places = widgetProps.valueProps.places;
+    this.steps = widgetProps.valueProps.steps;
     if(this.numeric){
-      this.min = widgetProps.min;
-      this.max = widgetProps.max;
+      this.min = widgetProps.valueProps.min;
+      this.max = widgetProps.valueProps.max;
     }
     this.box.userData.targetElem = this;
 
@@ -1999,8 +2000,9 @@ class ValueTextWidget extends BaseTextBox{
   UpdateValue(){
     if(this.box.parent.userData.value == undefined)
       return;
-
+    this.box.parent.userData.value = Number.parseFloat(this.box.parent.userData.value).toFixed(this.places);
     this.UpdateText(this.box.parent.userData.value);
+    this.box.dispatchEvent({type:'onValueUpdate'});
   }
   EditableSetup(){
     inputPrompts.push(this.textMesh);
@@ -2035,7 +2037,8 @@ export class SliderWidget extends BaseWidget {
     draggable.push(this.handle);
     
     if(this.box.userData.hasSubObject){
-      this.ValueText(this, widgetProps.boxProps, widgetProps, this.size.baseWidth, this.size.baseHeight);
+      this.valueTextBox = this.ValueText(this, widgetProps.boxProps, widgetProps, this.size.baseWidth, this.size.baseHeight);
+      this.valueTextBox.box.userData.updateValTargetElem = this;
 
       if(this.horizontal){
         this.box.position.set(this.box.position.x-this.widgetSize.subWidth/2, this.box.position.y, this.box.position.z);
@@ -2043,7 +2046,12 @@ export class SliderWidget extends BaseWidget {
         this.box.position.set(this.box.position.x, this.box.position.y+this.widgetSize.subHeight/2, this.box.position.z);
       }
 
+      this.valueTextBox.box.addEventListener('onValueUpdate', function(event) {
+        //this.userData.updateValTargetElem.UpdateSliderPosition();
+      });
+
     }
+
 
     this.SetSliderUserData();
 
@@ -2154,6 +2162,14 @@ export class SliderWidget extends BaseWidget {
     }
 
     this.handle.position.copy(pos);
+  }
+
+};
+
+export class ColorWidget extends BaseWidget {
+  constructor(widgetProps) {
+
+    super(widgetProps);
   }
 
 };
@@ -2477,8 +2493,6 @@ export class InputTextWidget extends BaseWidget {
     setupStencilChildMaterial(this.inputText.material, this.box.material.stencilRef);
     this.BaseText.SetMergedTextUserData('inputText');
     this.inputTextSize = this.inputText.userData.size;
-    //this.box.add(this.inputText);
-    //this.inputText.position.set(this.inputText.position.x, this.inputText.position.y-this.height/2-this.inputTextSize.height/2, this.depth/2);
     this.box.userData.properties = textInputProps;
     this.inputBoxProps = inputBoxProps;
     this.btnBoxProps = btnBoxProps;
@@ -2597,7 +2611,6 @@ export function createTextInput(textInputProps) {
   }
 };
 
-//TODO: Need to fix Scrolling!!
 export function createScrollableTextInput(textInputProps) {
   textInputProps.draggable = true;
   createTextInput(textInputProps);
@@ -3520,6 +3533,7 @@ export function mouseMoveHandler(raycaster, event){
       }else{
         moveDir=-1;
       }
+
       // Limit scrolling
       dragPosition.x = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll, dragPosition.x + deltaX * 0.01));
       lastDragged.position.copy(dragPosition);
