@@ -991,11 +991,11 @@ export function centerPos(parentSize, childSize, zPosDir=1, padding=0.05){
   return new THREE.Vector3(0, 0, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
-export function leftPos(parentSize, childSize, zPosDir=1, padding=0.05){
-  return new THREE.Vector3(parentSize.depth-childSize.width+padding, 0, (parentSize.depth/2+childSize.depth/2)*zPosDir);
+export function leftPos(parentSize, childSize, zPosDir=1, padding=0.1){
+  return new THREE.Vector3(-(parentSize.width/2)+childSize.width+padding, 0, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
-export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties(), meshProps=textMeshProperties(), align='CENTER') {
+export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties(), meshProps=textMeshProperties(), align='CENTER', editText=false) {
   return {
     'font': font,
     'letterSpacing': letterSpacing,
@@ -1007,7 +1007,8 @@ export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, pa
     'zOffset': zOffset,
     'matProps': matProps,
     'meshProps': meshProps,
-    'align': align
+    'align': align,
+    'editText': editText
   }
 };
 
@@ -1019,16 +1020,21 @@ export class BaseText {
     this.multiTextArray = [];
     this.material = getMaterial(textProps.matProps);
     this.meshes = {};
+    this.editText = textProps.editText;
   }
-  SetMaterial(material){
-    this.material = material;
+  HandlePortalStencil(){
     if(this.parent.userData.isPortal){
       setupStencilChildMaterial(this.material, this.parent.material.stencilRef);
     }
   }
+  SetMaterial(material){
+    this.HandlePortalStencil();
+    this.material = material;
+  }
   SetParent(parent){
     this.parent = parent;
     this.parentSize = getGeometrySize(this.parent.geometry);
+    this.initialPositionY = (this.parentSize.height / 2) - (this.textProps.height) - (this.textProps.padding);
 
     if(this.parent.userData.isPortal){
       this.zPosDir = -1;
@@ -1039,24 +1045,38 @@ export class BaseText {
   }
   NewTextMesh(key, text){
     const geometry = this.GeometryText(text);
+    this.HandlePortalStencil();
     if(this.MultiLetterMeshes){
       this.multiTextArray = geometry.letterMeshes;
       this.meshes[key] = this.MergedMultiText(geometry);
     }else{
+      geometry.center();
       this.meshes[key] = new THREE.Mesh(geometry, this.material);
     }
     
     this.meshes[key].userData.size = getGeometrySize(this.meshes[key].geometry);
     this.meshes[key].userData.key = key;
+    this.meshes[key].userData.currentText = text;
     this.meshes[key].userData.controller = this;
     this.ParentText(key);
     this.AlignTextPos(key);
+
+    if(this.editText){
+      this.meshes[key].addEventListener('update', function(event) {
+        this.userData.controller.UpdateTextMesh(this.userData.key, this.userData.currentText);
+      });
+
+      this.meshes[key].addEventListener('onEnter', function(event) {
+        this.userData.controller.AlignEditTextToTop(this.userData.key);
+      });
+    }
 
     return this.meshes[key]
   }
   NewSingleTextMesh(key, text, sizeMult=1){
     const geometry = this.SingleTextGeometry(text, sizeMult);
     geometry.center();
+    this.HandlePortalStencil();
     this.meshes[key] = new THREE.Mesh(geometry, this.material);
     this.meshes[key].userData.size = getGeometrySize(geometry);
     this.meshes[key].userData.key = key;
@@ -1065,6 +1085,16 @@ export class BaseText {
     this.AlignTextPos(key);
 
     return this.meshes[key]
+  }
+  AlignEditTextToTop(key){
+    let yPosition = this.meshes[key].position.y;
+    let textSize = getGeometrySize(this.meshes[key].geometry);
+
+    yPosition=-this.parentSize.height;
+    console.log(this.initialPositionY)
+    let pos = new THREE.Vector3(this.meshes[key].position.x, this.initialPositionY, this.meshes[key].position.z);
+    this.meshes[key].position.copy(pos);
+
   }
   AlignTextPos(key){
     if(this.textProps.align == 'CENTER'){
@@ -1085,7 +1115,7 @@ export class BaseText {
     this.meshes[key].geometry.dispose();
     this.meshes[key].geometry = this.GeometryText(text);
     this.meshes[key].userData.size = getGeometrySize(this.meshes[key].geometry);
-    AlignTextPos(key);
+    this.AlignTextPos(key);
   }
   MergedMultiTextMesh(text){
     const geometry = this.MergedMultiGeometry(text);
@@ -1106,9 +1136,10 @@ export class BaseText {
     return geometry
   }
   MergedTextGeometry(text) {
-    let lineWidth = -(this.parentSize.width / 2 - (this.textProps.padding));
-    let yPosition = this.parentSize.height / 2 ;
     const boxSize = getGeometrySize(this.parent.geometry);
+    let lineWidth = -(this.parentSize.width / 2 - (this.textProps.padding));
+    let yPosition = this.initialPositionY;
+    
 
     let letterGeometries = [];
 
@@ -1182,9 +1213,6 @@ export class BaseText {
     merged.letterMeshes.forEach((m, i) => {
       mergedMesh.add(m);
     });
-
-    console.log('mergedMesh')
-    console.log(mergedMesh.material)
 
     return mergedMesh
   }
@@ -2302,9 +2330,6 @@ export class TextBoxWidget extends BaseWidget {
     this.textMeshSize = getGeometrySize(this.textMesh.geometry);
     this.box.add(this.textMesh);
 
-    console.log('this.textMesh')
-    console.log(this.textMesh)
-
     this.HandleListConfig(textBoxProps.listConfig);
 
     if(textProps.draggable){
@@ -2447,24 +2472,23 @@ export class InputTextWidget extends BaseWidget {
     let widgetProps = widgetProperties(inputBoxProps, textInputProps.name, true, true, textProps, false, undefined, textInputProps.listConfig, 0)
     super(widgetProps);
     textInputProps.buttonProps.boxProps.parent = this.box;
-    this.inputTextMaterial = getMaterial(textProps.matProps, 0);
+    this.BaseText.SetParent(this.box);
     this.inputText = this.BaseText.NewTextMesh('inputText', 'Enter Text');
+    setupStencilChildMaterial(this.inputText.material, this.box.material.stencilRef);
     this.BaseText.SetMergedTextUserData('inputText');
     this.inputTextSize = this.inputText.userData.size;
-    this.box.add(this.inputText);
-    this.inputText.position.set(this.inputText.position.x, this.inputText.position.y-this.height/2-this.inputTextSize.height/2, this.depth/2);
+    //this.box.add(this.inputText);
+    //this.inputText.position.set(this.inputText.position.x, this.inputText.position.y-this.height/2-this.inputTextSize.height/2, this.depth/2);
     this.box.userData.properties = textInputProps;
     this.inputBoxProps = inputBoxProps;
     this.btnBoxProps = btnBoxProps;
+    this.buttonProps = textInputProps.buttonProps;
 
     mouseOverable.push(this.inputText);
 
-    if(textInputProps.buttonProps != undefined){
+    if(this.buttonProps != undefined){
       this.button = this.AttachButton();
     }
-
-    //this.box.position.set(this.box.position.x, this.box.position.y, this.parentSize.depth/2+this.depth/2)
-
 
     this.HandleTextInputSetup();
   }
@@ -2486,9 +2510,9 @@ export class InputTextWidget extends BaseWidget {
   AttachButton(){
     let btn = undefined;
     if(!this.box.userData.properties.isPortal){
-      btn = ButtonElement(this.box.userData.properties.buttonProps);
+      btn = ButtonElement(this.buttonProps);
     }else{
-      btn = PortalButtonElement(this.box.userData.properties.buttonProps);
+      btn = PortalButtonElement(this.buttonProps);
     }
 
     if(this.box.userData.properties.buttonProps.attach == 'RIGHT'){
@@ -2516,22 +2540,18 @@ export class InputTextWidget extends BaseWidget {
     btnBoxProps.width = size.subWidth;
     btnBoxProps.height = size.subHeight;
     btnBoxProps.depth = size.subDepth;
-    btnBoxProps.matProps = inputTextProps.matProps;
 
     return { inputBoxProps, btnBoxProps }
   }
   static SetupPortalProps(textInputProps){
-    textInputProps.isPortal = true;
     textInputProps.boxProps.isPortal = true;
-    textInputProps.matProps.useCase = 'STENCIL';
+    textInputProps.boxProps.matProps.useCase = 'STENCIL';
     textInputProps.textProps.matProps.useCase = 'STENCIL_CHILD';
     if(textInputProps.buttonProps!=undefined){
-      textInputProps.buttonProps.isPortal = true;
       textInputProps.buttonProps.boxProps.isPortal = true;
-      textInputProps.buttonProps.matProps.useCase = 'STENCIL';
+      textInputProps.buttonProps.boxProps.matProps.useCase = 'STENCIL';
       textInputProps.buttonProps.textProps.matProps.useCase = 'STENCIL_CHILD';
     }
-
     return textInputProps
   }
 };
@@ -2553,24 +2573,19 @@ export function defaultTextInputPortalBoxProps(parent=undefined){
   return TextInputBoxProperties(parent, true);
 };
 
-export function textInputProperties(boxProps=defaultTextInputBoxProps(), name='', padding=0.01, textProps=undefined, matProps=undefined, buttonProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, isPortal=false, draggable=false){
+export function textInputProperties(boxProps=undefined, name='', textProps=undefined, buttonProps=undefined, draggable=false){
   return {
     'type': 'INPUT_TEXT',
     'boxProps': boxProps,
     'name': name,
-    'padding': padding,
     'textProps': textProps,
-    'matProps': matProps,
     'buttonProps': buttonProps,
-    'animProps': animProps,
-    'listConfig': listConfig,
-    'onCreated': onCreated,
-    'isPortal': isPortal,
     'draggable': draggable
   }
 };
 
 export function createTextInput(textInputProps) {
+  textInputProps.textProps.editText = true;
   if(typeof textInputProps.textProps.font === 'string'){
     // Load the font
     loader.load(textInputProps.textProps.font, (font) => {
@@ -2759,6 +2774,8 @@ export function createListSelectorPortal(listSelectorProps, selectors) {
 
 
 function ButtonElement(buttonProps){
+  console.log('buttonProps')
+  console.log(buttonProps)
   let btn = new BaseTextBox(buttonProps);
   let textProps = buttonProps.textProps;
   const tProps = editTextProperties(btn, '', btn.textMesh, textProps.font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
@@ -3564,6 +3581,7 @@ function inputTextYPosition(event, textMesh, boxSize, padding){
   if(textMesh.widget == undefined){
     if (event.key === 'Enter') {
       yPosition=boxSize.height-boxSize.height;
+      textMesh.dispatchEvent({type:'onEnter'});
     }else{
       yPosition=textSize.height-padding;
     }
@@ -3576,10 +3594,11 @@ function inputTextYPosition(event, textMesh, boxSize, padding){
 function onEnterKey(event, textMesh, currentText, boxSize, padding){
 
   let yPosition = textMesh.position.y;
+  textMesh.dispatchEvent({type:'onEnter'});
 
   if(textMesh.widget == undefined){
     yPosition=inputTextYPosition(event, textMesh, boxSize, padding);
-    textMesh.position.set(textMesh.position.x, yPosition, textMesh.position.z);
+    //textMesh.position.set(textMesh.position.x, yPosition, textMesh.position.z);
     if(textMesh.userData.textProps.draggable){
       draggable.push(textMesh);
     }
@@ -3595,8 +3614,8 @@ function onHandleTextGeometry(textMesh, currentText, boxSize){
 
   let textProps = textMesh.userData.textProps;
   if(currentText.length > 0){
-    textMesh.scale.copy(textMesh.userData.defaultScale);
-    textMesh.userData.controller.UpdateTextMesh(textMesh.userData.key, currentText);
+    textMesh.userData.currentText = currentText;
+    textMesh.dispatchEvent({type:'update'});
   }
 }
 
@@ -3606,7 +3625,7 @@ function onHandleTypingText(event, textMesh, currentText, boxSize, padding){
 
   if(textMesh.widget == undefined){
     yPosition=inputTextYPosition(event, textMesh, boxSize, padding);
-    textMesh.position.set(textMesh.position.x, yPosition, textMesh.position.z);
+    //textMesh.position.set(textMesh.position.x, yPosition, textMesh.position.z);
 
     textMesh.userData.textProps.cBox.box.userData.currentText = currentText;
   }else{
