@@ -1822,6 +1822,7 @@ export class BaseWidget extends BaseBox {
     baseBoxProps.depth = size.baseDepth/2;
     super(baseBoxProps);
     let zOffset = 1;
+    this.value = widgetProps.valueProps.defaultValue;
     this.box.userData.horizontal = widgetProps.horizontal;
     this.box.userData.hasSubObject = widgetProps.useValueText;
     this.box.userData.properties = widgetProps;
@@ -1894,6 +1895,9 @@ export class BaseWidget extends BaseBox {
   }
   CenterWidgetText(){
     let pos = this.CenterBoxPos();
+    if(this.isPortal){
+      pos.z = -(this.widgetTextSize.depth+this.size.depth);
+    }
     this.widgetText.position.copy(pos);
   }
   ValueText(){
@@ -2145,8 +2149,9 @@ export class SliderWidget extends BaseWidget {
     return value.toFixed(this.handle.userData.places);
   }
   OnSliderMove(){
-
-    this.box.userData.value = this.SliderValue();
+    let value = this.SliderValue();
+    this.box.userData.value = value;
+    this.value = value;
 
     if(this.box.userData.valueBox != undefined){
       this.box.userData.valueBox.currentText = this.box.userData.value;
@@ -2210,10 +2215,10 @@ export function colorWidgetProperties(boxProps, name='', horizontal=true, defaul
 
 export class ColorWidget extends BaseWidget {
   constructor(widgetProps) {
-    let colorWidgetProps = ColorWidget.SliderWidgetProps(widgetProps);
+    let colorWidgetProps = ColorWidget.ColorWidgetProps(widgetProps);
     super(colorWidgetProps.base);
 
-    colorWidgetProps = this.InitSliderWidgetProps(colorWidgetProps)
+    colorWidgetProps = this.InitColorWidgetProps(colorWidgetProps)
 
     this.redSlider = new SliderWidget(colorWidgetProps.red);
     this.greenSlider = new SliderWidget(colorWidgetProps.green);
@@ -2227,16 +2232,26 @@ export class ColorWidget extends BaseWidget {
     this.colorIndcator = new BaseBox(colorWidgetProps.indicator);
     this.colorIndcator.AlignLeft();
 
-
     this.sliders.forEach((slider, index) =>{
       let pos = slider.TopBoxPos();
       pos.y = pos.y-(slider.size.height*index);
       slider.box.position.copy(pos);
       slider.CenterWidgetText();
+      slider.handle.userData.targetColorElem = this;
+
+      slider.handle.addEventListener('action', function(event) {
+        this.userData.targetColorElem.UpdateColor();
+        //this.userData.updateValTargetElem.UpdateSliderPosition();
+      });
     });
 
   }
-  InitSliderWidgetProps(sliderWidgetProps){
+  UpdateColor(){
+    console.log(this.redSlider.value)
+    let rgb = [this.redSlider.value, this.blueSlider.value, this.greenSlider.value];
+    let col = colorsea(rgb, this.redSlider.value);
+  }
+  InitColorWidgetProps(sliderWidgetProps){
     let colors = ['red', 'blue', 'green'];
     let boxMatProps = ColorWidget.SliderMatProps(sliderWidgetProps.base);
     let sliderHeight = 0.25;
@@ -2250,8 +2265,8 @@ export class ColorWidget extends BaseWidget {
     sliderBoxProps.height = sliderBoxProps.height*sliderHeight;
 
     colors.forEach((color, index) =>{
-      console.log(color)
       sliderWidgetProps[color].name = color;
+      sliderWidgetProps[color].boxProps.isPortal = true;
       sliderWidgetProps[color].boxProps = {...sliderBoxProps};
       sliderWidgetProps[color].boxProps.matProps = boxMatProps[color];
       sliderWidgetProps[color].boxProps.parent = this.box;
@@ -2261,7 +2276,7 @@ export class ColorWidget extends BaseWidget {
 
     return sliderWidgetProps
   }
-  static SliderWidgetProps(widgetProps){
+  static ColorWidgetProps(widgetProps){
     let props = {...widgetProps};
     let indicatorBoxProps = {...widgetProps.boxProps};
     widgetProps.boxProps.width = widgetProps.boxProps.width*1.3;
@@ -2271,6 +2286,8 @@ export class ColorWidget extends BaseWidget {
     const greenProps = {...props};
     const blueProps = {...props};
     const alphaProps = {...props};
+
+    alphaProps.valueProps = numberValueProperties( 0, 0, 100, 0, 0.001, true);;
 
     return {'base': widgetProps, 'red': redProps, 'blue': blueProps, 'green': greenProps, 'alpha': alphaProps, 'indicator': indicatorBoxProps};
   }
