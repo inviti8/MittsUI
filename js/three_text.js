@@ -1352,6 +1352,7 @@ export class BaseBox {
     this.box.userData.height = this.height;
     this.box.userData.depth = this.depth;
     this.box.userData.padding = this.padding;
+    this.size = getGeometrySize(this.box.geometry);
     this.parentSize = getGeometrySize(this.parent.geometry);
 
     this.box.userData.width = boxProps.width;
@@ -1359,19 +1360,21 @@ export class BaseBox {
     this.box.userData.depth = boxProps.depth;
     this.box.userData.padding = boxProps.padding;
     this.box.userData.isPortal = boxProps.isPortal;
-
-    this.zPos = this.depth/2;
+    this.zPosDir = 1;
+    //this.zPos = this.depth/2;
 
     if(this.isPortal){
       this.parent.material.depthWrite = false;
-      this.zPos = 0;
+      this.zPosDir = -1;
+      //this.zPos = 0;
     }
 
     
     if(!this.parent.isScene){
       this.parent.add(this.box);
       this.parentSize = getGeometrySize(boxProps.parent.geometry);
-      this.box.position.set(this.box.position.x, this.box.position.y, this.parentSize.depth/2+this.zPos);
+      this.box.position.copy(this.CenterBoxPos());
+      //this.box.position.set(this.box.position.x, this.box.position.y, this.parentSize.depth/2);
     }
   }
   CreateBoxGeometry(boxProps) {
@@ -1456,6 +1459,24 @@ export class BaseBox {
   MakeBoxMaterialVisible(){
     this.box.material.opacity = 1;
     this.box.material.transparent = false;
+  }
+  AlignCenter(){
+    this.box.position.copy(this.CenterBoxPos(this.zPosDir));
+  }
+  AlignTop(){
+    this.box.position.copy(this.TopBoxPos(this.zPosDir));
+  }
+  AlignLeft(){
+    this.box.position.copy(this.LeftBoxPos(this.zPosDir));
+  }
+  CenterBoxPos(zPosDir=1){
+    return new THREE.Vector3(this.parentSize.width-this.parentSize.width, this.parentSize.height-this.parentSize.height, (this.parentSize.depth/2)*zPosDir);
+  }
+  TopBoxPos(zPosDir=1){
+    return new THREE.Vector3(this.parentSize.width-this.parentSize.width, this.parentSize.height/2-this.size.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
+  }
+  LeftBoxPos(zPosDir=1){
+    return new THREE.Vector3(-(this.parentSize.width/2-this.size.width/2), this.parentSize.height/2-this.size.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
   }
   static RoundedBoxGeometry(width, height, depth, radius, smoothness, zOffset=1){
     const shape = new THREE.Shape();
@@ -1809,7 +1830,7 @@ export class BaseWidget extends BaseBox {
     this.widgetSize = size;
     this.handleSize = 2;
     this.baseBoxProps = baseBoxProps;
-    this.size = size;
+    this.widgetSize = size;
     this.complexMesh = widgetProps.boxProps.complexMesh;
 
     this.BaseText = new BaseText(widgetProps.textProps);
@@ -1829,22 +1850,23 @@ export class BaseWidget extends BaseBox {
       this.box.add(this.handle);
 
       if(widgetProps.horizontal){
-        this.handle.position.set(-(this.size.baseWidth/2-this.size.handleWidth/2), this.handle.position.y, this.handleZPos*zOffset);
+        this.handle.position.set(-(this.widgetSize.baseWidth/2-this.widgetSize.handleWidth/2), this.handle.position.y, this.handleZPos*zOffset);
       }else{
-        this.handle.position.set(this.handle.position.x,-(this.size.baseHeight/2-this.size.handleHeight/2), this.handleZPos*zOffset);
+        this.handle.position.set(this.handle.position.x,-(this.widgetSize.baseHeight/2-this.widgetSize.handleHeight/2), this.handleZPos*zOffset);
       }
     }
 
     this.widgetText = this.WidgetText();
+    this.widgetTextSize = getGeometrySize(this.widgetText.geometry);
 
   }
   WidgetHandle(){
     let handleBoxProps = {...this.baseBoxProps};
     handleBoxProps.parent = this.box;
-    handleBoxProps.width = this.size.handleWidth;
-    handleBoxProps.height = this.size.handleHeight;
-    handleBoxProps.depth = this.size.handleDepth;
-    this.handleZPos = this.size.baseDepth/2+this.size.handleDepth/2;
+    handleBoxProps.width = this.widgetSize.handleWidth;
+    handleBoxProps.height = this.widgetSize.handleHeight;
+    handleBoxProps.depth = this.widgetSize.handleDepth;
+    this.handleZPos = this.widgetSize.baseDepth/2+this.widgetSize.handleDepth/2;
 
     let handle = new BaseBox(handleBoxProps);
     handle.box.material = this.handleMaterial;
@@ -1861,28 +1883,33 @@ export class BaseWidget extends BaseBox {
       const textSize = text.userData.size;
       const padding = this.BaseText.textProps.padding;
 
-      text.position.set(0, this.height+textSize.height/2+padding, this.parentSize.depth/2);
+      text.position.set(0, this.height/2+textSize.height/2, this.depth/2);
       if(!props.horizontal){
-        text.position.set(0, this.height/2, this.parentSize.depth/2+this.depth/2+text.userData.size.depth);
+        text.position.set(0, this.height/2+textSize.height/2, this.depth/2);
       }
-      boxProps.parent.add(text);
+      this.box.add(text);
 
       return text
     }
   }
+  CenterWidgetText(){
+    let pos = this.CenterBoxPos();
+    this.widgetText.position.copy(pos);
+  }
   ValueText(){
-    const widgetProps = this.box.userData.properties;
+    const widgetProps = {...this.box.userData.properties};
+    widgetProps.boxProps.parent = this.box;
     const boxProps = widgetProps.boxProps;
     const valBox = new ValueTextWidget(widgetProps);
 
-    this.box.add(valBox.box);
+    //this.box.add(valBox.box);
     darkenMaterial(valBox.box.material, 30);
     this.box.userData.valueBox = valBox.box;
 
     if(widgetProps.horizontal){
-      valBox.box.position.set(this.size.baseWidth/2+valBox.width/2, valBox.box.position.y, boxProps.parent.position.z);
+      valBox.box.position.set(this.widgetSize.baseWidth/2+valBox.width/2, valBox.box.position.y, this.depth/2);
     }else{
-      valBox.box.position.set(valBox.box.position.x, -this.size.baseHeight+valBox.height, boxProps.parent.position.z);
+      valBox.box.position.set(valBox.box.position.x, -this.widgetSize.baseHeight+valBox.height, this.depth/2);
     }
 
     return valBox
@@ -2040,11 +2067,11 @@ export class SliderWidget extends BaseWidget {
       this.valueTextBox = this.ValueText(this, widgetProps.boxProps, widgetProps, this.size.baseWidth, this.size.baseHeight);
       this.valueTextBox.box.userData.updateValTargetElem = this;
 
-      if(this.horizontal){
-        this.box.position.set(this.box.position.x-this.widgetSize.subWidth/2, this.box.position.y, this.box.position.z);
-      }else{
-        this.box.position.set(this.box.position.x, this.box.position.y+this.widgetSize.subHeight/2, this.box.position.z);
-      }
+      // if(this.horizontal){
+      //   this.box.position.set(this.box.position.x-this.widgetSize.subWidth/2, this.box.position.y, this.box.position.z);
+      // }else{
+      //   this.box.position.set(this.box.position.x, this.box.position.y+this.widgetSize.subHeight/2, this.box.position.z);
+      // }
 
       this.valueTextBox.box.addEventListener('onValueUpdate', function(event) {
         //this.userData.updateValTargetElem.UpdateSliderPosition();
@@ -2166,13 +2193,120 @@ export class SliderWidget extends BaseWidget {
 
 };
 
+export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ff0000', textProps=undefined, useValueText=true, useAlpha=true ){
+  return {
+    'type': 'COLOR_WIDGET',
+    'boxProps': boxProps,
+    'name': name,
+    'horizontal': horizontal,
+    'defaultColor': defaultColor,
+    'textProps': textProps,
+    'useValueText': useValueText,
+    'valueProps': numberValueProperties( 0, 0, 255, 0, 0.001, true),
+    'useAlpha': useAlpha,
+    'handleSize': 0
+  }
+};
+
 export class ColorWidget extends BaseWidget {
   constructor(widgetProps) {
+    let colorWidgetProps = ColorWidget.SliderWidgetProps(widgetProps);
+    super(colorWidgetProps.base);
 
-    super(widgetProps);
+    colorWidgetProps = this.InitSliderWidgetProps(colorWidgetProps)
+
+    this.redSlider = new SliderWidget(colorWidgetProps.red);
+    this.greenSlider = new SliderWidget(colorWidgetProps.green);
+    this.blueSlider = new SliderWidget(colorWidgetProps.blue);
+    this.sliders = [this.redSlider, this.greenSlider, this.blueSlider];
+    if(widgetProps.useAlpha){
+      this.alphaSlider = new SliderWidget(colorWidgetProps.alpha);
+      this.sliders.push(this.alphaSlider);
+    }
+
+    this.colorIndcator = new BaseBox(colorWidgetProps.indicator);
+    this.colorIndcator.AlignLeft();
+
+
+    this.sliders.forEach((slider, index) =>{
+      let pos = slider.TopBoxPos();
+      pos.y = pos.y-(slider.size.height*index);
+      slider.box.position.copy(pos);
+      slider.CenterWidgetText();
+    });
+
+  }
+  InitSliderWidgetProps(sliderWidgetProps){
+    let colors = ['red', 'blue', 'green'];
+    let boxMatProps = ColorWidget.SliderMatProps(sliderWidgetProps.base);
+    let sliderHeight = 0.25;
+    if(!sliderWidgetProps.base.useAlpha){
+      sliderHeight = 0.33;
+    }else{
+      colors.push('alpha');
+    }
+    let sliderBoxProps = {...sliderWidgetProps.base.boxProps};
+    sliderBoxProps.width = sliderBoxProps.width*0.54;
+    sliderBoxProps.height = sliderBoxProps.height*sliderHeight;
+
+    colors.forEach((color, index) =>{
+      console.log(color)
+      sliderWidgetProps[color].name = color;
+      sliderWidgetProps[color].boxProps = {...sliderBoxProps};
+      sliderWidgetProps[color].boxProps.matProps = boxMatProps[color];
+      sliderWidgetProps[color].boxProps.parent = this.box;
+    });
+
+    sliderWidgetProps['indicator'].parent = this.box;
+
+    return sliderWidgetProps
+  }
+  static SliderWidgetProps(widgetProps){
+    let props = {...widgetProps};
+    let indicatorBoxProps = {...widgetProps.boxProps};
+    widgetProps.boxProps.width = widgetProps.boxProps.width*1.3;
+    indicatorBoxProps.width = indicatorBoxProps.width*0.18;
+    props.handleSize = 8;
+    const redProps = {...props};
+    const greenProps = {...props};
+    const blueProps = {...props};
+    const alphaProps = {...props};
+
+    return {'base': widgetProps, 'red': redProps, 'blue': blueProps, 'green': greenProps, 'alpha': alphaProps, 'indicator': indicatorBoxProps};
+  }
+  static SliderMatProps(widgetProps){
+    let boxMatProps = {...widgetProps.boxProps.matProps};
+    let redMatProps = {...boxMatProps};
+    redMatProps.color = 'red';
+    let greenMatProps = {...boxMatProps};
+    greenMatProps.color = 'green';
+    let blueMatProps = {...boxMatProps};
+    blueMatProps.color = 'blue';
+    let props = {'red': redMatProps, 'blue': blueMatProps, 'green': greenMatProps};
+    if(widgetProps.useAlpha){
+      let alphaMatProps = {...boxMatProps};
+      alphaMatProps.color = 'gray';
+      props = {'red': redMatProps, 'blue': blueMatProps, 'green': greenMatProps, 'alpha': alphaMatProps};
+    }
+
+    return props;
   }
 
 };
+
+export function createColorWidget(colorWidgetProps) {
+  colorWidgetProps.useValueText = true;
+  if(typeof colorWidgetProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(colorWidgetProps.textProps.font, (font) => {
+      colorWidgetProps.textProps.font = font;
+      new ColorWidget(colorWidgetProps);
+    });
+  }else if(colorWidgetProps.textProps.font.isFont){
+    new ColorWidget(colorWidgetProps);
+  }
+  
+}
 
 export function stringValueProperties(defaultValue='Off', onValue='On', offValue='Off', editable=false){
   return {
