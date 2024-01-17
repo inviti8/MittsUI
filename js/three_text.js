@@ -831,7 +831,6 @@ export function getBaseMaterial(color='white', type='BASIC', side=THREE.FrontSid
 
     default:
       mat = new THREE.MeshBasicMaterial({ color: color, side: side });
-
   }
 
   return mat
@@ -987,23 +986,23 @@ export function getScenePool(){
   return scenePool;
 };
 
-export function centerPos(parentSize, childSize, zPosDir=1, padding=0.05){
+export function centerPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, parentSize.height-parentSize.height, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
-export function topCenterPos(parentSize, childSize, zPosDir=1, padding=0.05){
+export function topCenterPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, (parentSize.height/2)-childSize.height/2-padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
-export function topCenterOutsidePos(parentSize, childSize, zPosDir=1, padding=0.05){
+export function topCenterOutsidePos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, (parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
-export function bottomCenterPos(parentSize, childSize, zPosDir=1, padding=0.05){
+export function bottomCenterPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, -(parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
-export function bottomCenterOutsidePos(parentSize, childSize, zPosDir=1, padding=0.05){
+export function bottomCenterOutsidePos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, -(parentSize.height/2)-childSize.height/2-padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
@@ -1115,7 +1114,6 @@ export class BaseText {
     geometry.center();
     this.HandlePortalStencil();
     this.meshes[key] = new THREE.Mesh(geometry, this.material);
-    this.meshes[key].size = getGeometrySize(geometry);
     this.meshes[key].userData.size = getGeometrySize(geometry);
     this.meshes[key].userData.key = key;
     this.meshes[key].userData.controller = this;
@@ -1141,24 +1139,32 @@ export class BaseText {
       this.LeftTextPos(key)
     }
   }
+  CenterTopTextPos(key){
+    this.meshes[key].position.copy(topCenterPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
+  }
   CenterTopOutsideTextPos(key){
-    this.meshes[key].position.copy(topCenterOutsidePos(this.parentSize, this.meshes[key].size, this.zPosDir));
+    this.meshes[key].position.copy(topCenterOutsidePos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
+  }
+  CenterBottomTextPos(key){
+    this.meshes[key].position.copy(bottomCenterPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
   }
   CenterBottomOutsideTextPos(key){
-    this.meshes[key].position.copy(bottomCenterOutsidePos(this.parentSize, this.meshes[key].size, this.zPosDir));
+    this.meshes[key].position.copy(bottomCenterOutsidePos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
   }
   CenterTextPos(key){
-    this.meshes[key].position.copy(centerPos(this.parentSize, this.meshes[key].size, this.zPosDir));
+    this.meshes[key].position.copy(centerPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
   }
   LeftTextPos(key){
-    this.meshes[key].position.copy(leftCenterPos(this.parentSize, this.meshes[key].size, this.zPosDir));
+    this.meshes[key].position.copy(leftCenterPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
+  }
+  LeftBottomCornerTextPos(key){
+    this.meshes[key].position.copy(leftBottomCornerPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
   }
   UpdateTextMesh(key, text){
     if(this.meshes[key]==undefined)
       return;
     this.meshes[key].geometry.dispose();
     this.meshes[key].geometry = this.GeometryText(text);
-    this.meshes[key].size = getGeometrySize(this.meshes[key].geometry);
     this.meshes[key].userData.size = getGeometrySize(this.meshes[key].geometry);
     this.AlignTextPos(key);
   }
@@ -2309,7 +2315,7 @@ export class ColorWidget extends BaseWidget {
     this.colorIndcator.AlignLeft();
 
     this.sliders.forEach((slider, index) =>{
-      let pos = slider.TopBoxPos();
+      let pos = slider.TopCenterBoxPos();
       pos.y = pos.y-(slider.size.height*index);
       slider.box.position.copy(pos);
       slider.CenterWidgetText();
@@ -2805,9 +2811,9 @@ export class InputTextWidget extends BaseWidget {
     }
 
     if(this.box.userData.properties.buttonProps.attach == 'RIGHT'){
-      btn.box.position.set(this.width/2+btn.width/2, btn.box.position.y, -this.depth/2+btn.depth/2);
+      btn.AlignOutsideRight();
     }else if(widgetProps.buttonProps.attach == 'BOTTOM'){
-      btn.box.position.set(btn.box.position.x, -(this.height/2+btn.height/2), -this.height/2+btn.depth/2);
+      btn.AlignOutsideRight();
     }
 
     return btn
@@ -3062,8 +3068,6 @@ export function createListSelectorPortal(listSelectorProps, selectors) {
 
 
 function ButtonElement(buttonProps){
-  console.log('buttonProps')
-  console.log(buttonProps)
   let btn = new BaseTextBox(buttonProps);
   let textProps = buttonProps.textProps;
   const tProps = editTextProperties(btn, '', btn.textMesh, textProps.font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, true, textProps.meshProps);
@@ -3255,7 +3259,7 @@ export function createImageBox(imageProps){
 
   if(typeof DEFAULT_TEXT_PROPS.font === 'string'){
     // Load the font
-    loader.load(DEFAULT_TEXT_PROPS.font, (DEFAULT_FONT) => {
+    loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
       DEFAULT_TEXT_PROPS.font = font;
       SetListConfigFont(imageProps.listConfig, font);
       new ImageWidget(imageProps);
@@ -3346,7 +3350,7 @@ export class GLTFModelWidget extends BaseWidget {
 function GLTFModelLoader(gltfProps){
   if(typeof DEFAULT_TEXT_PROPS.font === 'string'){
     // Load the font
-    loader.load(DEFAULT_TEXT_PROPS.font, (DEFAULT_FONT) => {
+    loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
       DEFAULT_TEXT_PROPS.font = font;
       SetListConfigFont(gltfProps.listConfig, font);
       new GLTFModelWidget(gltfProps);
@@ -3449,31 +3453,25 @@ export class ListItemBox extends BaseBox {
 
     if(infoProps.title.length>0){
       this.titleText = this.BaseText.NewSingleTextMesh('titleText', infoProps.title);
-      const size = this.titleText.userData.size;
-      this.box.add(this.titleText);
-
-      this.titleText.position.set(0, (this.height/2)-(size.height/2)-(this.textProps.padding*2), this.textZPos*textMeshOffset);
+      this.BaseText.CenterTopTextPos('titleText');
       this.box.userData.title = this.titleText;
     }
 
     if(infoProps.author.length>0){
       this.authorText = this.BaseText.NewSingleTextMesh('authorText', infoProps.author);
-      const size = this.authorText.userData.size;
-      this.box.add(this.authorText);
-
-      this.authorText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), this.textZPos*textMeshOffset);
+      this.BaseText.LeftBottomCornerTextPos('authorText');
       this.box.userData.author = this.authorText;
     }
 
     this.dateText = this.BaseText.NewSingleTextMesh('dateText', date, 0.5);
-    let size = this.dateText.userData.size;
-    this.box.add(this.dateText);
-    this.dateText.position.set(-(this.width/2-this.textProps.padding)+(size.width/2)+this.textProps.padding, -(this.height/2)+(size.height/2)+(this.textProps.padding*2), this.textZPos*textMeshOffset);
-
+    this.BaseText.LeftBottomCornerTextPos('dateText');
     this.box.userData.date = this.dateText;
+
     if( this.authorText != undefined){
-      this.authorText.position.set(this.box.userData.author.position.x, this.authorText.position.y+size.height+(this.textProps.padding*2), this.authorText.position.z);
+      this.authorText.translateY(this.dateText.userData.size.height+this.BaseText.padding);
     }
+
+    this.box.translateY(-(this.size.height+this.padding)*this.index);
 
   }
   SetContent(content){
@@ -3482,7 +3480,7 @@ export class ListItemBox extends BaseBox {
       content.box.parent.remove(content.widgetText);
     }
     let boxZOffset = 1;
-    let zPos = content.textMeshSize.depth*2;
+    
     this.box.add(content.box);
     
     if(content.box.userData.properties.boxProps.isPortal && !this.isPortal){
@@ -3491,7 +3489,7 @@ export class ListItemBox extends BaseBox {
     }
     if(this.isPortal){
       let boxZOffset = -1;
-      zPos = -(this.textZPos+(content.textMeshSize.depth*3));
+      //let zPos = -(this.textZPos+(content.textMeshSize.depth*3));
       if(content.gltf!=undefined){
         this.box.add(content.gltf.scene)
         if(content.isPortal){
@@ -3502,6 +3500,7 @@ export class ListItemBox extends BaseBox {
         
       }
       if(content.textMesh!=undefined){
+        let zPos = content.textMeshSize.depth*2;
         this.box.material.depthWrite = false;
         this.box.add(content.textMesh);
         content.NewTextMeshStencilMaterial(this.box.material.stencilRef);
@@ -3512,8 +3511,7 @@ export class ListItemBox extends BaseBox {
       if(content.imageMaterial!=undefined){
         content.NewImageBoxStencilMaterial(this.box.material.stencilRef);
       }
-
-      content.box.position.set(0, 0, this.depth/2+0.125*boxZOffset);
+      content.AlignCenter();
       content.box.scale.set(content.box.scale.x*this.childInset, content.box.scale.y*this.childInset, content.box.scale.z*this.childInset);
       
       this.box.material.stencilWrite = true;
@@ -3689,7 +3687,6 @@ export function createImageContentList( imageProps, contentArr ) {
   listConfig.boxProps.parent.userData.listElements = [];
 
   contentArr.forEach((imgUrl, index) =>{
-    console.log(imgUrl);
     let props = {...imageProps};
     let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
     props.listConfig = lConfig;
