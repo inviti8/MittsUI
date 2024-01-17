@@ -991,6 +991,22 @@ export function centerPos(parentSize, childSize, zPosDir=1, padding=0.05){
   return new THREE.Vector3(parentSize.width-parentSize.width, parentSize.height-parentSize.height, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+export function topCenterPos(parentSize, childSize, zPosDir=1, padding=0.05){
+  return new THREE.Vector3(parentSize.width-parentSize.width, (parentSize.height/2)-childSize.height/2-padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
+}
+
+export function topCenterOutsidePos(parentSize, childSize, zPosDir=1, padding=0.05){
+  return new THREE.Vector3(parentSize.width-parentSize.width, (parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
+}
+
+export function bottomCenterPos(parentSize, childSize, zPosDir=1, padding=0.05){
+  return new THREE.Vector3(parentSize.width-parentSize.width, -(parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
+}
+
+export function bottomCenterOutsidePos(parentSize, childSize, zPosDir=1, padding=0.05){
+  return new THREE.Vector3(parentSize.width-parentSize.width, -(parentSize.height/2)-childSize.height/2-padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
+}
+
 export function rightCenterPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3((parentSize.width/2)-childSize.width/2-padding, parentSize.height-parentSize.height, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
@@ -1124,6 +1140,12 @@ export class BaseText {
     }else if(this.textProps.align == 'LEFT'){
       this.LeftTextPos(key)
     }
+  }
+  CenterTopOutsideTextPos(key){
+    this.meshes[key].position.copy(topCenterOutsidePos(this.parentSize, this.meshes[key].size, this.zPosDir));
+  }
+  CenterBottomOutsideTextPos(key){
+    this.meshes[key].position.copy(bottomCenterOutsidePos(this.parentSize, this.meshes[key].size, this.zPosDir));
   }
   CenterTextPos(key){
     this.meshes[key].position.copy(centerPos(this.parentSize, this.meshes[key].size, this.zPosDir));
@@ -1492,19 +1514,52 @@ export class BaseBox {
     this.box.position.copy(this.CenterBoxPos(this.zPosDir));
   }
   AlignTop(){
-    this.box.position.copy(this.TopBoxPos(this.zPosDir));
+    this.box.position.copy(this.TopCenterBoxPos(this.zPosDir));
+  }
+  AlignBottom(zPosDir=1){
+    this.box.position.copy(this.BottomCenterBoxPos(this.zPosDir));
+  }
+  AlignOutsideBottom(zPosDir=1){
+    this.box.position.copy(this.BottomCenterOutsideBoxPos(zPosDir));
   }
   AlignLeft(){
-    this.box.position.copy(this.LeftBoxPos(this.zPosDir));
+    this.box.position.copy(this.LeftCenterBoxPos(this.zPosDir));
+  }
+  AlignOutsideLeft(zPosDir=1){
+    this.box.position.copy(this.LeftCenterOutsideBoxPos(zPosDir));
+  }
+  AlignRight(){
+    this.box.position.copy(this.RightCenterBoxPos(this.zPosDir));
+  }
+  AlignOutsideRight(zPosDir=1){
+    this.box.position.copy(this.RightCenterOutsideBoxPos(zPosDir));
   }
   CenterBoxPos(zPosDir=1){
     return new THREE.Vector3(this.parentSize.width-this.parentSize.width, this.parentSize.height-this.parentSize.height, (this.parentSize.depth/2)*zPosDir);
   }
-  TopBoxPos(zPosDir=1){
+  TopCenterBoxPos(zPosDir=1){
     return new THREE.Vector3(this.parentSize.width-this.parentSize.width, this.parentSize.height/2-this.size.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
   }
-  LeftBoxPos(zPosDir=1){
-    return new THREE.Vector3(-(this.parentSize.width/2-this.size.width/2), this.parentSize.height/2-this.size.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
+  TopCenterOutsideBoxPos(zPosDir=1){
+    return new THREE.Vector3(this.parentSize.width-this.parentSize.width, this.parentSize.height/2+this.size.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
+  }
+  BottomCenterBoxPos(zPosDir=1){
+    return new THREE.Vector3(this.parentSize.width-this.parentSize.width, -this.parentSize.height/2+this.size.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
+  }
+  BottomCenterOutsideBoxPos(zPosDir=1){
+    return new THREE.Vector3(this.parentSize.width-this.parentSize.width, -(this.parentSize.height/2+this.size.height/2), (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
+  }
+  RightCenterBoxPos(zPosDir=1){
+    return new THREE.Vector3(this.parentSize.width/2-this.size.width/2, this.parentSize.height/2-this.parentSize.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
+  }
+  RightCenterOutsideBoxPos(zPosDir=1){
+    return new THREE.Vector3(this.parentSize.width/2+this.size.width/2, this.parentSize.height/2-this.parentSize.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
+  }
+  LeftCenterBoxPos(zPosDir=1){
+    return new THREE.Vector3(-(this.parentSize.width/2-this.size.width/2), this.parentSize.height/2-this.parentSize.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
+  }
+  LeftCenterOutsideBoxPos(zPosDir=1){
+    return new THREE.Vector3(-(this.parentSize.width/2+this.size.width/2), this.parentSize.height/2-this.parentSize.height/2, (this.parentSize.depth/2+this.size.depth/2)*zPosDir);
   }
   static RoundedBoxGeometry(width, height, depth, radius, smoothness, zOffset=1){
     const shape = new THREE.Shape();
@@ -1873,15 +1928,14 @@ export class BaseWidget extends BaseBox {
 
     if(this.handleSize > 0){
       this.handleMaterial = getMaterial(widgetProps.boxProps.matProps, widgetProps.boxProps.parent.material.stencilRef);
-      this.handle = this.WidgetHandle();
+      this.handleCtrl = this.WidgetHandle();
+      this.handle = this.handleCtrl.box;
       this.handle.renderOrder = 2;
 
-      this.box.add(this.handle);
-
       if(widgetProps.horizontal){
-        this.handle.position.set(-(this.widgetSize.baseWidth/2-this.widgetSize.handleWidth/2), this.handle.position.y, this.handleZPos*zOffset);
+        this.handleCtrl.AlignLeft();
       }else{
-        this.handle.position.set(this.handle.position.x,-(this.widgetSize.baseHeight/2-this.widgetSize.handleHeight/2), this.handleZPos*zOffset);
+        this.handleCtrl.AlignBottom();
       }
     }
 
@@ -1900,7 +1954,7 @@ export class BaseWidget extends BaseBox {
     let handle = new BaseBox(handleBoxProps);
     handle.box.material = this.handleMaterial;
 
-    return handle.box
+    return handle
   }
   WidgetText(){
     if(this.name.length>0){
@@ -1912,11 +1966,8 @@ export class BaseWidget extends BaseBox {
       const textSize = text.userData.size;
       const padding = this.BaseText.textProps.padding;
 
-      text.position.set(0, this.height/2+textSize.height/2, this.depth/2);
-      if(!props.horizontal){
-        text.position.set(0, this.height/2+textSize.height/2, this.depth/2);
-      }
       this.box.add(text);
+      this.BaseText.CenterTopOutsideTextPos('widgetText');
 
       return text
     }
@@ -1937,9 +1988,9 @@ export class BaseWidget extends BaseBox {
     this.box.userData.valueBox = valBox.box;
 
     if(widgetProps.horizontal){
-      valBox.box.position.set(this.widgetSize.baseWidth/2+valBox.width/2, valBox.box.position.y, this.depth/2);
+      valBox.AlignOutsideRight();
     }else{
-      valBox.box.position.set(valBox.box.position.x, -this.widgetSize.baseHeight+valBox.height, this.depth/2);
+      valBox.AlignOutsideBottom();
     }
 
     return valBox
@@ -2421,18 +2472,20 @@ export class ToggleWidget extends BaseWidget {
   constructor(widgetProps) {
 
     super(widgetProps);
+    this.on = widgetProps.on;
     
     if(this.box.userData.hasSubObject){
       this.ValueText(this, widgetProps.boxProps, widgetProps, this.size.baseWidth, this.size.baseHeight)
     }
-
     this.setToggleUserData();
 
     if(widgetProps.horizontal){
-      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x+this.widgetSize.baseWidth/2, this.handle.position.y, this.handle.position.z+this.widgetSize.baseDepth);
+      this.handle.userData.onPos = this.handleCtrl.RightCenterBoxPos();
     }else{
-      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x, this.handle.position.y+(this.size.baseHeight/2), this.handle.position.z+this.widgetSize.baseDepth);
+      this.handle.userData.onPos = this.handleCtrl.TopCenterBoxPos();
     }
+
+    toggles.push(this.handle);
 
     if(widgetProps.valueProps.defaultValue == widgetProps.valueProps.onValue){
       this.handle.position.copy(this.handle.userData.onPos);
@@ -2446,6 +2499,10 @@ export class ToggleWidget extends BaseWidget {
     this.handle.addEventListener('action', function(event) {
       toggleAnimation(this.userData.targetElem);
     });
+
+    if(this.on){
+      toggleAnimation(this);
+    }
 
   }
   setToggleUserData(){
@@ -3101,12 +3158,10 @@ export function createSliderBox(sliderProps) {
     new SliderWidget(sliderProps);
   }
 };
-//FIX TOGGLE!!!
+
 function ToggleBox(toggleProps){
   const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
   let toggle = new ToggleWidget(toggleProps);
-  //toggle.box.position.set(toggle.box.position.x, toggle.box.position.y, toggle.box.position.z+parentSize.depth/2);
-  toggles.push(toggle.handle);
 }
 
 export function createToggleBox(toggleProps) {
