@@ -1119,7 +1119,6 @@ export class BaseText {
 
   }
   AlignTextPos(key){
-    console.log(this.textProps.align)
     if(this.textProps.align == 'CENTER'){
       this.CenterTextPos(key)
     }else if(this.textProps.align == 'LEFT'){
@@ -2040,7 +2039,7 @@ class ValueTextWidget extends BaseTextBox{
     });
 
   }
-  SetValue(val){
+  SetValueText(val){
     if(this.box.parent.userData.value == undefined)
       return;
 
@@ -2058,7 +2057,9 @@ class ValueTextWidget extends BaseTextBox{
   UpdateValueText(){
     if(this.box.parent.userData.value == undefined)
       return;
-    this.box.parent.userData.value = Number.parseFloat(this.box.parent.userData.value).toFixed(this.places);
+    if(this.numeric){
+      this.box.parent.userData.value = Number.parseFloat(this.box.parent.userData.value).toFixed(this.places);
+    }
     this.UpdateText(this.box.parent.userData.value);
     this.box.dispatchEvent({type:'onValueUpdated'});
   }
@@ -2428,9 +2429,9 @@ export class ToggleWidget extends BaseWidget {
     this.setToggleUserData();
 
     if(widgetProps.horizontal){
-      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x+this.size.baseWidth/2, this.handle.position.y, this.handle.position.z+this.size.baseDepth);
+      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x+this.widgetSize.baseWidth/2, this.handle.position.y, this.handle.position.z+this.widgetSize.baseDepth);
     }else{
-      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x, this.handle.position.y+(this.size.baseHeight/2), this.handle.position.z+this.size.baseDepth);
+      this.handle.userData.onPos = new THREE.Vector3(this.handle.position.x, this.handle.position.y+(this.size.baseHeight/2), this.handle.position.z+this.widgetSize.baseDepth);
     }
 
     if(widgetProps.valueProps.defaultValue == widgetProps.valueProps.onValue){
@@ -2449,17 +2450,16 @@ export class ToggleWidget extends BaseWidget {
   }
   setToggleUserData(){
     let toggleProps = this.box.userData.properties;
-    let size = this.widgetSize;
 
     this.box.userData.type = 'TOGGLE';
-    this.box.userData.size = {'width': toggleProps.boxProps.width, 'height': toggleProps.boxProps.height, 'depth': size.baseDepth};
+    this.box.userData.size = {'width': toggleProps.boxProps.width, 'height': toggleProps.boxProps.height, 'depth': this.widgetSize.baseDepth};
     this.box.userData.handle = this.handle;
     this.box.userData.horizontal = toggleProps.horizontal;
     this.box.userData.valueProps = toggleProps.valueProps;
     this.box.userData.value = toggleProps.valueProps.defaultValue;
 
     this.handle.userData.type = 'TOGGLE';
-    this.handle.userData.size = {'width': this.size.handleWidth, 'height': this.size.handleHeight, 'depth': this.size.handleDepth};
+    this.handle.userData.size = {'width': this.widgetSize.handleWidth, 'height': this.widgetSize.handleHeight, 'depth': this.widgetSize.handleDepth};
     this.handle.userData.offPos = new THREE.Vector3().copy(this.handle.position);
     this.handle.userData.horizontal = toggleProps.horizontal;
     this.handle.userData.anim = false;
@@ -3863,7 +3863,7 @@ function onHandleTypingText(event, textMesh, currentText, boxSize, padding){
 
     if(!isNaN(currentText)){
       textMesh.widget.box.userData.currentText = currentText;
-      textMesh.widget.SetValue(currentText);
+      textMesh.widget.SetValueText(currentText);
     }
   } 
 }
