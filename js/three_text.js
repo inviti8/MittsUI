@@ -617,12 +617,18 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
         let pos = obj.userData.closedPos;
         let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
         gsap.to(obj.position, props);
+        props = { duration: duration, x: 0, y: 0, z: 0, ease: easeOut };
+        gsap.to(elem.userData.handleExpand.scale, props)
 
       }else if(!expanded){
+        console.log('xxx')
+        console.log()
         let pos = obj.userData.expandedPos;
         yPos += pos.y;
         let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
         gsap.to(obj.position, props);
+        props = { duration: duration, x: 1, y: 1, z: 1, ease: easeOut };
+        gsap.to(elem.userData.handleExpand.scale, props);
 
       }
 
@@ -1058,6 +1064,12 @@ export class BaseText {
     this.meshes = {};
     this.editText = textProps.editText;
   }
+  DarkenTextMaterial(amount=10){
+    darkenMaterial(this.material, amount);
+  }
+  LightenTextMaterial(amount=10){
+    lightenMaterial(this.material, amount);
+  }
   HandlePortalStencil(){
     if(this.parent.userData.isPortal){
       setupStencilChildMaterial(this.material, this.parent.material.stencilRef);
@@ -1379,7 +1391,7 @@ function setGeometryPivot(mesh, boxProps){
       mesh.pivot = new THREE.Vector3(boxProps.width, boxProps.height, boxProps.depth/2);
       break;
     default:
-      //mesh.pivot = new THREE.Vector3(boxProps.width/2, boxProps.height/2, boxProps.depth/2);
+      mesh.pivot = new THREE.Vector3(0, 0, 0);
   }
 }
 
@@ -1397,7 +1409,7 @@ export class BaseBox {
     this.material = getMaterial(boxProps.matProps);
     this.geometry = this.CreateBoxGeometry(boxProps);
     this.box = new THREE.Mesh(this.geometry, this.material);
-    //setGeometryPivot(this.box, boxProps);
+    setGeometryPivot(this.box, boxProps);
     this.box.userData.width = this.width;
     this.box.userData.height = this.height;
     this.box.userData.depth = this.depth;
@@ -1451,6 +1463,11 @@ export class BaseBox {
   UpdateMaterial(matProps){
     this.material.dispose();
     this.material = getMaterial(matProps);
+    this.box.material = this.material;
+  }
+  ReplaceMaterial(material){
+    this.material.dispose();
+    this.material = material;
     this.box.material = this.material;
   }
   CreateHeightExpandedMorph(sizeMult){
@@ -1515,6 +1532,19 @@ export class BaseBox {
   MakeBoxMaterialVisible(){
     this.box.material.opacity = 1;
     this.box.material.transparent = false;
+  }
+  DarkenBoxMaterial(amount=10){
+    darkenMaterial(this.box.material, amount);
+  }
+  LightenBoxMaterial(amount=10){
+    lightenMaterial(this.box.material, amount);
+  }
+  CreateComplemetaryColorMaterial(matProps){
+    let c = '#'+this.box.material.color.getHexString()
+    let colsea = colorsea(c, 100);
+    matProps.color = colsea.complement().hex();
+
+    return getMaterial(matProps, matProps.stencilRef);
   }
   AlignCenter(){
     this.box.position.copy(this.CenterBoxPos(this.zPosDir));
@@ -1639,7 +1669,7 @@ export function roundedBox(boxProps){
   return new BaseBox(boxProps).box
 };
 
-export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined){
+export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
   return {
     'type': 'PANEL',
     'boxProps': boxProps,
@@ -1650,7 +1680,8 @@ export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT
     'open': open,
     'expanded': expanded,
     'isSubPanel': isSubPanel,
-    'topPanel': topPanel
+    'topPanel': topPanel,
+    'topCtrl': topCtrl
   }
 };
 
@@ -1729,7 +1760,6 @@ export function buttonProperties(boxProps, name='Button', value='', textProps=un
 export class BasePanel extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
-    this.box.userData.properties = panelProps;
     
     this.boxProps = panelProps.boxProps;
     this.name = panelProps.name;
@@ -1739,7 +1769,23 @@ export class BasePanel extends BaseTextBox {
     this.sections = panelProps.sections;
     this.open = panelProps.open;
     this.isSubPanel = panelProps.isSubPanel;
+    if(this.isSubPanel){
+      this.subPanelMaterial = panelProps.topCtrl.subPanelMaterial;
+      this.handleMaterial = panelProps.topCtrl.handleMaterial;
+    }else{
+      this.subPanelMaterial = getMaterial(this.matProps, this.matProps.stencilRef);
+      darkenMaterial(this.subPanelMaterial, 10);
+      this.handleMaterial = this.CreateComplemetaryColorMaterial(this.matProps);
+    }
 
+    if(panelProps.topPanel == undefined){
+      panelProps.topPanel = this.box;
+      panelProps.topCtrl = this;
+      this.handleOpen = this.CreateTopHandle();
+    }
+
+    this.box.userData.properties = panelProps;
+    
     this.handleExpand = this.CreateHandle(panelProps);
     this.CreateTop();
     
@@ -1755,10 +1801,6 @@ export class BasePanel extends BaseTextBox {
 
     this.handleOpen = undefined;
     this.SetUserData();
-    if(panelProps.topPanel == undefined){
-      panelProps.topPanel = this.box;
-      this.handleOpen = this.CreateTopHandle();
-    }
 
     if(panelProps.sections != undefined){
       this.CreateSections(panelProps);
@@ -1767,6 +1809,8 @@ export class BasePanel extends BaseTextBox {
     this.handleExpand.addEventListener('action', function(event) {
       panelAnimation(this.userData.targetElem, 'EXPAND');
     });
+
+    //panelAnimation(this.box, 'EXPAND');
   }
   CreateTopHandle() {
     const handle = this.CreateHandle();
@@ -1796,11 +1840,10 @@ export class BasePanel extends BaseTextBox {
   }
   CreateHandle() {
     let result = undefined;
-    let material = getMaterial(this.matProps, this.matProps.stencilRef);
     let geometry = new THREE.OctahedronGeometry(this.height*0.2, 0);
     geometry.center();
     const size = getGeometrySize(geometry);
-    result = new THREE.Mesh(geometry, material);
+    result = new THREE.Mesh(geometry, this.handleMaterial);
     result.userData.offRotation = new THREE.Vector3().copy(result.rotation);
     result.userData.onRotation = new THREE.Vector3(result.rotation.x, result.rotation.y, result.rotation.z+0.8)
     result.userData.size = size;
@@ -1815,7 +1858,12 @@ export class BasePanel extends BaseTextBox {
     boxProps.parent = this.box;
     const result = new BaseBox(boxProps);
     let size = getGeometrySize(result.box.geometry);
-    result.box.material = this.box.material;
+    if(this.isSubPanel){
+      result.box.material = this.subPanelMaterial;
+    }else{
+      result.box.material = this.box.material;
+    }
+    
     result.box.position.set(result.box.position.x, -(this.height/2+result.height/2), 0);
     this.box.add(result.box);
     result.box.userData.expandedPos = new THREE.Vector3().set(result.box.position.x, -(this.height+result.height), result.box.position.z);
@@ -1841,7 +1889,7 @@ export class BasePanel extends BaseTextBox {
 
     if(this.isSubPanel){
       this.box.position.copy(this.parent.position);
-      darkenMaterial(this.box.material, 10);
+      this.DarkenBoxMaterial();
       this.box.userData.onPos = new THREE.Vector3(this.box.position.x, -(this.parentSize.height/2-this.height/2), this.box.position.z);
       this.box.userData.offPos = new THREE.Vector3().copy(this.box.position);
     }
@@ -1867,10 +1915,11 @@ export class BasePanel extends BaseTextBox {
       sectionProps.name = name;
       sectionProps.isSubPanel = true;
       sectionProps.boxProps.parent = panelProps.topPanel;
-      let parentSize = getGeometrySize(panelProps.topPanel.geometry);
 
       sectionProps.sections = sect;
       let section = new BasePanel(sectionProps);
+      section.ReplaceMaterial(this.subPanelMaterial);
+      section.handleExpand.scale.set(0,0,0);
       section.box.position.set(this.width/2-section.width/2, 0, -this.depth);
 
       let bottom = section.box.userData.bottom;
