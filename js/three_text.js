@@ -569,7 +569,6 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     gsap.to(handle.rotation, props);
   }
 
-
   if(anim == 'OPEN'){
     let onScale = elem.userData.onScale;
     let offScale = elem.userData.offScale;
@@ -611,40 +610,66 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     let bottomHeight = bottom.userData.size.height;
     let elemHeight = topHeight+bottomHeight;
     let yPos = -bottomHeight/2;
+    let elemsLength = elem.userData.sectionElements.length;
 
-    for (const obj of elem.userData.sectionElements) {
-      if(expanded){
-        let pos = obj.userData.closedPos;
-        let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
-        gsap.to(obj.position, props);
-        props = { duration: duration, x: 0, y: 0, z: 0, ease: easeOut };
-        gsap.to(elem.userData.handleExpand.scale, props)
+    if(elem.userData.sectionsValueTypes == 'container'){
+      //Move sub elements to correct positions
+      for (const obj of elem.userData.sectionElements) {
+        if(!expanded){
+          console.log('y')
+          let pos = obj.userData.expandedPos;
+          yPos += pos.y;
+          let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+          gsap.to(obj.position, props);
+          //expand handle
+          props = { duration: duration, x: 1, y: 1, z: 1, ease: easeOut };
+          gsap.to(obj.userData.handleExpand.scale, props);
+        }else if(expanded){
+          console.log('x')
+          let pos = obj.userData.closedPos;
+          let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+          gsap.to(obj.position, props);
+          //contract handle
+          props = { duration: duration, x: 0, y: 0, z: 0, ease: easeOut };
+          gsap.to(obj.userData.handleExpand.scale, props);
+        }
 
-      }else if(!expanded){
-        console.log('xxx')
-        console.log()
-        let pos = obj.userData.expandedPos;
-        yPos += pos.y;
-        let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
-        gsap.to(obj.position, props);
-        props = { duration: duration, x: 1, y: 1, z: 1, ease: easeOut };
-        gsap.to(elem.userData.handleExpand.scale, props);
-
+        idx +=1;
+        lastObj = obj;
       }
+    } else if(elem.userData.sectionsValueTypes == 'controls'){
+      elemsLength = elem.userData.widgetElements.length;
 
-      idx +=1;
-      lastObj = obj;
+      for (const obj of elem.userData.widgetElements) {
+        if(!expanded){
+          let pos = obj.userData.expandedPos;
+          yPos += pos.y;
+          let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+          gsap.to(obj.position, props);
+        }else if(expanded){
+          let pos = obj.userData.closedPos;
+          let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+          gsap.to(obj.position, props);
+        }
+
+        idx +=1;
+        //lastObj = obj;
+      }
     }
+
     
+    //Do animation for expand handle and move down bottom element of main container
     if(!expanded){
+      console.log('z')
       let rot = elem.userData.handleExpand.userData.onRotation;
       let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
-      let y = (bottomHeight/2+elemHeight * elem.userData.sectionElements.length) + bottomHeight;
+      let y = (bottomHeight/2+elemHeight * elemsLength) + bottomHeight;
       let pos = bottom.userData.expandedPos;
       props = { duration: duration, x: pos.x, y: -y, z: pos.z, ease: easeOut };
       gsap.to(bottom.position, props);
     }else if(expanded){
+      console.log('a')
       let rot = elem.userData.handleExpand.userData.offRotation;
       let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
@@ -665,26 +690,25 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       // console.log(elemCnt)
       // console.log(subPanels)
 
-      if(elem.userData.sectionElements.length == 0){
+      if(elem.userData.sectionElements.length>0){
         if(!expanded){
-   
           for (const i of range(startIdx, elemCnt)) {
-            // let idx = i-1;
-            // let subPanel = subPanels[idx];
-            // yPos = (yPos-bottomHeight)-(elemHeight/2+bottomHeight);
-            // let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
-            // gsap.to(subPanel.position, props);
+            let idx = i-1;
+            let subPanel = subPanels[idx];
+            yPos = (yPos-bottomHeight)-(elemHeight/2+bottomHeight);
+            let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
+            gsap.to(subPanel.position, props);
           }
 
-          // yPos = yPos-bottomHeight;
-          // let props = { duration: duration, x: topPanelBottom.position.x, y: yPos, z: topPanelBottom.position.z, ease: easeOut };
+          yPos = yPos-bottomHeight;
+          let props = { duration: duration, x: topPanelBottom.position.x, y: yPos, z: topPanelBottom.position.z, ease: easeOut };
         }else if(expanded){
           for (const i of range(startIdx, elemCnt)) {
-            // let idx = i-1;
-            // let subPanel = subPanels[idx];
-            // yPos = ((yPos-bottomHeight)-(elemHeight/2+bottomHeight);
-            // let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
-            // gsap.to(subPanel.position, props);
+            let idx = i-1;
+            let subPanel = subPanels[idx];
+            yPos = (yPos-bottomHeight)-(elemHeight/2+bottomHeight);
+            let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
+            gsap.to(subPanel.position, props);
           }
         } 
       }
@@ -1570,6 +1594,12 @@ export class BaseBox {
   AlignOutsideRight(zPosDir=1){
     this.box.position.copy(this.RightCenterOutsideBoxPos(zPosDir));
   }
+  AlignOutsideFrontParent(){
+    this.box.translateZ(this.parentSize.depth+this.depth/2);
+  }
+  AlignOutsideBehindParent(){
+    this.box.translateZ(-this.parentSize.depth-this.depth/2);
+  }
   CenterBoxPos(zPosDir=1){
     return new THREE.Vector3(this.parentSize.width-this.parentSize.width, this.parentSize.height-this.parentSize.height, (this.parentSize.depth/2)*zPosDir);
   }
@@ -1669,38 +1699,18 @@ export function roundedBox(boxProps){
   return new BaseBox(boxProps).box
 };
 
-export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
+
+export function buttonProperties(boxProps, name='Button', value='', textProps=undefined, mouseOver=false, attach='RIGHT'){
   return {
-    'type': 'PANEL',
+    'type': 'BUTTON',
     'boxProps': boxProps,
     'name': name,
+    'value': value,
     'textProps': textProps,
-    'attach': attach,
-    'sections': sections,
-    'open': open,
-    'expanded': expanded,
-    'isSubPanel': isSubPanel,
-    'topPanel': topPanel,
-    'topCtrl': topCtrl
+    'mouseOver': mouseOver,
+    'attach': attach
   }
 };
-
-export function CreateBasePanel(panelProps) {
-  if(typeof panelProps.textProps.font === 'string'){
-    // Load the font
-    loader.load(panelProps.textProps.font, (font) => {
-      panelProps.textProps.font = font;
-      let panel = new BasePanel(panelProps);
-      panels.push(panel);
-      console.log(panel)
-    });
-  }else if(panelProps.textProps.font.isFont){
-    let panel = new BasePanel(panelProps);
-    panels.push(panel);
-  } 
-  
-};
-
 
 class BaseTextBox extends BaseBox {
   constructor(buttonProps) {
@@ -1745,15 +1755,29 @@ class BaseTextBox extends BaseBox {
   }
 }
 
-export function buttonProperties(boxProps, name='Button', value='', textProps=undefined, mouseOver=false, attach='RIGHT'){
+//value types: container, controls, label, edit_text, toggle, int_slider, float_slider
+export function panelSectionProperties(name='Section', value_type='container', data={}){
   return {
-    'type': 'BUTTON',
+    'type': 'PANEL_SECTION',
+    'name': name,
+    'value_type': value_type,
+    'data': data
+  }
+};
+
+export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
+  return {
+    'type': 'PANEL',
     'boxProps': boxProps,
     'name': name,
-    'value': value,
     'textProps': textProps,
-    'mouseOver': mouseOver,
-    'attach': attach
+    'attach': attach,
+    'sections': sections,
+    'open': open,
+    'expanded': expanded,
+    'isSubPanel': isSubPanel,
+    'topPanel': topPanel,
+    'topCtrl': topCtrl
   }
 };
 
@@ -1767,8 +1791,10 @@ export class BasePanel extends BaseTextBox {
     this.matProps = panelProps.boxProps.matProps;
     this.attach = panelProps.attach;
     this.sections = panelProps.sections;
+    this.sectionsValueTypes = panelProps.sections.value_type;
     this.open = panelProps.open;
     this.isSubPanel = panelProps.isSubPanel;
+    this.controlList = [];
     if(this.isSubPanel){
       this.subPanelMaterial = panelProps.topCtrl.subPanelMaterial;
       this.handleMaterial = panelProps.topCtrl.handleMaterial;
@@ -1803,7 +1829,12 @@ export class BasePanel extends BaseTextBox {
     this.SetUserData();
 
     if(panelProps.sections != undefined){
-      this.CreateSections(panelProps);
+      if(this.sectionsValueTypes == 'controls'){
+        this.CreateControlSections(panelProps);
+        console.log(this)
+      }else if(this.sectionsValueTypes == 'container'){
+        this.CreateContainerSections(panelProps);
+      }
     }
 
     this.handleExpand.addEventListener('action', function(event) {
@@ -1898,6 +1929,8 @@ export class BasePanel extends BaseTextBox {
   SetUserData(){
     this.box.userData.textMesh = this.textMesh;
     this.box.userData.bottom = this.bottom.box;
+    this.box.userData.isSubPanel = this.isSubPanel;
+    this.box.userData.sectionsValueTypes = this.sectionsValueTypes;
     this.box.userData.expandedPos = new THREE.Vector3().copy(this.box.position);
     this.box.userData.closedPos = new THREE.Vector3().copy(this.box.position);
     this.box.userData.onPos = new THREE.Vector3().copy(this.box.position);
@@ -1908,9 +1941,54 @@ export class BasePanel extends BaseTextBox {
     this.box.userData.widgetElements = [];
     this.box.userData.size = getGeometrySize(this.box.geometry);
   }
-  CreateSections(panelProps){
+  CreateControlSections(panelProps){
     let index = 1;
-    for (const [name, sect] of Object.entries(panelProps.sections)) {
+    for (const [name, sect] of Object.entries(panelProps.sections.data)) {
+      let sectionProps = {...panelProps};
+      sectionProps.name = name;
+      sectionProps.isSubPanel = true;
+      sectionProps.boxProps.parent = this.box;
+      let widget = undefined;
+
+      switch (sect.value_type) {
+        case 'label':
+          let btnProps = buttonProperties(sectionProps.boxProps, name, '', sectionProps.textProps)
+          widget = new BaseTextBox(btnProps);
+          widget.AlignOutsideBehindParent()
+          this.controlList.push(widget);
+          this.box.userData.widgetElements.push(widget.box);
+        case 'edit_text':
+          console.log('edit_text');
+        case 'toggle':
+          console.log('toggle');
+        case 'int_slider':
+          console.log('int_slider');
+        case 'float_slider':
+          console.log('float_slider');
+        default:
+          console.log('X');
+      }
+
+      console.log('widget.box')
+      console.log(widget.box)
+
+      let bottomHeight = this.bottom.height;
+      let yPos =  bottomHeight - (this.height + bottomHeight)*index;
+      widget.box.userData.index = index;
+      console.log('yPos')
+      console.log(yPos)
+      widget.box.userData.expandedPos = new THREE.Vector3(widget.box.position.x, yPos, widget.box.position.z);
+      widget.box.userData.closedPos = new THREE.Vector3().copy(widget.box.position);
+
+      console.log('widget.box.userData.expandedPos')
+      console.log(widget.box.userData.expandedPos)
+      
+      index += 1;
+    }
+  }
+  CreateContainerSections(panelProps){
+    let index = 1;
+    for (const [name, sect] of Object.entries(panelProps.sections.data)) {
       let sectionProps = {...panelProps};
       sectionProps.name = name;
       sectionProps.isSubPanel = true;
@@ -1933,6 +2011,21 @@ export class BasePanel extends BaseTextBox {
       index += 1;
     }
   }
+};
+
+export function CreateBasePanel(panelProps) {
+  if(typeof panelProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(panelProps.textProps.font, (font) => {
+      panelProps.textProps.font = font;
+      let panel = new BasePanel(panelProps);
+      panels.push(panel);
+    });
+  }else if(panelProps.textProps.font.isFont){
+    let panel = new BasePanel(panelProps);
+    panels.push(panel);
+  } 
+  
 };
 
 export function widgetProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), listConfig=undefined, handleSize=2 ){
