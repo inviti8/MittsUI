@@ -601,8 +601,6 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
   }
 
   if(anim == 'EXPAND'){
-    let idx = 1;
-    let lastObj = undefined;
     
     let expanded = elem.userData.properties.expanded;
     let bottom = elem.userData.bottom;
@@ -612,37 +610,28 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     let yPos = -bottomHeight/2;
     let sectionsLength = elem.userData.sectionElements.length;
     let bottomYPos = -((bottomHeight/2+elemHeight * sectionsLength) + bottomHeight);
-    let openSectionCnt = 0;
     let thisIndex = elem.userData.index;
     let parentBottom = elem.parent.userData.bottom;
-
-    if(!expanded){
-      openSectionCnt = elem.parent.userData.openSections += 1;
-    }else if(expanded){
-      openSectionCnt = elem.parent.userData.openSections -= 1;
-    }
+    let props = {};
 
     if(elem.userData.sectionsValueTypes == 'container'){
       //Move sub elements to correct positions
       for (const obj of elem.userData.sectionElements) {
         if(!expanded){
           let pos = obj.userData.expandedPos;
-          let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+          props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
           gsap.to(obj.position, props);
           //expand handle
           props = { duration: duration, x: 1, y: 1, z: 1, ease: easeOut };
           gsap.to(obj.userData.handleExpand.scale, props);
         }else if(expanded){
           let pos = obj.userData.closedPos;
-          let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+          props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
           gsap.to(obj.position, props);
           //contract handle
           props = { duration: duration, x: 0, y: 0, z: 0, ease: easeOut };
           gsap.to(obj.userData.handleExpand.scale, props);
         }
-
-        idx +=1;
-        lastObj = obj;
       }
     } else if(elem.userData.sectionsValueTypes == 'controls'){
       sectionsLength = elem.userData.widgetElements.length;
@@ -652,53 +641,32 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       for (const obj of elem.userData.widgetElements) {
         if(!expanded){
           let pos = obj.userData.expandedPos;
-          let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+          props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
           gsap.to(obj.position, props);
         }else if(expanded){
           let pos = obj.userData.closedPos;
-          let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+          props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
           gsap.to(obj.position, props);
         }
-
-        idx +=1;
-        lastObj = obj;
       }
     }
 
-    let lastBottom = lastObj.userData.bottom;
-    console.log('lastBottom')
-    console.log(lastBottom)
     //Do animation for expand handle and move down bottom element of main container
     if(!expanded){
       let rot = elem.userData.handleExpand.userData.onRotation;
-      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+      props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
       let pos = bottom.userData.expandedPos;
       props = { duration: duration, x: pos.x, y: bottomYPos, z: pos.z, ease: easeOut };
       gsap.to(bottom.position, props);
-      if(parentBottom!=undefined){
-        //Adjust parent bottom;
-        // bottomYPos = lastBottom.userData.expandedPos;
-        // let props = { duration: duration, x: parentBottom.position.x, y: bottomYPos, z: parentBottom.position.z, ease: easeOut };
-        // gsap.to(parentBottom.position, props);
-      }
-
     }else if(expanded){
       let rot = elem.userData.handleExpand.userData.offRotation;
-      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+      props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
       let pos = bottom.userData.closedPos;
       bottomYPos = pos.y;
       props = { duration: duration, x: pos.x, y: bottomYPos, z: pos.z, ease: easeOut };
-      gsap.to(bottom.position, props);
-
-      if(parentBottom!=undefined){
-        //Adjust parent bottom;
-        // bottomYPos = lastBottom.userData.closedPos;
-        // let props = { duration: duration, x: parentBottom.position.x, y: bottomYPos, z: parentBottom.position.z, ease: easeOut };
-        // gsap.to(parentBottom.position, props);
-      }
-      
+      gsap.to(bottom.position, props); 
     }
 
     
@@ -709,52 +677,63 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       let startIdx = elem.userData.index+1;
       let parentSectionsLength = elem.parent.userData.sectionElements.length;
       let YPos = elem.position.y;
+
       
       if(!expanded){
-        for (const i of range(startIdx, parentSectionsLength)) {
-          let idx = i-1;
-          let el = elem.parent.userData.sectionElements[idx];
-          let prev = elem.parent.userData.sectionElements[idx-1];
-          let pos = el.position;
-          let Y = prev.userData.expandedHeight;
-          
-          if(idx>startIdx-1){
-            if(!prev.userData.properties.expanded){
-              Y = prev.userData.closedHeight;
+        if(elem.userData.index==parentSectionsLength){
+          YPos -= elem.userData.expandedHeight-parentBottom.userData.height-parentBottom.userData.height;
+        }else{
+          for (const i of range(startIdx, parentSectionsLength)) {
+            let idx = i-1;
+            let el = elem.parent.userData.sectionElements[idx];
+            let prev = elem.parent.userData.sectionElements[idx-1];
+            let pos = el.position;
+            let Y = prev.userData.expandedHeight;
+            
+            if(idx>startIdx-1){
+              if(!prev.userData.properties.expanded){
+                Y = prev.userData.closedHeight;
+              }
+            }
+            YPos -= Y;
+            props = { duration: duration, x: pos.x, y: YPos, z: pos.z, ease: easeOut };
+            gsap.to(el.position, props);
+            if(i==parentSectionsLength){
+              subPanelBottom = el.userData.bottom;
             }
           }
-          YPos -= Y;
-          let props = { duration: duration, x: pos.x, y: YPos, z: pos.z, ease: easeOut };
-          gsap.to(el.position, props);
-          if(i==parentSectionsLength){
-            subPanelBottom = el.userData.bottom;
-          }
         }
+        
       }else if(expanded){
-        for (const i of range(startIdx, parentSectionsLength)) {
-          let idx = i-1;
-          let el = elem.parent.userData.sectionElements[idx];
-          let prev = elem.parent.userData.sectionElements[idx-1];
-          let pos = el.position;
-          let Y = prev.userData.closedHeight;
-          
-          if(idx>startIdx-1){
-            if(prev.userData.properties.expanded){
-              Y = prev.userData.expandedHeight;
+        if(elem.userData.index==parentSectionsLength){;
+          YPos -= elem.userData.closedHeight-parentBottom.userData.height-parentBottom.userData.height;
+        }else{
+          for (const i of range(startIdx, parentSectionsLength)) {
+            let idx = i-1;
+            let el = elem.parent.userData.sectionElements[idx];
+            let prev = elem.parent.userData.sectionElements[idx-1];
+            let pos = el.position;
+            let Y = prev.userData.closedHeight;
+            
+            if(idx>startIdx-1){
+              if(prev.userData.properties.expanded){
+                Y = prev.userData.expandedHeight;
+              }
             }
-          }
-          YPos -= Y;
-          let props = { duration: duration, x: pos.x, y: YPos, z: pos.z, ease: easeOut };
-          gsap.to(el.position, props);
-          if(i==parentSectionsLength){
-            subPanelBottom = el.userData.bottom;
-          }
+            YPos -= Y;
+            props = { duration: duration, x: pos.x, y: YPos, z: pos.z, ease: easeOut };
+            gsap.to(el.position, props);
+            if(i==parentSectionsLength){
+              subPanelBottom = el.userData.bottom;
+            }
+          }      
         }
+
       }
 
       //Adjust the bottom for parent container again
       YPos -= parentBottom.userData.height/2+parentBottom.userData.height;
-      let props = { duration: duration, x: parentBottom.position.x, y: YPos, z: parentBottom.position.z, ease: easeOut };
+      props = { duration: duration, x: parentBottom.position.x, y: YPos, z: parentBottom.position.z, ease: easeOut };
       gsap.to(parentBottom.position, props);
 
     }
