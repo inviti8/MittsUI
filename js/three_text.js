@@ -1819,6 +1819,7 @@ export class BasePanel extends BaseTextBox {
     this.sectionsValueTypes = panelProps.sections.value_type;
     this.open = panelProps.open;
     this.isSubPanel = panelProps.isSubPanel;
+    this.panelList = [];
     this.controlList = [];
     if(this.isSubPanel){
       this.subPanelMaterial = panelProps.topCtrl.subPanelMaterial;
@@ -1861,8 +1862,18 @@ export class BasePanel extends BaseTextBox {
       }
     }
 
+    this.handleExpand.addEventListener('close', function(event) {
+      this.userData.targetElem.userData.properties.expanded = false;
+      panelAnimation(this.userData.targetElem, 'EXPAND');
+    });
+
     this.handleExpand.addEventListener('action', function(event) {
       this.userData.targetElem.userData.properties.expanded = !this.userData.targetElem.userData.properties.expanded;
+      if(!this.userData.targetElem.userData.properties.expanded){
+        this.userData.targetElem.userData.panelList.forEach((panel, idx) => {
+            panel.handleExpand.dispatchEvent({type:'close'});
+        });
+      }
       panelAnimation(this.userData.targetElem, 'EXPAND');
     });
 
@@ -1970,6 +1981,7 @@ export class BasePanel extends BaseTextBox {
     this.box.userData.openSections = 0;
     this.box.userData.sectionElements = [];
     this.box.userData.widgetElements = [];
+    this.box.userData.panelList = [];
     this.box.userData.size = getGeometrySize(this.box.geometry);
   }
   CreateControlSections(panelProps){
@@ -2041,6 +2053,8 @@ export class BasePanel extends BaseTextBox {
       section.box.userData.expandedPos.set(section.box.position.x, yPos, section.box.position.z);
       section.box.userData.closedPos = new THREE.Vector3().copy(section.box.position);
       panelProps.topPanel.userData.sectionElements.push(section.box);
+      this.box.userData.panelList.push(section);
+      this.panelList.push(section);
       
       index += 1;
     }
