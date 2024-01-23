@@ -610,13 +610,21 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     let bottomHeight = bottom.userData.size.height;
     let elemHeight = topHeight+bottomHeight;
     let yPos = -bottomHeight/2;
-    let elemsLength = elem.userData.sectionElements.length;
+    let sectionsLength = elem.userData.sectionElements.length;
+    let bottomYPos = (bottomHeight/2+elemHeight * sectionsLength) + bottomHeight;
+    let openSectionCnt = 0;
+    let thisIndex = elem.userData.index;
+
+    if(!expanded){
+      openSectionCnt = elem.parent.userData.openSections += 1;
+    }else if(expanded){
+      openSectionCnt = elem.parent.userData.openSections -= 1;
+    }
 
     if(elem.userData.sectionsValueTypes == 'container'){
       //Move sub elements to correct positions
       for (const obj of elem.userData.sectionElements) {
         if(!expanded){
-          console.log('y')
           let pos = obj.userData.expandedPos;
           yPos += pos.y;
           let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
@@ -625,7 +633,6 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
           props = { duration: duration, x: 1, y: 1, z: 1, ease: easeOut };
           gsap.to(obj.userData.handleExpand.scale, props);
         }else if(expanded){
-          console.log('x')
           let pos = obj.userData.closedPos;
           let props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
           gsap.to(obj.position, props);
@@ -638,7 +645,9 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
         lastObj = obj;
       }
     } else if(elem.userData.sectionsValueTypes == 'controls'){
-      elemsLength = elem.userData.widgetElements.length;
+      sectionsLength = elem.userData.widgetElements.length;
+      let widgetHeight = elem.userData.widgetHeight;
+      bottomYPos = (bottomHeight/2+widgetHeight * sectionsLength) + bottomHeight;
 
       for (const obj of elem.userData.widgetElements) {
         if(!expanded){
@@ -653,23 +662,20 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
         }
 
         idx +=1;
-        //lastObj = obj;
+        lastObj = obj;
       }
     }
 
     
     //Do animation for expand handle and move down bottom element of main container
     if(!expanded){
-      console.log('z')
       let rot = elem.userData.handleExpand.userData.onRotation;
       let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
-      let y = (bottomHeight/2+elemHeight * elemsLength) + bottomHeight;
       let pos = bottom.userData.expandedPos;
-      props = { duration: duration, x: pos.x, y: -y, z: pos.z, ease: easeOut };
+      props = { duration: duration, x: pos.x, y: -bottomYPos, z: pos.z, ease: easeOut };
       gsap.to(bottom.position, props);
     }else if(expanded){
-      console.log('a')
       let rot = elem.userData.handleExpand.userData.offRotation;
       let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
@@ -685,39 +691,80 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       let subPanels = topPanel.userData.sectionElements;
       let elemCnt = subPanels.length;
       let startIdx = elem.userData.index+1;
+      let parentSectionsLength = elem.parent.userData.sectionElements.length;
       // console.log(topPanel)
       // console.log(elem.userData.index)
       // console.log(elemCnt)
-      // console.log(subPanels)
+      // console.log('subPanels')
+      // console.log(topPanelBottom.position.y)
+      // console.log(bottomYPos)
 
-      if(elem.userData.sectionElements.length>0){
-        if(!expanded){
-          for (const i of range(startIdx, elemCnt)) {
-            let idx = i-1;
-            let subPanel = subPanels[idx];
-            yPos = (yPos-bottomHeight)-(elemHeight/2+bottomHeight);
-            let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
-            gsap.to(subPanel.position, props);
-          }
+      // let idx = thisIndex;
+      // let pos = elem.parent.userData.sectionElements[idx].position;
+      // let YPos = elem.parent.userData.expandedHeight;
+      // let props = { duration: duration, x: pos.x, y: -YPos, z: pos.z, ease: easeOut };
+      // gsap.to(elem.parent.userData.sectionElements[idx].position, props);
 
-          yPos = yPos-bottomHeight;
-          let props = { duration: duration, x: topPanelBottom.position.x, y: yPos, z: topPanelBottom.position.z, ease: easeOut };
-        }else if(expanded){
-          for (const i of range(startIdx, elemCnt)) {
-            let idx = i-1;
-            let subPanel = subPanels[idx];
-            yPos = (yPos-bottomHeight)-(elemHeight/2+bottomHeight);
-            let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
-            gsap.to(subPanel.position, props);
+     
+      
+      if(!expanded){
+         for (const i of range(startIdx, parentSectionsLength)) {
+          let idx = i-1;
+          let el = elem.parent.userData.sectionElements[idx];
+          let prev = elem.parent.userData.sectionElements[idx-1];
+          let pos = el.position;
+          let topBox = pos.y+(el.userData.closedHeight);
+          let YPos = topBox-prev.userData.expandedHeight;
+
+          // console.log('prev.userData.expandedHeight')
+          // console.log(prev.userData.expandedHeight)
+          // console.log('YPos')
+          // console.log(YPos)
+
+          console.log('el')
+          console.log(elem.parent.userData.sectionElements[idx])
+          console.log('idx')
+          console.log(idx)
+          
+          if(idx>startIdx-1){
+            if(!prev.userData.properties.expanded){
+              YPos = topBox-prev.userData.closedHeight*i;
+            }
           }
-        } 
+          let props = { duration: duration, x: pos.x, y: YPos, z: pos.z, ease: easeOut };
+          gsap.to(el.position, props);
+        }
+      }else if(expanded){
+
       }
+
+      // if(elem.userData.sectionElements.length>0){
+      //   if(!expanded){
+      //     for (const i of range(startIdx, elemCnt)) {
+      //       let idx = i-1;
+      //       let subPanel = subPanels[idx];
+      //       yPos = (yPos-bottomHeight)-(elemHeight/2+bottomHeight);
+      //       let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
+      //       gsap.to(subPanel.position, props);
+      //     }
+
+
+      //   }else if(expanded){
+      //     for (const i of range(startIdx, elemCnt)) {
+      //       let idx = i-1;
+      //       let subPanel = subPanels[idx];
+      //       yPos = (yPos-bottomHeight)-(elemHeight/2+bottomHeight);
+      //       let props = { duration: duration, x: subPanel.position.x, y: yPos, z: subPanel.position.z, ease: easeOut };
+      //       gsap.to(subPanel.position, props);
+      //     }
+      //   } 
+      // }
 
     }
 
     //textMesh.widget.base.userData.valueBox.dispatchEvent({type:'update'});
 
-    elem.userData.properties.expanded = !elem.userData.properties.expanded;
+    //elem.userData.properties.expanded = !elem.userData.properties.expanded;
 
   }
 
@@ -1831,7 +1878,6 @@ export class BasePanel extends BaseTextBox {
     if(panelProps.sections != undefined){
       if(this.sectionsValueTypes == 'controls'){
         this.CreateControlSections(panelProps);
-        console.log(this)
       }else if(this.sectionsValueTypes == 'container'){
         this.CreateContainerSections(panelProps);
       }
@@ -1839,6 +1885,17 @@ export class BasePanel extends BaseTextBox {
 
     this.handleExpand.addEventListener('action', function(event) {
       panelAnimation(this.userData.targetElem, 'EXPAND');
+      this.userData.targetElem.userData.properties.expanded = !this.userData.targetElem.userData.properties.expanded;
+      if(this.userData.targetElem.userData.properties.isSubPanel){
+        let expanded = this.userData.targetElem.userData.properties.expanded;
+        // if(!expanded){
+        //   this.userData.targetElem.parent.userData.openSections -= 1;
+        // }else if(expanded){
+        //   this.userData.targetElem.parent.userData.openSections += 1;
+        // }
+
+        //console.log(this.userData.targetElem.parent.userData.openSections)
+      }
     });
 
     //panelAnimation(this.box, 'EXPAND');
@@ -1898,6 +1955,9 @@ export class BasePanel extends BaseTextBox {
     result.box.position.set(result.box.position.x, -(this.height/2+result.height/2), 0);
     this.box.add(result.box);
     result.box.userData.expandedPos = new THREE.Vector3().set(result.box.position.x, -(this.height+result.height), result.box.position.z);
+    if(this.sectionsValueTypes == 'controls'){
+      result.box.userData.expandedPos = new THREE.Vector3().set(result.box.position.x, -result.height, result.box.position.z);
+    }
     result.box.userData.closedPos = new THREE.Vector3().copy(result.box.position);
     result.box.userData.size = size;
 
@@ -1933,16 +1993,20 @@ export class BasePanel extends BaseTextBox {
     this.box.userData.sectionsValueTypes = this.sectionsValueTypes;
     this.box.userData.expandedPos = new THREE.Vector3().copy(this.box.position);
     this.box.userData.closedPos = new THREE.Vector3().copy(this.box.position);
+    this.box.userData.closedHeight = this.height+this.bottom.height;
     this.box.userData.onPos = new THREE.Vector3().copy(this.box.position);
     this.box.userData.offPos = new THREE.Vector3().copy(this.box.position);
     this.box.userData.onScale = new THREE.Vector3(0,0,0).copy(this.box.scale);
     this.box.userData.offScale = new THREE.Vector3(0,0,0);
+    this.box.userData.sectionCount = Object.keys(this.sections).length;
+    this.box.userData.openSections = 0;
     this.box.userData.sectionElements = [];
     this.box.userData.widgetElements = [];
     this.box.userData.size = getGeometrySize(this.box.geometry);
   }
   CreateControlSections(panelProps){
     let index = 1;
+    let widgetHeight = undefined;
     for (const [name, sect] of Object.entries(panelProps.sections.data)) {
       let sectionProps = {...panelProps};
       sectionProps.name = name;
@@ -1954,37 +2018,39 @@ export class BasePanel extends BaseTextBox {
         case 'label':
           let btnProps = buttonProperties(sectionProps.boxProps, name, '', sectionProps.textProps)
           widget = new BaseTextBox(btnProps);
-          widget.AlignOutsideBehindParent()
+          widget.AlignOutsideBehindParent();
           this.controlList.push(widget);
           this.box.userData.widgetElements.push(widget.box);
+          break;
         case 'edit_text':
           console.log('edit_text');
+          break;
         case 'toggle':
           console.log('toggle');
+          break;
         case 'int_slider':
           console.log('int_slider');
+          break;
         case 'float_slider':
           console.log('float_slider');
+          break;
         default:
           console.log('X');
       }
 
-      console.log('widget.box')
-      console.log(widget.box)
 
       let bottomHeight = this.bottom.height;
-      let yPos =  bottomHeight - (this.height + bottomHeight)*index;
+      let yPos =  -(this.height)*index;
       widget.box.userData.index = index;
-      console.log('yPos')
-      console.log(yPos)
       widget.box.userData.expandedPos = new THREE.Vector3(widget.box.position.x, yPos, widget.box.position.z);
       widget.box.userData.closedPos = new THREE.Vector3().copy(widget.box.position);
-
-      console.log('widget.box.userData.expandedPos')
-      console.log(widget.box.userData.expandedPos)
+      widgetHeight = widget.box.userData.height;
       
       index += 1;
     }
+    this.box.userData.widgetHeight = widgetHeight;
+    this.box.userData.expandedHeight = this.height+(widgetHeight*Object.keys(this.sections.data).length)+this.bottom.height;
+    //this.parent.userData.expandedHeight = (widgetHeight*Object.keys(this.sections).length)+this.bottom.height;
   }
   CreateContainerSections(panelProps){
     let index = 1;
