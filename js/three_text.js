@@ -509,7 +509,6 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
       }
 
       if(elem.userData.properties.isPortal){
-        console.log('HERE')
         let props = { duration: duration, 0: 0, ease: easeIn };
         if(elem.userData.open){
           props = { duration: duration, 0: 1, ease: easeIn };
@@ -617,14 +616,14 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     if(elem.userData.sectionsValueTypes == 'container'){
       //Move sub elements to correct positions
       for (const obj of elem.userData.sectionElements) {
-        if(!expanded){
+        if(expanded){
           let pos = obj.userData.expandedPos;
           props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
           gsap.to(obj.position, props);
           //expand handle
           props = { duration: duration, x: 1, y: 1, z: 1, ease: easeOut };
           gsap.to(obj.userData.handleExpand.scale, props);
-        }else if(expanded){
+        }else if(!expanded){
           let pos = obj.userData.closedPos;
           props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
           gsap.to(obj.position, props);
@@ -639,11 +638,11 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       bottomYPos = -((bottomHeight/2+widgetHeight * sectionsLength) + bottomHeight);
 
       for (const obj of elem.userData.widgetElements) {
-        if(!expanded){
+        if(expanded){
           let pos = obj.userData.expandedPos;
           props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
           gsap.to(obj.position, props);
-        }else if(expanded){
+        }else if(!expanded){
           let pos = obj.userData.closedPos;
           props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
           gsap.to(obj.position, props);
@@ -652,14 +651,14 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     }
 
     //Do animation for expand handle and move down bottom element of main container
-    if(!expanded){
+    if(expanded){
       let rot = elem.userData.handleExpand.userData.onRotation;
       props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
       let pos = bottom.userData.expandedPos;
       props = { duration: duration, x: pos.x, y: bottomYPos, z: pos.z, ease: easeOut };
       gsap.to(bottom.position, props);
-    }else if(expanded){
+    }else if(!expanded){
       let rot = elem.userData.handleExpand.userData.offRotation;
       props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
       handleRotate(elem.userData.handleExpand, props);
@@ -669,19 +668,16 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       gsap.to(bottom.position, props); 
     }
 
-    
-
     //if a sub panel is opened, we need to manage positions of other sub panels and base panel elements
     if(elem.userData.properties.isSubPanel){
       let subPanelBottom = undefined;
       let startIdx = elem.userData.index+1;
       let parentSectionsLength = elem.parent.userData.sectionElements.length;
       let YPos = elem.position.y;
-
       
-      if(!expanded){
+      if(expanded){
         if(elem.userData.index==parentSectionsLength){
-          YPos -= elem.userData.expandedHeight-parentBottom.userData.height-parentBottom.userData.height;
+          //YPos -= elem.userData.expandedHeight-parentBottom.userData.height-parentBottom.userData.height;
         }else{
           for (const i of range(startIdx, parentSectionsLength)) {
             let idx = i-1;
@@ -704,9 +700,9 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
           }
         }
         
-      }else if(expanded){
+      }else if(!expanded){
         if(elem.userData.index==parentSectionsLength){;
-          YPos -= elem.userData.closedHeight-parentBottom.userData.height-parentBottom.userData.height;
+          //YPos -= elem.userData.closedHeight-parentBottom.userData.height-parentBottom.userData.height;
         }else{
           for (const i of range(startIdx, parentSectionsLength)) {
             let idx = i-1;
@@ -731,16 +727,22 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
 
       }
 
+      //calculate bottom based on child bottom position
+      let lastElem = elem.parent.userData.sectionElements[parentSectionsLength-1];
+
+      if(!lastElem.userData.properties.expanded){
+        YPos -= lastElem.userData.closedHeight-parentBottom.userData.height/2;
+      }else{
+        YPos -= lastElem.userData.expandedHeight-parentBottom.userData.height/2;
+      }
+
       //Adjust the bottom for parent container again
-      YPos -= parentBottom.userData.height/2+parentBottom.userData.height;
       props = { duration: duration, x: parentBottom.position.x, y: YPos, z: parentBottom.position.z, ease: easeOut };
       gsap.to(parentBottom.position, props);
 
     }
 
     //textMesh.widget.base.userData.valueBox.dispatchEvent({type:'update'});
-
-    //elem.userData.properties.expanded = !elem.userData.properties.expanded;
 
   }
 
@@ -1860,18 +1862,8 @@ export class BasePanel extends BaseTextBox {
     }
 
     this.handleExpand.addEventListener('action', function(event) {
-      panelAnimation(this.userData.targetElem, 'EXPAND');
       this.userData.targetElem.userData.properties.expanded = !this.userData.targetElem.userData.properties.expanded;
-      if(this.userData.targetElem.userData.properties.isSubPanel){
-        let expanded = this.userData.targetElem.userData.properties.expanded;
-        // if(!expanded){
-        //   this.userData.targetElem.parent.userData.openSections -= 1;
-        // }else if(expanded){
-        //   this.userData.targetElem.parent.userData.openSections += 1;
-        // }
-
-        //console.log(this.userData.targetElem.parent.userData.openSections)
-      }
+      panelAnimation(this.userData.targetElem, 'EXPAND');
     });
 
     //panelAnimation(this.box, 'EXPAND');
