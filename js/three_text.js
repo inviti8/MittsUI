@@ -2232,20 +2232,6 @@ export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, s
   }
 };
 
-export function sliderProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8){
-  return {
-    'type': 'SLIDER',
-    'boxProps': boxProps,
-    'name': name,
-    'horizontal': horizontal,
-    'textProps': textProps,
-    'useValueText': useValueText,
-    'numeric': numeric,
-    'valueProps': valueProps,
-    'handleSize': handleSize
-  }
-};
-
 class ValueTextWidget extends BaseTextBox{
   constructor(widgetProps) {
     let valBoxProps = {...widgetProps.boxProps};
@@ -2336,6 +2322,20 @@ class ValueTextWidget extends BaseTextBox{
 
 }
 
+export function sliderProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8){
+  return {
+    'type': 'SLIDER',
+    'boxProps': boxProps,
+    'name': name,
+    'horizontal': horizontal,
+    'textProps': textProps,
+    'useValueText': useValueText,
+    'numeric': numeric,
+    'valueProps': valueProps,
+    'handleSize': handleSize
+  }
+};
+
 export class SliderWidget extends BaseWidget {
   constructor(widgetProps) {
     widgetProps.textProps.align = 'LEFT';
@@ -2364,6 +2364,11 @@ export class SliderWidget extends BaseWidget {
     this.UpdateSliderPosition();
 
   }
+  SetValue(val){
+    this.box.userData.value = value;
+    this.value = value;
+    this.box.dispatchEvent({type:'update'});
+  }
   SetSliderUserData(){
     let sliderProps = this.box.userData.properties;
     let size = BaseWidget.CalculateWidgetSize(sliderProps.boxProps, sliderProps.horizontal, sliderProps.useValueText, 8);
@@ -2374,6 +2379,7 @@ export class SliderWidget extends BaseWidget {
     this.box.userData.horizontal = sliderProps.horizontal;
     this.box.userData.valueProps = sliderProps.valueProps;
     this.box.userData.value = sliderProps.valueProps.defaultValue;
+    this.box.normalizedValue = sliderProps.valueProps.defaultValue;
     this.box.userData.targetElem = this;
 
     this.handle.userData.type = 'SLIDER';
@@ -2382,6 +2388,7 @@ export class SliderWidget extends BaseWidget {
     this.handle.userData.min = sliderProps.valueProps.min;
     this.handle.userData.max = sliderProps.valueProps.max;
     this.handle.userData.places = sliderProps.valueProps.places;
+
 
     if(sliderProps.horizontal){
       this.handle.userData.maxScroll = this.handle.position.x + (size.baseWidth-size.handleWidth);
@@ -2415,6 +2422,8 @@ export class SliderWidget extends BaseWidget {
       value = ((pos-minScroll)/divider*(max-min))+min;
     }
 
+    this.UpdateNormalizedValue();
+
     return value.toFixed(this.handle.userData.places);
   }
   OnSliderMove(){
@@ -2437,6 +2446,7 @@ export class SliderWidget extends BaseWidget {
     let max = this.handle.userData.max;
     let min = this.handle.userData.min;
     let value = this.box.userData.value;
+    this.UpdateNormalizedValue();
     if(value>max){
       this.box.userData.value = max;
       value = max;
@@ -2463,6 +2473,68 @@ export class SliderWidget extends BaseWidget {
     }
 
     this.handle.position.copy(pos);
+  }
+  UpdateNormalizedValue(){
+    let max = this.handle.userData.max;
+    let min = this.handle.userData.min;
+    let value = this.box.userData.value;
+    this.box.normalizedValue = (value-min)/(max-min);
+    this.box.userData.normalizedValue = this.box.normalizedValue;
+  }
+
+};
+
+export function meterWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true){
+  return {
+    'type': 'METER_WIDGET',
+    'boxProps': boxProps,
+    'name': name,
+    'horizontal': horizontal,
+    'defaultColor': defaultColor,
+    'textProps': textProps,
+    'useValueText': useValueText,
+    'valueProps': numberValueProperties( 0, 0, 255, 0, 0.001, true),
+    'useAlpha': useAlpha,
+    'handleSize': 0,
+    'alpha': alpha
+  }
+};
+
+export class MeterWidget extends SliderWidget {
+  constructor(widgetProps) {
+    super(widgetProps);
+    const meterBoxProps = {...widgetProps.boxProps}
+    meterBoxProps.width = this.box.userData.size.width;
+    meterBoxProps.height = this.box.userData.size.height;
+    meterBoxProps.pivot = 'LEFT';
+    if(!this.box.userData.horizontal){
+      meterBoxProps.pivot = 'BOTTOM';
+    }
+    meterBoxProps.parent = this.box;
+
+    this.meter = new BaseBox(meterBoxProps);
+    this.meter.AlignLeft();
+    this.handleCtrl.MakeBoxMaterialInvisible()
+    this.handle.userData.meterElem = this;
+    this.box.userData.meterElem = this;
+
+    this.handle.addEventListener('action', function(event) {
+      this.userData.meterElem.UpdateMeter();
+    });
+
+    this.box.addEventListener('update', function(event) {
+      this.userData.meterElem.UpdateMeter();
+    });
+
+    this.UpdateMeter();
+
+  }
+  UpdateMeter(){
+    if(this.box.userData.horizontal){
+      this.meter.box.scale.set(this.box.normalizedValue, this.meter.box.scale.y, this.meter.box.scale.z);
+    }else{
+      this.meter.box.scale.set(this.meter.box.scale.x, this.box.normalizedValue, this.meter.box.scale.z);
+    }
   }
 
 };
@@ -3338,6 +3410,19 @@ export function createMouseOverButton(buttonProps){
 export function createMouseOverPortalButton(buttonProps){
   buttonProps.mouseOver = true;
   createPortalButton(buttonProps);
+};
+
+export function createMeter(meterProps) {
+  if(typeof meterProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(meterProps.textProps.font, (font) => {
+      meterProps.textProps.font = font;
+      new MeterWidget(meterProps);
+
+    });
+  }else if(meterProps.textProps.font.isFont){
+    new MeterWidget(meterProps);
+  }
 };
 
 export function createSliderBox(sliderProps) {
