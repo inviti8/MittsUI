@@ -1221,6 +1221,9 @@ export class BaseText {
   LeftBottomCornerTextPos(key){
     this.meshes[key].position.copy(leftBottomCornerPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
   }
+  DeleteTextGeometry(key){
+    this.meshes[key].geometry.dispose();
+  }
   UpdateTextMesh(key, text){
     if(this.meshes[key]==undefined)
       return;
@@ -2175,6 +2178,10 @@ export class BaseWidget extends BaseBox {
     }
     this.widgetText.position.copy(pos);
   }
+  DeleteWidgetText(){
+    this.BaseText.DeleteTextGeometry('widgetText');
+    this.box.remove(this.widgetText);
+  }
   ValueText(){
     const widgetProps = {...this.box.userData.properties};
     widgetProps.boxProps.parent = this.box;
@@ -2332,7 +2339,8 @@ export function sliderProperties(boxProps, name='', horizontal=true, textProps=u
     'useValueText': useValueText,
     'numeric': numeric,
     'valueProps': valueProps,
-    'handleSize': handleSize
+    'handleSize': handleSize,
+    'draggable': true
   }
 };
 
@@ -2340,7 +2348,9 @@ export class SliderWidget extends BaseWidget {
   constructor(widgetProps) {
     widgetProps.textProps.align = 'LEFT';
     super(widgetProps);
-    draggable.push(this.handle);
+    if(widgetProps.draggable){
+      draggable.push(this.handle);
+    }
     
     if(this.box.userData.hasSubObject){
       this.valueTextBox = this.ValueText(this, widgetProps.boxProps, widgetProps, this.size.baseWidth, this.size.baseHeight);
@@ -2484,19 +2494,18 @@ export class SliderWidget extends BaseWidget {
 
 };
 
-export function meterWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true){
+export function meterProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, draggable=true){
   return {
-    'type': 'METER_WIDGET',
+    'type': 'METER',
     'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
-    'defaultColor': defaultColor,
     'textProps': textProps,
     'useValueText': useValueText,
-    'valueProps': numberValueProperties( 0, 0, 255, 0, 0.001, true),
-    'useAlpha': useAlpha,
-    'handleSize': 0,
-    'alpha': alpha
+    'numeric': numeric,
+    'valueProps': valueProps,
+    'handleSize': handleSize,
+    'draggable': draggable
   }
 };
 
@@ -2507,13 +2516,19 @@ export class MeterWidget extends SliderWidget {
     meterBoxProps.width = this.box.userData.size.width;
     meterBoxProps.height = this.box.userData.size.height;
     meterBoxProps.pivot = 'LEFT';
-    if(!this.box.userData.horizontal){
+    if(!widgetProps.horizontal){
       meterBoxProps.pivot = 'BOTTOM';
     }
     meterBoxProps.parent = this.box;
 
     this.meter = new BaseBox(meterBoxProps);
-    this.meter.AlignLeft();
+
+    if(this.box.userData.horizontal){
+      this.meter.AlignLeft();
+    }else{
+      this.meter.AlignBottom();
+    }
+
     this.handleCtrl.MakeBoxMaterialInvisible()
     this.handle.userData.meterElem = this;
     this.box.userData.meterElem = this;
@@ -2539,7 +2554,7 @@ export class MeterWidget extends SliderWidget {
 
 };
 
-export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, alpha=100 ){
+export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true ){
   return {
     'type': 'COLOR_WIDGET',
     'boxProps': boxProps,
@@ -2551,7 +2566,9 @@ export function colorWidgetProperties(boxProps, name='', horizontal=true, defaul
     'valueProps': numberValueProperties( 0, 0, 255, 0, 0.001, true),
     'useAlpha': useAlpha,
     'handleSize': 0,
-    'alpha': alpha
+    'draggable': draggable,
+    'alpha': alpha,
+    'meter': meter
   }
 };
 
@@ -2561,14 +2578,20 @@ export class ColorWidget extends BaseWidget {
     super(colorWidgetProps.base);
     this.value = widgetProps.defaultColor;
 
+    this.colorManipulator = MeterWidget;
+    if(!widgetProps.meter){
+      this.colorManipulator = SliderWidget;
+    }
+
     colorWidgetProps = this.InitColorWidgetProps(colorWidgetProps)
     this.useAlpha = colorWidgetProps.base.useAlpha;
-    this.redSlider = new SliderWidget(colorWidgetProps.red);
-    this.greenSlider = new SliderWidget(colorWidgetProps.green);
-    this.blueSlider = new SliderWidget(colorWidgetProps.blue);
+    this.redSlider = new this.colorManipulator(colorWidgetProps.red);
+    this.greenSlider = new this.colorManipulator(colorWidgetProps.green);
+    this.blueSlider = new this.colorManipulator(colorWidgetProps.blue);
     this.sliders = [this.redSlider, this.greenSlider, this.blueSlider];
+
     if(widgetProps.useAlpha){
-      this.alphaSlider = new SliderWidget(colorWidgetProps.alpha);
+      this.alphaSlider = new this.colorManipulator(colorWidgetProps.alpha);
       this.sliders.push(this.alphaSlider);
     }
 
@@ -2584,6 +2607,10 @@ export class ColorWidget extends BaseWidget {
       slider.box.userData.targetColorElem = this;
       slider.handle.userData.targetColorElem = this;
       slider.valueTextBox.box.userData.targetColorElem = this;
+
+      if(widgetProps.meter){
+        slider.DeleteWidgetText();
+      }
 
       slider.handle.addEventListener('action', function(event) {
         this.userData.targetColorElem.UpdateColor();
