@@ -31,6 +31,9 @@ THREE.Object3D.prototype.updateMatrix = function () {
 
 };
 
+//colors
+const PRIMARY_COLOR = '#4ed8a7';
+const SECONDARY_COLOR = '#cf5270';
 
 const loader = new FontLoader();
 const gltfLoader = new GLTFLoader();
@@ -777,6 +780,30 @@ export function textMeshProperties(curveSegments=12, bevelEnabled=false, bevelTh
     'bevelOffset': bevelOffset,
     'bevelSegments': bevelSegments,
   }
+};
+
+//default widget text mesh properties
+const W_CURVE_SEGMENTS = 12;
+const W_BEVEL_ENABLED = false;
+const W_BEVEL_THICKNESS = 0.1;
+const W_BEVEL_SIZE = 0.1;
+const W_BEVEL_OFFSET = 0;
+const W_BEVEL_SEGMENTS = 3;
+
+export function defaultWidgetTextMeshProperties(){
+  return textMeshProperties(W_CURVE_SEGMENTS, W_BEVEL_ENABLED, W_BEVEL_THICKNESS, W_BEVEL_SIZE, W_BEVEL_OFFSET, W_BEVEL_SEGMENTS)
+}
+
+//default value text mesh properties
+const VT_CURVE_SEGMENTS = 12;
+const VT_BEVEL_ENABLED = false;
+const VT_BEVEL_THICKNESS = 0.1;
+const VT_BEVEL_SIZE = 0.1;
+const VT_BEVEL_OFFSET = 0;
+const VT_BEVEL_SEGMENTS = 3;
+
+export function defaultValueTextMeshProperties(){
+  return textMeshProperties(VT_CURVE_SEGMENTS, VT_BEVEL_ENABLED, VT_BEVEL_THICKNESS, VT_BEVEL_SIZE, VT_BEVEL_OFFSET, VT_BEVEL_SEGMENTS)
 }
 
 export function createTextGeometry(character, font, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments) {
@@ -1102,6 +1129,50 @@ export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, pa
   }
 };
 
+//Default widget text properties
+const W_LETTER_SPACING = 0.02;
+const W_LINE_SPACING = 0.1;
+const W_WORD_SPACING = 0.1;
+const W_TEXT_PADDING = 0.025;
+const W_TEXT_SIZE = 0.05;
+const W_TEXT_HEIGHT = 0.05;
+const W_TEXT_Z_OFFSET = 1;
+const W_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR);
+const W_TEXT_MESH_PROPS = defaultWidgetTextMeshProperties();
+
+export function defaultWidgetTextProperties(font){
+  return textProperties( font, W_LETTER_SPACING, W_LINE_SPACING, W_WORD_SPACING , W_TEXT_PADDING, W_TEXT_SIZE, W_TEXT_HEIGHT, W_TEXT_Z_OFFSET, W_TEXT_MAT_PROPS, W_TEXT_MESH_PROPS);
+};
+
+export function defaultWidgetStencilTextProperties(font){
+  let textProps = defaultWidgetTextProperties(font);
+  textProps.matProps = phongStencilMatProperties(SECONDARY_COLOR);
+
+  return textProps
+};
+
+//Default value text properties
+const VT_LETTER_SPACING = 0.02;
+const VT_LINE_SPACING = 0.1;
+const VT_WORD_SPACING = 0.1;
+const VT_TEXT_PADDING = 0.025;
+const VT_TEXT_SIZE = 0.05;
+const VT_TEXT_HEIGHT = 0.05;
+const VT_TEXT_Z_OFFSET = 1;
+const VT_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR);
+const VT_TEXT_MESH_PROPS = defaultValueTextMeshProperties();
+
+export function defaultValueTextProperties(font){
+  return textProperties( font, VT_LETTER_SPACING, VT_LINE_SPACING, VT_WORD_SPACING , VT_TEXT_PADDING, VT_TEXT_SIZE, VT_TEXT_HEIGHT, VT_TEXT_Z_OFFSET, VT_TEXT_MAT_PROPS, VT_TEXT_MESH_PROPS);
+};
+
+export function defaultStencilValueTextProperties(font){
+  let textProps = defaultValueTextProperties(font);
+  textProps.matProps = phongStencilMatProperties(SECONDARY_COLOR);
+
+  return textProps
+};
+
 export class BaseText {
   constructor(textProps){
     this.textProps = textProps;
@@ -1415,6 +1486,30 @@ export function boxProperties(name, parent, width, height, depth, smoothness, ra
   }
 };
 
+//default widget box constants
+const W_WIDTH = 1.5;
+const W_HEIGHT = 0.25;
+const W_DEPTH = 0.1;
+const W_SMOOTHNESS = 3;
+const W_RADIUS = 0.02;
+const W_Z_OFFSET = 0.025;
+const W_COMPLEX_MESH = true;
+const W_MAT_PROPS = phongMatProperties(PRIMARY_COLOR);
+const W_PIVOT = 'CENTER';
+const W_PADDING = 0;
+const W_IS_PORTAL = false;
+
+export function defaultWidgetBox(name, parent){
+  return boxProperties(name, parent, W_WIDTH, W_HEIGHT, W_DEPTH, W_SMOOTHNESS, W_RADIUS, W_Z_OFFSET, W_COMPLEX_MESH, W_MAT_PROPS, W_PIVOT, W_PADDING, W_IS_PORTAL)
+};
+
+export function defaultPortalWidgetBox(name, parent){
+  let boxProps = defaultWidgetBox(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
 function setGeometryPivot(mesh, boxProps){
   let geomSize = getGeometrySize(mesh.geometry);
   switch (boxProps.pivot) {
@@ -1722,11 +1817,6 @@ export class BaseBox {
   }
 
 }
-
-export function roundedBox(boxProps){
-  return new BaseBox(boxProps).box
-};
-
 
 export function buttonProperties(boxProps, name='Button', value='', textProps=undefined, mouseOver=false, attach='RIGHT'){
   return {
@@ -2119,7 +2209,7 @@ export class BaseWidget extends BaseBox {
     this.BaseText = new BaseText(widgetProps.textProps);
     this.BaseText.SetParent(this.box);
 
-    darkenMaterial(this.box.material, 10);
+    darkenMaterial(this.box.material, 20);
 
     if(this.isPortal){
       zOffset = -1;
@@ -2244,6 +2334,7 @@ class ValueTextWidget extends BaseTextBox{
     let valBoxProps = {...widgetProps.boxProps};
     valBoxProps.isPortal = true;
     let textProps = widgetProps.textProps;
+    textProps.align = 'LEFT';
     let valMatProps = materialProperties('BASIC', widgetProps.textProps.matProps.color, false, 1, THREE.FrontSide, 'STENCIL');
     let size = BaseWidget.CalculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText);
     let defaultVal = widgetProps.valueProps.defaultValue.toString();
@@ -2513,9 +2604,12 @@ export class MeterWidget extends SliderWidget {
   constructor(widgetProps) {
     super(widgetProps);
     const meterBoxProps = {...widgetProps.boxProps}
+    let meterMatProps = {...widgetProps.boxProps.matProps}
+    meterMatProps.color = SECONDARY_COLOR;
     meterBoxProps.width = this.box.userData.size.width;
     meterBoxProps.height = this.box.userData.size.height;
     meterBoxProps.pivot = 'LEFT';
+    meterBoxProps.matProps = meterMatProps;
     if(!widgetProps.horizontal){
       meterBoxProps.pivot = 'BOTTOM';
     }
@@ -2736,8 +2830,21 @@ export function createColorWidget(colorWidgetProps) {
   }else if(colorWidgetProps.textProps.font.isFont){
     new ColorWidget(colorWidgetProps);
   }
-  
-}
+};
+
+export function createColorWidgetPortal(colorWidgetProps) {
+  colorWidgetProps.useValueText = true;
+  colorWidgetProps.boxProps.isPortal = true;
+  if(typeof colorWidgetProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(colorWidgetProps.textProps.font, (font) => {
+      colorWidgetProps.textProps.font = font;
+      new ColorWidget(colorWidgetProps);
+    });
+  }else if(colorWidgetProps.textProps.font.isFont){
+    new ColorWidget(colorWidgetProps);
+  }
+};
 
 export function stringValueProperties(defaultValue='Off', onValue='On', offValue='Off', editable=false){
   return {
@@ -2978,12 +3085,10 @@ export function createStaticTextBox(textBoxProps) {
   }  
 };
 
-
 export function createStaticTextPortal(textBoxProps) {
   textBoxProps = TextBoxWidget.SetupPortalProps(textBoxProps);
   createStaticTextBox(textBoxProps);
 }
-
 
 export function createStaticScrollableTextBox(textBoxProps) {
   textBoxProps.textProps.draggable = true;
@@ -3011,17 +3116,16 @@ export function createMultiTextBox(textBoxProps) {
   }
 };
 
-
 export function createMultiTextPortal(textBoxProps) {
   textBoxProps = TextBoxWidget.SetupPortalProps(textBoxProps);
   createMultiTextBox(textBoxProps);
 };
-//TODO; Fix scrolling
+
 export function createMultiScrollableTextBox(textBoxProps) {
   textBoxProps.textProps.draggable = true;
   createMultiTextBox(textBoxProps);
 };
-//TODO; Fix scrolling
+
 export function createMultiScrollableTextPortal(textBoxProps) {
   textBoxProps = TextBoxWidget.SetupPortalProps(textBoxProps);
   createMultiScrollableTextBox(textBoxProps);
@@ -3452,6 +3556,11 @@ export function createMeter(meterProps) {
   }
 };
 
+export function createMeterPortal(meterProps) {
+  meterProps.boxProps.isPortal = true;
+  createMeter(meterProps);
+};
+
 export function createSliderBox(sliderProps) {
   if(typeof sliderProps.textProps.font === 'string'){
     // Load the font
@@ -3463,6 +3572,11 @@ export function createSliderBox(sliderProps) {
   }else if(sliderProps.textProps.font.isFont){
     new SliderWidget(sliderProps);
   }
+};
+
+export function createSliderPortal(sliderProps) {
+  sliderProps.boxProps.isPortal = true;
+  createSliderBox(sliderProps);
 };
 
 function ToggleBox(toggleProps){
