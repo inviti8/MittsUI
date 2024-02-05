@@ -1486,25 +1486,43 @@ export function boxProperties(name, parent, width, height, depth, smoothness, ra
   }
 };
 
+//default box geometry constants
+const SMOOTHNESS = 3;
+const RADIUS = 0.02;
+const Z_OFFSET = 0.025;
+const COMPLEX_MESH = true;
+const MAT_PROPS = phongMatProperties(PRIMARY_COLOR);
+const PIVOT = 'CENTER';
+const PADDING = 0;
+const IS_PORTAL = false;
+
 //default widget box constants
 const W_WIDTH = 1.5;
 const W_HEIGHT = 0.25;
 const W_DEPTH = 0.1;
-const W_SMOOTHNESS = 3;
-const W_RADIUS = 0.02;
-const W_Z_OFFSET = 0.025;
-const W_COMPLEX_MESH = true;
-const W_MAT_PROPS = phongMatProperties(PRIMARY_COLOR);
-const W_PIVOT = 'CENTER';
-const W_PADDING = 0;
-const W_IS_PORTAL = false;
 
-export function defaultWidgetBox(name, parent){
-  return boxProperties(name, parent, W_WIDTH, W_HEIGHT, W_DEPTH, W_SMOOTHNESS, W_RADIUS, W_Z_OFFSET, W_COMPLEX_MESH, W_MAT_PROPS, W_PIVOT, W_PADDING, W_IS_PORTAL)
+export function defaultWidgetBoxProps(name, parent){
+  return boxProperties(name, parent, W_WIDTH, W_HEIGHT, W_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
-export function defaultPortalWidgetBox(name, parent){
-  let boxProps = defaultWidgetBox(parent);
+export function defaultWidgetPortalProps(name, parent){
+  let boxProps = defaultWidgetBoxProps(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
+//default panel widget box constants
+const PW_WIDTH = 1.7;
+const PW_HEIGHT = 0.35;
+const PW_DEPTH = 0.1;
+
+export function defaultPanelWidgetBoxProps(name, parent){
+  return boxProperties(name, parent, PW_WIDTH, PW_HEIGHT, PW_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+};
+
+export function defaultPanelWidgetPortalProps(name, parent){
+  let boxProps = defaultPanelWidgetBoxProps(parent);
   boxProps.isPortal = true;
 
   return boxProps
@@ -1541,7 +1559,6 @@ function setGeometryPivot(mesh, boxProps){
       mesh.pivot = new THREE.Vector3(0, 0, 0);
   }
 }
-
 
 export class BaseBox {
   constructor(boxProps) {
@@ -1873,6 +1890,13 @@ class BaseTextBox extends BaseBox {
   }
 }
 
+export class PanelLabel extends BaseTextBox {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.AlignOutsideBehindParent();
+  }
+};
+
 //value types: container, controls, label, edit_text, toggle, int_slider, float_slider
 export function panelSectionProperties(name='Section', value_type='container', data={}){
   return {
@@ -1914,6 +1938,7 @@ export class BasePanel extends BaseTextBox {
     this.isSubPanel = panelProps.isSubPanel;
     this.panelList = [];
     this.controlList = [];
+
     if(this.isSubPanel){
       this.subPanelMaterial = panelProps.topCtrl.subPanelMaterial;
       this.handleMaterial = panelProps.topCtrl.handleMaterial;
@@ -2084,14 +2109,12 @@ export class BasePanel extends BaseTextBox {
       let sectionProps = {...panelProps};
       sectionProps.name = name;
       sectionProps.isSubPanel = true;
-      sectionProps.boxProps.parent = this.box;
+      sectionProps.boxProps = defaultPanelWidgetBoxProps('panel-box-'+index.toString(), this.box);
       let widget = undefined;
 
       switch (sect.value_type) {
         case 'label':
-          let btnProps = buttonProperties(sectionProps.boxProps, name, '', sectionProps.textProps)
-          widget = new BaseTextBox(btnProps);
-          widget.AlignOutsideBehindParent();
+          widget = new PanelLabel(sectionProps);
           this.controlList.push(widget);
           this.box.userData.widgetElements.push(widget.box);
           break;
@@ -2106,6 +2129,12 @@ export class BasePanel extends BaseTextBox {
           break;
         case 'float_slider':
           console.log('float_slider');
+          break;
+        case 'meter':
+          console.log('meter');
+          break;
+        case 'color_widget':
+          console.log('color_widget');
           break;
         default:
           console.log('X');
@@ -2835,15 +2864,7 @@ export function createColorWidget(colorWidgetProps) {
 export function createColorWidgetPortal(colorWidgetProps) {
   colorWidgetProps.useValueText = true;
   colorWidgetProps.boxProps.isPortal = true;
-  if(typeof colorWidgetProps.textProps.font === 'string'){
-    // Load the font
-    loader.load(colorWidgetProps.textProps.font, (font) => {
-      colorWidgetProps.textProps.font = font;
-      new ColorWidget(colorWidgetProps);
-    });
-  }else if(colorWidgetProps.textProps.font.isFont){
-    new ColorWidget(colorWidgetProps);
-  }
+  createColorWidget(colorWidgetProps);
 };
 
 export function stringValueProperties(defaultValue='Off', onValue='On', offValue='Off', editable=false){
