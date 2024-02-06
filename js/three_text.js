@@ -1135,7 +1135,7 @@ const W_LINE_SPACING = 0.1;
 const W_WORD_SPACING = 0.1;
 const W_TEXT_PADDING = 0.025;
 const W_TEXT_SIZE = 0.05;
-const W_TEXT_HEIGHT = 0.05;
+const W_TEXT_HEIGHT = 0.01;
 const W_TEXT_Z_OFFSET = 1;
 const W_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR);
 const W_TEXT_MESH_PROPS = defaultWidgetTextMeshProperties();
@@ -1528,6 +1528,54 @@ export function defaultPanelWidgetPortalProps(name, parent){
   return boxProps
 };
 
+//default panel widget box constants
+const PIT_WIDTH = 1.5;
+const PIT_HEIGHT = 0.25;
+const PIT_DEPTH = 0.1;
+
+export function defaultPanelEditTextBoxProps(name, parent){
+  return boxProperties(name, parent, PIT_WIDTH, PIT_HEIGHT, PIT_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+};
+
+export function defaultPanelEditTextPortalProps(name, parent){
+  let boxProps = defaultPanelEditTextBoxProps(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
+//default panel widget box constants
+const EDTBTN_WIDTH = 1;
+const EDTBTN_HEIGHT = 0.25;
+const EDTBTN_DEPTH = 0.01;
+
+export function defaultEditTextButtonBoxProps(name, parent){
+  return boxProperties(name, parent, EDTBTN_WIDTH, EDTBTN_HEIGHT, EDTBTN_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+};
+
+export function defaultEditTextButtonPortalProps(name, parent){
+  let boxProps = defaultEditTextButtonBoxProps(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
+//default panel widget box constants
+const PTGL_WIDTH = 1;
+const PTGL_HEIGHT = 0.25;
+const PTGL_DEPTH = 0.01;
+
+export function defaultPanelToggleBoxProps(name, parent){
+  return boxProperties(name, parent, PTGL_WIDTH, PTGL_HEIGHT, PTGL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+};
+
+export function defaultPanelTogglePortalProps(name, parent){
+  let boxProps = defaultPanelToggleBoxProps(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
 function setGeometryPivot(mesh, boxProps){
   let geomSize = getGeometrySize(mesh.geometry);
   switch (boxProps.pivot) {
@@ -1849,6 +1897,8 @@ export function buttonProperties(boxProps, name='Button', value='', textProps=un
 
 class BaseTextBox extends BaseBox {
   constructor(buttonProps) {
+    console.log('@@@@@@@@@@@@@@@@@@@')
+    console.log(buttonProps)
     super(buttonProps.boxProps);
 
     this.text = buttonProps.name;
@@ -1888,9 +1938,53 @@ class BaseTextBox extends BaseBox {
     this.BaseText.ParentText('btn_text');
     this.BaseText.AlignTextPos('btn_text');
   }
+  DeleteText(){
+    this.textMesh.geometry.dispose();
+    this.box.remove(this.textMesh);
+  }
 }
 
 export class PanelLabel extends BaseTextBox {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.AlignOutsideBehindParent();
+  }
+};
+
+export class PanelEditText extends BaseTextBox {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.DeleteText();
+    this.AlignOutsideBehindParent();
+    const editTextProps = defaultPanelEditTextProps(panelProps.name, this.box, panelProps.textProps.font);
+    this.ctrlWidget = new InputTextWidget(editTextProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+  }
+};
+
+export class PanelInputText extends BaseTextBox {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.DeleteText();
+    this.AlignOutsideBehindParent();
+    const inputTextProps = defaultPanelInputTextProps(panelProps.name, this.box, panelProps.textProps.font);
+    this.ctrlWidget = new InputTextWidget(inputTextProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+  }
+};
+
+export class PanelBooleanToggle extends BaseTextBox {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.DeleteText();
+    this.AlignOutsideBehindParent();
+    const toggleProps = defaultPanelBooleanToggleProps(panelProps.name, this.box, panelProps.textProps.font);
+    this.ctrlWidget = new ToggleWidget(toggleProps);
+
+  }
+};
+
+export class PanelIntSlider extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.AlignOutsideBehindParent();
@@ -1941,10 +2035,13 @@ export class BasePanel extends BaseTextBox {
 
     if(this.isSubPanel){
       this.subPanelMaterial = panelProps.topCtrl.subPanelMaterial;
+      this.ctrlPanelMaterial = panelProps.topCtrl.ctrlPanelMaterial;
       this.handleMaterial = panelProps.topCtrl.handleMaterial;
     }else{
       this.subPanelMaterial = getMaterial(this.matProps, this.matProps.stencilRef);
       darkenMaterial(this.subPanelMaterial, 10);
+      this.ctrlPanelMaterial = getMaterial(this.matProps, this.matProps.stencilRef);
+      darkenMaterial(this.ctrlPanelMaterial, 20);
       this.handleMaterial = this.CreateComplemetaryColorMaterial(this.matProps);
     }
 
@@ -2110,19 +2207,20 @@ export class BasePanel extends BaseTextBox {
       sectionProps.name = name;
       sectionProps.isSubPanel = true;
       sectionProps.boxProps = defaultPanelWidgetBoxProps('panel-box-'+index.toString(), this.box);
-      let widget = undefined;
+      let ctrlBox = undefined;
 
       switch (sect.value_type) {
         case 'label':
-          widget = new PanelLabel(sectionProps);
-          this.controlList.push(widget);
-          this.box.userData.widgetElements.push(widget.box);
+          ctrlBox = new PanelLabel(sectionProps);
           break;
         case 'edit_text':
-          console.log('edit_text');
+          ctrlBox = new PanelEditText(sectionProps);
           break;
-        case 'toggle':
-          console.log('toggle');
+        case 'input_text':
+          ctrlBox = new PanelInputText(sectionProps);
+          break;
+        case 'boolean_toggle':
+          ctrlBox = new PanelBooleanToggle(sectionProps);
           break;
         case 'int_slider':
           console.log('int_slider');
@@ -2140,13 +2238,16 @@ export class BasePanel extends BaseTextBox {
           console.log('X');
       }
 
+      this.controlList.push(ctrlBox);
+      this.box.userData.widgetElements.push(ctrlBox.box);
 
       let bottomHeight = this.bottom.height;
       let yPos =  -(this.height)*index;
-      widget.box.userData.index = index;
-      widget.box.userData.expandedPos = new THREE.Vector3(widget.box.position.x, yPos, widget.box.position.z);
-      widget.box.userData.closedPos = new THREE.Vector3().copy(widget.box.position);
-      widgetHeight = widget.box.userData.height;
+      ctrlBox.ReplaceMaterial(this.ctrlPanelMaterial);
+      ctrlBox.box.userData.index = index;
+      ctrlBox.box.userData.expandedPos = new THREE.Vector3(ctrlBox.box.position.x, yPos, ctrlBox.box.position.z);
+      ctrlBox.box.userData.closedPos = new THREE.Vector3().copy(ctrlBox.box.position);
+      widgetHeight = ctrlBox.box.userData.height;
       
       index += 1;
     }
@@ -2297,6 +2398,10 @@ export class BaseWidget extends BaseBox {
     }
     this.widgetText.position.copy(pos);
   }
+  Recenter(width){
+    this.box.translateX(-width/2);
+    this.widgetText.translateX(width/2);
+  }
   DeleteWidgetText(){
     this.BaseText.DeleteTextGeometry('widgetText');
     this.box.remove(this.widgetText);
@@ -2308,6 +2413,8 @@ export class BaseWidget extends BaseBox {
     const valBox = new ValueTextWidget(widgetProps);
     darkenMaterial(valBox.box.material, 30);
     this.box.userData.valueBox = valBox.box;
+
+    this.Recenter(valBox.width);
 
     if(widgetProps.horizontal){
       valBox.AlignOutsideRight();
@@ -2891,6 +2998,12 @@ export function toggleProperties(boxProps, name='', horizontal=true, on=false, t
   }
 };
 
+export function defaultPanelBooleanToggleProps(name, parent, font, on=false){
+  const boxProps = defaultPanelToggleBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+  return toggleProperties(boxProps, name, true, on, textProps);
+}
+
 export class ToggleWidget extends BaseWidget {
   constructor(widgetProps) {
 
@@ -3176,13 +3289,16 @@ export function editTextProperties(cBox, text, textMesh, font, size, height, zOf
 export class InputTextWidget extends BaseWidget {
   constructor(textInputProps) {
     const props = InputTextWidget.CalculateBoxProps(textInputProps);
-    const inputBoxProps = props.inputBoxProps;
-    const btnBoxProps = props.btnBoxProps;
-    textInputProps.buttonProps.boxProps = btnBoxProps;
+    let inputBoxProps = props.inputBoxProps;
+    let btnBoxProps = undefined;
+    if(textInputProps.buttonProps != undefined){
+      btnBoxProps = props.btnBoxProps;
+      textInputProps.buttonProps.boxProps = btnBoxProps;
+    }
+    
     const textProps = textInputProps.textProps;
     let widgetProps = widgetProperties(inputBoxProps, textInputProps.name, true, true, textProps, false, undefined, textInputProps.listConfig, 0)
     super(widgetProps);
-    textInputProps.buttonProps.boxProps.parent = this.box;
     this.BaseText.SetParent(this.box);
     this.inputText = this.BaseText.NewTextMesh('inputText', 'Enter Text');
     setupStencilChildMaterial(this.inputText.material, this.box.material.stencilRef);
@@ -3190,9 +3306,12 @@ export class InputTextWidget extends BaseWidget {
     this.inputTextSize = this.inputText.userData.size;
     this.box.userData.properties = textInputProps;
     this.inputBoxProps = inputBoxProps;
-    this.btnBoxProps = btnBoxProps;
-    this.buttonProps = textInputProps.buttonProps;
-
+    if(btnBoxProps!=undefined){
+      textInputProps.buttonProps.boxProps.parent = this.box;
+      this.btnBoxProps = btnBoxProps;
+      this.buttonProps = textInputProps.buttonProps;
+    }
+    
     mouseOverable.push(this.inputText);
 
     if(this.buttonProps != undefined){
@@ -3223,6 +3342,7 @@ export class InputTextWidget extends BaseWidget {
     }else{
       btn = PortalButtonElement(this.buttonProps);
     }
+    this.Recenter(this.btnBoxProps.width);
 
     if(this.box.userData.properties.buttonProps.attach == 'RIGHT'){
       btn.AlignOutsideRight();
@@ -3292,6 +3412,20 @@ export function textInputProperties(boxProps=undefined, name='', textProps=undef
     'draggable': draggable
   }
 };
+
+export function defaultPanelEditTextProps(name, parent, font){
+  const boxProps = defaultPanelEditTextBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+  return textInputProperties(boxProps, name, textProps);
+}
+
+export function defaultPanelInputTextProps(name, parent, font){
+  const boxProps = defaultPanelEditTextBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+  const btnBoxProps = defaultEditTextButtonBoxProps(name, parent);
+  const btnProps = buttonProperties(btnBoxProps, name, '', textProps)
+  return textInputProperties(boxProps, name, textProps, btnProps);
+}
 
 export function createTextInput(textInputProps) {
   textInputProps.textProps.editText = true;
