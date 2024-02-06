@@ -1528,13 +1528,15 @@ export function defaultPanelWidgetPortalProps(name, parent){
   return boxProps
 };
 
+//default panel ctrl widget constants
+const PCTRL_HEIGHT = 0.18;
+const PCTRL_DEPTH = 0.01;
+
 //default panel widget box constants
 const PIT_WIDTH = 1.5;
-const PIT_HEIGHT = 0.25;
-const PIT_DEPTH = 0.1;
 
 export function defaultPanelEditTextBoxProps(name, parent){
-  return boxProperties(name, parent, PIT_WIDTH, PIT_HEIGHT, PIT_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, PIT_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultPanelEditTextPortalProps(name, parent){
@@ -1546,11 +1548,9 @@ export function defaultPanelEditTextPortalProps(name, parent){
 
 //default panel widget box constants
 const EDTBTN_WIDTH = 1;
-const EDTBTN_HEIGHT = 0.25;
-const EDTBTN_DEPTH = 0.01;
 
 export function defaultEditTextButtonBoxProps(name, parent){
-  return boxProperties(name, parent, EDTBTN_WIDTH, EDTBTN_HEIGHT, EDTBTN_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, EDTBTN_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultEditTextButtonPortalProps(name, parent){
@@ -1560,17 +1560,42 @@ export function defaultEditTextButtonPortalProps(name, parent){
   return boxProps
 };
 
-//default panel widget box constants
+//default panel toggle box constants
 const PTGL_WIDTH = 1;
-const PTGL_HEIGHT = 0.25;
-const PTGL_DEPTH = 0.01;
 
 export function defaultPanelToggleBoxProps(name, parent){
-  return boxProperties(name, parent, PTGL_WIDTH, PTGL_HEIGHT, PTGL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, PTGL_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultPanelTogglePortalProps(name, parent){
   let boxProps = defaultPanelToggleBoxProps(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
+//default panel toggle box constants
+const PSL_WIDTH = 1.2;
+
+export function defaultPanelSliderBoxProps(name, parent){
+  return boxProperties(name, parent, PSL_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+};
+
+export function defaultPanelSliderPortalProps(name, parent){
+  let boxProps = defaultPanelSliderBoxProps(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
+const CW_HEIGHT = 0.3;
+
+export function defaultPanelColorWidgetBoxProps(name, parent){
+  return boxProperties(name, parent, W_WIDTH, CW_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+};
+
+export function defaultPanelColorWidgetPortalProps(name, parent){
+  let boxProps = defaultPanelColorWidgetBoxProps(parent);
   boxProps.isPortal = true;
 
   return boxProps
@@ -1897,8 +1922,6 @@ export function buttonProperties(boxProps, name='Button', value='', textProps=un
 
 class BaseTextBox extends BaseBox {
   constructor(buttonProps) {
-    console.log('@@@@@@@@@@@@@@@@@@@')
-    console.log(buttonProps)
     super(buttonProps.boxProps);
 
     this.text = buttonProps.name;
@@ -1944,50 +1967,89 @@ class BaseTextBox extends BaseBox {
   }
 }
 
-export class PanelLabel extends BaseTextBox {
+export class PanelBox extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.AlignOutsideBehindParent();
   }
 };
 
-export class PanelEditText extends BaseTextBox {
+export class PanelLabel extends PanelBox {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+  }
+};
+
+export class PanelEditText extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.DeleteText();
-    this.AlignOutsideBehindParent();
     const editTextProps = defaultPanelEditTextProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new InputTextWidget(editTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
 };
 
-export class PanelInputText extends BaseTextBox {
+export class PanelInputText extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.DeleteText();
-    this.AlignOutsideBehindParent();
     const inputTextProps = defaultPanelInputTextProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new InputTextWidget(inputTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
 };
 
-export class PanelBooleanToggle extends BaseTextBox {
+export class PanelBooleanToggle extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.DeleteText();
-    this.AlignOutsideBehindParent();
     const toggleProps = defaultPanelBooleanToggleProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new ToggleWidget(toggleProps);
 
   }
 };
 
-export class PanelIntSlider extends BaseTextBox {
+export class PanelSlider extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
-    this.AlignOutsideBehindParent();
+    this.DeleteText();
+    const section = panelProps.sections.data[panelProps.index];
+    const valProps = section.data;
+    const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    this.ctrlWidget = new SliderWidget(sliderProps);
+
+  }
+};
+
+export class PanelMeter extends PanelBox {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.DeleteText();
+    const section = panelProps.sections.data[panelProps.index];
+    const valProps = section.data;
+    const sliderProps = defaultPanelMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    this.ctrlWidget = new MeterWidget(sliderProps);
+  }
+};
+
+export class PanelValueMeter extends PanelBox {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.DeleteText();
+    const section = panelProps.sections.data[panelProps.index];
+    const valProps = section.data;
+    const sliderProps = defaultPanelValueMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    this.ctrlWidget = new MeterWidget(sliderProps);
+  }
+};
+
+export class PanelColorWidget extends PanelBox {
+  constructor(panelProps) {
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.DeleteText();
+    const colorWidgetProps = defaultPanelColorWidgetProps(panelProps.name, this.box, panelProps.textProps.font);
+    this.ctrlWidget = new ColorWidget(colorWidgetProps);
   }
 };
 
@@ -2013,7 +2075,8 @@ export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT
     'expanded': expanded,
     'isSubPanel': isSubPanel,
     'topPanel': topPanel,
-    'topCtrl': topCtrl
+    'topCtrl': topCtrl,
+    'index': 0
   }
 };
 
@@ -2207,6 +2270,7 @@ export class BasePanel extends BaseTextBox {
       sectionProps.name = name;
       sectionProps.isSubPanel = true;
       sectionProps.boxProps = defaultPanelWidgetBoxProps('panel-box-'+index.toString(), this.box);
+      sectionProps.index = index;
       let ctrlBox = undefined;
 
       switch (sect.value_type) {
@@ -2222,17 +2286,17 @@ export class BasePanel extends BaseTextBox {
         case 'boolean_toggle':
           ctrlBox = new PanelBooleanToggle(sectionProps);
           break;
-        case 'int_slider':
-          console.log('int_slider');
-          break;
-        case 'float_slider':
-          console.log('float_slider');
+        case 'slider':
+          ctrlBox = new PanelSlider(sectionProps);
           break;
         case 'meter':
-          console.log('meter');
+          ctrlBox = new PanelMeter(sectionProps);
+          break;
+        case 'value_meter':
+          ctrlBox = new PanelValueMeter(sectionProps);
           break;
         case 'color_widget':
-          console.log('color_widget');
+          ctrlBox = new PanelColorWidget(sectionProps);
           break;
         default:
           console.log('X');
@@ -2465,6 +2529,22 @@ export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, s
   }
 };
 
+export function intValueProperties( defaultValue=0, min=0, max=1){
+  return numberValueProperties( defaultValue, min, max, 0, 0.001, false)
+};
+
+export function intValuePropertiesEditable( defaultValue=0, min=0, max=1){
+  return numberValueProperties( defaultValue, min, max, 0, 0.001, true)
+};
+
+export function floatValueProperties( defaultValue=0, min=0, max=1){
+  return numberValueProperties( defaultValue, min, max, 3, 0.001, false)
+};
+
+export function floatValuePropertiesEditable( defaultValue=0, min=0, max=1){
+  return numberValueProperties( defaultValue, min, max, 3, 0.001, true)
+};
+
 class ValueTextWidget extends BaseTextBox{
   constructor(widgetProps) {
     let valBoxProps = {...widgetProps.boxProps};
@@ -2571,11 +2651,17 @@ export function sliderProperties(boxProps, name='', horizontal=true, textProps=u
   }
 };
 
+export function defaultPanelSliderProps(name, parent, font, valueProps){
+  const boxProps = defaultPanelSliderBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+  return sliderProperties(boxProps, name, true, textProps, true, true, valueProps)
+};
+
 export class SliderWidget extends BaseWidget {
   constructor(widgetProps) {
     widgetProps.textProps.align = 'LEFT';
     super(widgetProps);
-    if(widgetProps.draggable){
+    if(widgetProps.valueProps.editable){
       draggable.push(this.handle);
     }
     
@@ -2640,7 +2726,6 @@ export class SliderWidget extends BaseWidget {
   }
   SliderValue(){
     let coord = 'x';
-    let valBoxSize = this.box.userData.valueBox.userData.size;
     let divider = (this.box.userData.size.width-this.handle.userData.size.width);
 
     if(!this.handle.userData.horizontal){
@@ -2736,12 +2821,23 @@ export function meterProperties(boxProps, name='', horizontal=true, textProps=un
   }
 };
 
+export function defaultPanelMeterProps(name, parent, font, valueProps){
+  const boxProps = defaultPanelSliderBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+  return meterProperties(boxProps, name, true, textProps, false, true, valueProps)
+};
+
+export function defaultPanelValueMeterProps(name, parent, font, valueProps){
+  const boxProps = defaultPanelSliderBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+  return meterProperties(boxProps, name, true, textProps, true, true, valueProps)
+};
+
 export class MeterWidget extends SliderWidget {
   constructor(widgetProps) {
     super(widgetProps);
     const meterBoxProps = {...widgetProps.boxProps}
     let meterMatProps = {...widgetProps.boxProps.matProps}
-    meterMatProps.color = SECONDARY_COLOR;
     meterBoxProps.width = this.box.userData.size.width;
     meterBoxProps.height = this.box.userData.size.height;
     meterBoxProps.pivot = 'LEFT';
@@ -2781,6 +2877,9 @@ export class MeterWidget extends SliderWidget {
       this.meter.box.scale.set(this.meter.box.scale.x, this.box.normalizedValue, this.meter.box.scale.z);
     }
   }
+  SetMeterColor(color){
+    this.meter.material.color = color;
+  }
 
 };
 
@@ -2800,6 +2899,12 @@ export function colorWidgetProperties(boxProps, name='', horizontal=true, defaul
     'alpha': alpha,
     'meter': meter
   }
+};
+
+export function defaultPanelColorWidgetProps(name, parent, font){
+  const boxProps = defaultPanelColorWidgetBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+  return colorWidgetProperties(boxProps, name, true, '#ffffff', textProps)
 };
 
 export class ColorWidget extends BaseWidget {
