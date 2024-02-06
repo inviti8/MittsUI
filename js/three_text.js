@@ -1133,9 +1133,9 @@ export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, pa
 const W_LETTER_SPACING = 0.02;
 const W_LINE_SPACING = 0.1;
 const W_WORD_SPACING = 0.1;
-const W_TEXT_PADDING = 0.025;
-const W_TEXT_SIZE = 0.05;
-const W_TEXT_HEIGHT = 0.01;
+const W_TEXT_PADDING = 0.015;
+const W_TEXT_SIZE = 0.03;
+const W_TEXT_HEIGHT = 0.005;
 const W_TEXT_Z_OFFSET = 1;
 const W_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR);
 const W_TEXT_MESH_PROPS = defaultWidgetTextMeshProperties();
@@ -1271,11 +1271,17 @@ export class BaseText {
       this.LeftTextPos(key)
     }
   }
+  AlignTextZOuterBox(key, boxSize){
+    this.meshes[key].position.copy(new THREE.Vector3(this.meshes[key].position.x, this.meshes[key].position.y, boxSize.depth/2));
+  }
   CenterTopTextPos(key){
     this.meshes[key].position.copy(topCenterPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
   }
   CenterTopOutsideTextPos(key){
     this.meshes[key].position.copy(topCenterOutsidePos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
+  }
+  CenterTopOutsideChildTextPos(key, childSize){
+    this.meshes[key].position.copy(topCenterOutsidePos(childSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
   }
   CenterBottomTextPos(key){
     this.meshes[key].position.copy(bottomCenterPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
@@ -1514,7 +1520,7 @@ export function defaultWidgetPortalProps(name, parent){
 
 //default panel widget box constants
 const PW_WIDTH = 1.7;
-const PW_HEIGHT = 0.35;
+const PW_HEIGHT = 0.25;
 const PW_DEPTH = 0.1;
 
 export function defaultPanelWidgetBoxProps(name, parent){
@@ -1529,7 +1535,7 @@ export function defaultPanelWidgetPortalProps(name, parent){
 };
 
 //default panel ctrl widget constants
-const PCTRL_HEIGHT = 0.18;
+const PCTRL_HEIGHT = 0.13;
 const PCTRL_DEPTH = 0.01;
 
 //default panel widget box constants
@@ -1588,7 +1594,7 @@ export function defaultPanelSliderPortalProps(name, parent){
   return boxProps
 };
 
-const CW_HEIGHT = 0.3;
+const CW_HEIGHT = 0.25;
 
 export function defaultPanelColorWidgetBoxProps(name, parent){
   return boxProperties(name, parent, W_WIDTH, CW_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
@@ -1596,6 +1602,21 @@ export function defaultPanelColorWidgetBoxProps(name, parent){
 
 export function defaultPanelColorWidgetPortalProps(name, parent){
   let boxProps = defaultPanelColorWidgetBoxProps(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
+//default panel gltf model box props
+const PGL_WIDTH = 0.15;
+const PGL_HEIGHT = 0.15;
+
+export function defaultPanelGltfModelBoxProps(name, parent){
+  return boxProperties(name, parent, PGL_WIDTH, PGL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+};
+
+export function defaultPanelGltfModelPortalProps(name, parent){
+  let boxProps = defaultPanelGltfModelBoxProps(parent);
   boxProps.isPortal = true;
 
   return boxProps
@@ -1970,20 +1991,56 @@ class BaseTextBox extends BaseBox {
 export class PanelBox extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.DeleteText();
     this.AlignOutsideBehindParent();
   }
 };
 
-export class PanelLabel extends PanelBox {
+export class PanelLabel extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.AlignOutsideBehindParent();
+  }
+};
+
+export class PanelGltfModel extends BaseTextBox {
+  constructor(panelProps) {
+    panelProps.boxProps.matProps.useCase = 'STENCIL';
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.AlignOutsideBehindParent();
+    const section = panelProps.sections.data[panelProps.index];
+    let valProps = section.data;
+    this.useLabel = valProps.useLabel;
+    if(!valProps.useLabel){
+      this.DeleteText();
+    }
+    let gltfProps = defaultPanelGltfModelProps(panelProps.name, this.box, panelProps.textProps.font, valProps.path);
+    gltfProps.ctrl = this;
+
+    gltfLoader.load( gltfProps.gltf,function ( gltf ) {
+        gltfProps.gltf = gltf;
+        gltfProps.ctrl.ctrlWidget = new GLTFModelWidget(gltfProps);
+        gltfProps.ctrl.box.userData.ctrlWidget = gltfProps.ctrl.ctrlWidget;
+        if(gltfProps.ctrl.useLabel){
+          gltfProps.ctrl.BaseText.CenterTopOutsideChildTextPos('btn_text', gltfProps.ctrl.ctrlWidget.size);
+          gltfProps.ctrl.BaseText.AlignTextZOuterBox('btn_text', gltfProps.ctrl.size);
+        }
+      },
+      // called while loading is progressing
+      function ( xhr ) {
+        console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );
+      },
+      // called when loading has errors
+      function ( error ) {
+        console.log( error );
+      }
+    );
   }
 };
 
 export class PanelEditText extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
-    this.DeleteText();
     const editTextProps = defaultPanelEditTextProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new InputTextWidget(editTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -1993,7 +2050,6 @@ export class PanelEditText extends PanelBox {
 export class PanelInputText extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
-    this.DeleteText();
     const inputTextProps = defaultPanelInputTextProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new InputTextWidget(inputTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -2013,7 +2069,6 @@ export class PanelBooleanToggle extends PanelBox {
 export class PanelSlider extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
-    this.DeleteText();
     const section = panelProps.sections.data[panelProps.index];
     const valProps = section.data;
     const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
@@ -2025,7 +2080,6 @@ export class PanelSlider extends PanelBox {
 export class PanelMeter extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
-    this.DeleteText();
     const section = panelProps.sections.data[panelProps.index];
     const valProps = section.data;
     const sliderProps = defaultPanelMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
@@ -2036,7 +2090,6 @@ export class PanelMeter extends PanelBox {
 export class PanelValueMeter extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
-    this.DeleteText();
     const section = panelProps.sections.data[panelProps.index];
     const valProps = section.data;
     const sliderProps = defaultPanelValueMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
@@ -2047,7 +2100,6 @@ export class PanelValueMeter extends PanelBox {
 export class PanelColorWidget extends PanelBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
-    this.DeleteText();
     const colorWidgetProps = defaultPanelColorWidgetProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new ColorWidget(colorWidgetProps);
   }
@@ -2297,6 +2349,9 @@ export class BasePanel extends BaseTextBox {
           break;
         case 'color_widget':
           ctrlBox = new PanelColorWidget(sectionProps);
+          break;
+        case 'gltf':
+          ctrlBox = new PanelGltfModel(sectionProps);
           break;
         default:
           console.log('X');
@@ -2883,7 +2938,33 @@ export class MeterWidget extends SliderWidget {
 
 };
 
-export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true ){
+
+
+export class ColorHandler {
+  constructor(colorProps) {
+    this.colorProps = colorProps;
+    this.defaultColor = this.ColorObject(colorProps.defaultColor);
+    this.color = this.ColorObject(colorProps.defaultColor);
+  }
+  ColorObject(color){
+    let result = undefined;
+    if(typeof color === 'string'){
+      result = colorsea(color, 100);
+    }else if(color.constructor === Array){
+      if(color.length == 3){
+        const colorStr = 'rgb('+color[0]+', '+color[1]+', '+color[2]+')';
+        result = colorsea(colorStr, 100);
+      }else if(color.length == 4){
+        const colorStr = 'rgba('+color[0]+', '+color[1]+', '+color[2]+','+color[3]+'%)';
+        result = colorsea(colorStr, 100);
+      }
+    }
+
+    return result
+  }
+};
+
+export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex' ){
   return {
     'type': 'COLOR_WIDGET',
     'boxProps': boxProps,
@@ -2897,7 +2978,8 @@ export function colorWidgetProperties(boxProps, name='', horizontal=true, defaul
     'handleSize': 0,
     'draggable': draggable,
     'alpha': alpha,
-    'meter': meter
+    'meter': meter,
+    'colorValueType': colorValueType
   }
 };
 
@@ -2917,6 +2999,8 @@ export class ColorWidget extends BaseWidget {
     if(!widgetProps.meter){
       this.colorManipulator = SliderWidget;
     }
+
+    this.ColorHandler = new ColorHandler(widgetProps);
 
     colorWidgetProps = this.InitColorWidgetProps(colorWidgetProps)
     this.useAlpha = colorWidgetProps.base.useAlpha;
@@ -3946,6 +4030,16 @@ export function createImageBox(imageProps){
   }
 };
 
+export function modelValueProperties(path=0, rotX=false, rotY=false, useLabel=true){
+  return {
+    'type': 'MODEL_VALUE_PROPS',
+    'path': path,
+    'rotX': rotX,
+    'rotY': rotY,
+    'useLabel': useLabel
+  }
+};
+
 export function gltfProperties(boxProps, name='', gltf=undefined, listConfig=undefined, zOffset=0){
   return {
     'type': 'GLTF',
@@ -3956,6 +4050,13 @@ export function gltfProperties(boxProps, name='', gltf=undefined, listConfig=und
     'zOffset': zOffset
   }
 };
+
+export function defaultPanelGltfModelProps(name, parent, font, modelPath){
+  const boxProps = defaultPanelGltfModelBoxProps(name, parent);
+  boxProps.isPortal = true;
+  const textProps = defaultWidgetTextProperties(font);
+  return gltfProperties(boxProps, name, modelPath)
+}
 
 export class GLTFModelWidget extends BaseWidget {
   constructor(gltfProps) {
