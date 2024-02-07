@@ -511,6 +511,14 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
         gsap.to(current.scale, props);
       }
 
+      if(elem.userData.hoverZPos!=undefined){
+        let props = {duration: duration, x: elem.position.x, y: elem.position.y, z: elem.userData.defaultZPos}
+        if(elem.userData.open){
+          props = {duration: duration, x: elem.position.x, y: elem.position.y, z:elem.userData.hoverZPos};
+        }
+        gsap.to(elem.position, props);
+      }
+
       if(elem.userData.properties.isPortal){
         let props = { duration: duration, 0: 0, ease: easeIn };
         if(elem.userData.open){
@@ -1521,7 +1529,7 @@ export function defaultWidgetPortalProps(name, parent){
 //default panel widget box constants
 const PW_WIDTH = 1.7;
 const PW_HEIGHT = 0.25;
-const PW_DEPTH = 0.1;
+const PW_DEPTH = 0.05;
 
 export function defaultPanelWidgetBoxProps(name, parent){
   return boxProperties(name, parent, PW_WIDTH, PW_HEIGHT, PW_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
@@ -1594,7 +1602,7 @@ export function defaultPanelSliderPortalProps(name, parent){
   return boxProps
 };
 
-const CW_HEIGHT = 0.25;
+const CW_HEIGHT = 0.18;
 
 export function defaultPanelColorWidgetBoxProps(name, parent){
   return boxProperties(name, parent, W_WIDTH, CW_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
@@ -1602,6 +1610,19 @@ export function defaultPanelColorWidgetBoxProps(name, parent){
 
 export function defaultPanelColorWidgetPortalProps(name, parent){
   let boxProps = defaultPanelColorWidgetBoxProps(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
+const PLS_WIDTH = 0.8;
+
+export function defaultPanelListSelectorBoxProps(name, parent){
+  return boxProperties(name, parent, PLS_WIDTH, CW_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+};
+
+export function defaultPanelListSelectorPortalProps(name, parent){
+  let boxProps = defaultPanelListSelectorBoxProps(parent);
   boxProps.isPortal = true;
 
   return boxProps
@@ -2145,6 +2166,19 @@ export class PanelColorWidget extends PanelBox {
   }
 };
 
+export class PanelListSelector extends PanelBox {
+  constructor(panelProps) {
+    panelProps.boxProps.matProps.useCase = 'STENCIL';
+    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    const section = panelProps.sections.data[panelProps.index];
+    this.selectors = section.data;
+    const listSelectorProps = defaultPanelListSelectorProps(panelProps.name, this.box, panelProps.textProps.font);
+    this.ctrlWidget = new SelectorWidget(listSelectorProps);
+    this.ctrlWidget.box.userData.hoverZPos = this.size.depth*2;
+    this.ctrlWidget.SetSelectors(this.selectors);
+  }
+};
+
 //value types: container, controls, label, edit_text, toggle, int_slider, float_slider
 export function panelSectionProperties(name='Section', value_type='container', data={}){
   return {
@@ -2398,6 +2432,9 @@ export class BasePanel extends BaseTextBox {
           break;
         case 'gltf':
           ctrlBox = new PanelGltfModel(sectionProps);
+          break;
+        case 'selector':
+          ctrlBox = new PanelListSelector(sectionProps);
           break;
         default:
           console.log('X');
@@ -3630,7 +3667,6 @@ export class InputTextWidget extends BaseWidget {
   }
 };
 
-
 function TextInputBoxProperties(parent, portal=false){
   let matProps = phongMatProperties('black');
   if(portal){
@@ -3713,6 +3749,15 @@ export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name
   }
 };
 
+export function defaultPanelListSelectorProps(name, parent, font){
+  const boxProps = defaultPanelListSelectorBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+  const listSelectorProps = listSelectorProperties(boxProps, name, textProps)
+  //listSelectorProps.isPortal = true;
+
+  return listSelectorProps
+};
+
 export class SelectorWidget extends BaseWidget {
   constructor(listSelectorProps) {
     const isPortal = listSelectorProps.isPortal;
@@ -3734,6 +3779,8 @@ export class SelectorWidget extends BaseWidget {
     this.isPortal = isPortal;
     this.box.userData.properties = listSelectorProps;
     this.box.userData.selectors = [];
+    this.box.userData.defaultZPos = this.box.position.z;
+    this.box.userData.hoverZPos = this.box.position.z;
     this.btnBoxProps = btnBoxProps;
     this.btnMatProps = btnMatProps;
     this.btnTextProps = btnTextProps;
