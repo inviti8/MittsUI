@@ -2008,22 +2008,29 @@ export class PanelGltfModel extends BaseTextBox {
     panelProps.boxProps.matProps.useCase = 'STENCIL';
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.AlignOutsideBehindParent();
-    const section = panelProps.sections.data[panelProps.index];
-    let valProps = section.data;
-    this.useLabel = valProps.useLabel;
-    if(!valProps.useLabel){
+    this.panelProps = panelProps;
+    const section = panelProps.sections.data[this.panelProps.index];
+    this.valProps = section.data;
+    this.useLabel = this.valProps.useLabel;
+    this.loadedCallback = undefined;
+
+    if(!this.useLabel){
       this.DeleteText();
     }
-    let gltfProps = defaultPanelGltfModelProps(panelProps.name, this.box, panelProps.textProps.font, valProps.path);
+    let gltfProps = defaultPanelGltfModelProps(this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.path);
     gltfProps.ctrl = this;
 
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
         gltfProps.gltf = gltf;
-        gltfProps.ctrl.ctrlWidget = new GLTFModelWidget(gltfProps);
-        gltfProps.ctrl.box.userData.ctrlWidget = gltfProps.ctrl.ctrlWidget;
+        gltfProps.ctrl.modelBox = new GLTFModelWidget(gltfProps);
+        gltfProps.ctrl.box.userData.modelBox = gltfProps.ctrl.ctrlWidget;
         if(gltfProps.ctrl.useLabel){
-          gltfProps.ctrl.BaseText.CenterTopOutsideChildTextPos('btn_text', gltfProps.ctrl.ctrlWidget.size);
+          gltfProps.ctrl.BaseText.CenterTopOutsideChildTextPos('btn_text', gltfProps.ctrl.modelBox.size);
           gltfProps.ctrl.BaseText.AlignTextZOuterBox('btn_text', gltfProps.ctrl.size);
+        }
+
+        if(gltfProps.ctrl.loadedCallback){
+          gltfProps.ctrl.loadedCallback();
         }
       },
       // called while loading is progressing
@@ -2035,6 +2042,39 @@ export class PanelGltfModel extends BaseTextBox {
         console.log( error );
       }
     );
+  }
+};
+
+export class PanelGltfModelMeter extends PanelGltfModel{
+  constructor(panelProps) {
+    super(panelProps);
+    this.meterProps = defaultPanelMeterProps(this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
+    this.DeleteText();
+    this.loadedCallback = this.SetupMeter;
+  }
+  SetupMeter(){this.panelProps
+    this.meterProps.boxProps.width = this.meterProps.boxProps.width-this.modelBox.size.width;
+    this.ctrlWidget = new MeterWidget(this.meterProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+    this.modelBox.box.translateX(-this.ctrlWidget.size.width/2);
+    this.ctrlWidget.box.translateX(this.modelBox.size.width/2);
+    this.ctrlWidget.widgetText.translateX(-this.modelBox.size.width/2);
+  }
+};
+
+export class PanelGltfModelValueMeter extends PanelGltfModelMeter{
+  constructor(panelProps) {
+    super(panelProps);
+    this.meterProps = defaultPanelValueMeterProps(this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
+    this.loadedCallback = this.SetupValueMeter;
+  }
+  SetupValueMeter(){this.panelProps
+    this.meterProps.boxProps.width = this.meterProps.boxProps.width-this.modelBox.size.width;
+    this.ctrlWidget = new MeterWidget(this.meterProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+    this.modelBox.box.translateX(-(this.ctrlWidget.size.width/2+this.ctrlWidget.valueTextBox.width/2));
+    this.ctrlWidget.box.translateX(this.modelBox.size.width/2);
+    this.ctrlWidget.widgetText.translateX(-this.modelBox.size.width/2);
   }
 };
 
@@ -2082,8 +2122,8 @@ export class PanelMeter extends PanelBox {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     const section = panelProps.sections.data[panelProps.index];
     const valProps = section.data;
-    const sliderProps = defaultPanelMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
-    this.ctrlWidget = new MeterWidget(sliderProps);
+    const meterProps = defaultPanelMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    this.ctrlWidget = new MeterWidget(meterProps);
   }
 };
 
@@ -2092,8 +2132,8 @@ export class PanelValueMeter extends PanelBox {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     const section = panelProps.sections.data[panelProps.index];
     const valProps = section.data;
-    const sliderProps = defaultPanelValueMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
-    this.ctrlWidget = new MeterWidget(sliderProps);
+    const meterProps = defaultPanelValueMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    this.ctrlWidget = new MeterWidget(meterProps);
   }
 };
 
@@ -2344,8 +2384,14 @@ export class BasePanel extends BaseTextBox {
         case 'meter':
           ctrlBox = new PanelMeter(sectionProps);
           break;
+        case 'gltf_meter':
+          ctrlBox = new PanelGltfModelMeter(sectionProps);
+          break;
         case 'value_meter':
           ctrlBox = new PanelValueMeter(sectionProps);
+          break;
+        case 'gltf_value_meter':
+          ctrlBox = new PanelGltfModelValueMeter(sectionProps);
           break;
         case 'color_widget':
           ctrlBox = new PanelColorWidget(sectionProps);
@@ -2542,6 +2588,16 @@ export class BaseWidget extends BaseBox {
     }
 
     return valBox
+  }
+  static CalculateElementSizeOffset(elementSize, horizontal, boxProps){
+    let bProps = {...boxProps};
+    if(horizontal){
+      bProps.width = bProps.width-elementSize.width;
+    }else{
+      bProps.height = bProps.height-elementSize.height;
+    }
+
+    return bProps
   }
   static CalculateWidgetSize(boxProps, horizontal, useSubObject, operatorSizeDivisor, defaultSubOffset=0.65){
     let subOffset = 1;
@@ -4030,13 +4086,14 @@ export function createImageBox(imageProps){
   }
 };
 
-export function modelValueProperties(path=0, rotX=false, rotY=false, useLabel=true){
+export function modelValueProperties(path=0, rotX=false, rotY=false, useLabel=true, widgetValueProp=undefined){
   return {
     'type': 'MODEL_VALUE_PROPS',
     'path': path,
     'rotX': rotX,
     'rotY': rotY,
-    'useLabel': useLabel
+    'useLabel': useLabel,
+    'widgetValueProp': widgetValueProp
   }
 };
 
