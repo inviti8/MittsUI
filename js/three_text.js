@@ -32,8 +32,12 @@ THREE.Object3D.prototype.updateMatrix = function () {
 };
 
 //colors
-const PRIMARY_COLOR = '#4ed8a7';
-const SECONDARY_COLOR = '#cf5270';
+const PRIMARY_COLOR_A = '#4ed8a7';
+let c = colorsea(PRIMARY_COLOR_A, 100).darken(15);
+const PRIMARY_COLOR_B = c.hex();
+c = colorsea(PRIMARY_COLOR_A, 100).darken(5);
+const PRIMARY_COLOR_C = c.hex();
+const SECONDARY_COLOR_A = '#cf5270';
 
 const loader = new FontLoader();
 const gltfLoader = new GLTFLoader();
@@ -1145,7 +1149,7 @@ const W_TEXT_PADDING = 0.015;
 const W_TEXT_SIZE = 0.03;
 const W_TEXT_HEIGHT = 0.005;
 const W_TEXT_Z_OFFSET = 1;
-const W_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR);
+const W_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR_A);
 const W_TEXT_MESH_PROPS = defaultWidgetTextMeshProperties();
 
 export function defaultWidgetTextProperties(font){
@@ -1154,7 +1158,7 @@ export function defaultWidgetTextProperties(font){
 
 export function defaultWidgetStencilTextProperties(font){
   let textProps = defaultWidgetTextProperties(font);
-  textProps.matProps = phongStencilMatProperties(SECONDARY_COLOR);
+  textProps.matProps = phongStencilMatProperties(SECONDARY_COLOR_A);
 
   return textProps
 };
@@ -1167,7 +1171,7 @@ const VT_TEXT_PADDING = 0.025;
 const VT_TEXT_SIZE = 0.05;
 const VT_TEXT_HEIGHT = 0.05;
 const VT_TEXT_Z_OFFSET = 1;
-const VT_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR);
+const VT_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR_A);
 const VT_TEXT_MESH_PROPS = defaultValueTextMeshProperties();
 
 export function defaultValueTextProperties(font){
@@ -1176,7 +1180,7 @@ export function defaultValueTextProperties(font){
 
 export function defaultStencilValueTextProperties(font){
   let textProps = defaultValueTextProperties(font);
-  textProps.matProps = phongStencilMatProperties(SECONDARY_COLOR);
+  textProps.matProps = phongStencilMatProperties(SECONDARY_COLOR_A);
 
   return textProps
 };
@@ -1505,7 +1509,7 @@ const SMOOTHNESS = 3;
 const RADIUS = 0.02;
 const Z_OFFSET = 0.025;
 const COMPLEX_MESH = true;
-const MAT_PROPS = phongMatProperties(PRIMARY_COLOR);
+const MAT_PROPS = phongMatProperties(PRIMARY_COLOR_A);
 const PIVOT = 'CENTER';
 const PADDING = 0;
 const IS_PORTAL = false;
@@ -1542,6 +1546,7 @@ export function defaultPanelWidgetPortalProps(name, parent){
   return boxProps
 };
 
+const PCTRL_MAT_PROPS = phongMatProperties(PRIMARY_COLOR_B);
 //default panel ctrl widget constants
 const PCTRL_HEIGHT = 0.13;
 const PCTRL_DEPTH = 0.01;
@@ -1550,7 +1555,7 @@ const PCTRL_DEPTH = 0.01;
 const PIT_WIDTH = 1.5;
 
 export function defaultPanelEditTextBoxProps(name, parent){
-  return boxProperties(name, parent, PIT_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, PIT_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultPanelEditTextPortalProps(name, parent){
@@ -1564,7 +1569,7 @@ export function defaultPanelEditTextPortalProps(name, parent){
 const EDTBTN_WIDTH = 1;
 
 export function defaultEditTextButtonBoxProps(name, parent){
-  return boxProperties(name, parent, EDTBTN_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, EDTBTN_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultEditTextButtonPortalProps(name, parent){
@@ -1578,7 +1583,7 @@ export function defaultEditTextButtonPortalProps(name, parent){
 const PTGL_WIDTH = 1;
 
 export function defaultPanelToggleBoxProps(name, parent){
-  return boxProperties(name, parent, PTGL_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, PTGL_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultPanelTogglePortalProps(name, parent){
@@ -1592,7 +1597,7 @@ export function defaultPanelTogglePortalProps(name, parent){
 const PSL_WIDTH = 1.2;
 
 export function defaultPanelSliderBoxProps(name, parent){
-  return boxProperties(name, parent, PSL_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, PSL_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultPanelSliderPortalProps(name, parent){
@@ -1605,7 +1610,7 @@ export function defaultPanelSliderPortalProps(name, parent){
 const CW_HEIGHT = 0.18;
 
 export function defaultPanelColorWidgetBoxProps(name, parent){
-  return boxProperties(name, parent, W_WIDTH, CW_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, W_WIDTH, CW_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultPanelColorWidgetPortalProps(name, parent){
@@ -1615,14 +1620,30 @@ export function defaultPanelColorWidgetPortalProps(name, parent){
   return boxProps
 };
 
-const PLS_WIDTH = 0.8;
+//default selector box broperties
+const PLS_HEIGHT = 0.13;
+const PLS_WIDTH = 0.75;
 
 export function defaultPanelListSelectorBoxProps(name, parent){
-  return boxProperties(name, parent, PLS_WIDTH, CW_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, PLS_WIDTH, PLS_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultPanelListSelectorPortalProps(name, parent){
   let boxProps = defaultPanelListSelectorBoxProps(parent);
+  boxProps.isPortal = true;
+
+  return boxProps
+};
+
+//default selector box broperties
+const PBTN_WIDTH = 0.75;
+
+export function defaultPanelButtonBoxProps(name, parent){
+  return boxProperties(name, parent, PLS_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+};
+
+export function defaultPanelButtonPortalProps(name, parent){
+  let boxProps = defaultPanelButtonBoxProps(parent);
   boxProps.isPortal = true;
 
   return boxProps
@@ -1633,7 +1654,7 @@ const PGL_WIDTH = 0.15;
 const PGL_HEIGHT = 0.15;
 
 export function defaultPanelGltfModelBoxProps(name, parent){
-  return boxProperties(name, parent, PGL_WIDTH, PGL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
+  return boxProperties(name, parent, PGL_WIDTH, PGL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
 export function defaultPanelGltfModelPortalProps(name, parent){
@@ -1962,6 +1983,20 @@ export function buttonProperties(boxProps, name='Button', value='', textProps=un
   }
 };
 
+export function defaultPanelButtonProps(name, parent, font){
+  const boxProps = defaultPanelButtonBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+
+  buttonProperties(boxProps, name, '', textProps, false, 'CENTER')
+};
+
+export function defaultPanelEditTextButtonProps(name, parent, font){
+  const boxProps = defaultEditTextButtonBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+
+  buttonProperties(boxProps, name, '', textProps)
+};
+
 class BaseTextBox extends BaseBox {
   constructor(buttonProps) {
     super(buttonProps.boxProps);
@@ -2026,7 +2061,6 @@ export class PanelLabel extends BaseTextBox {
 
 export class PanelGltfModel extends BaseTextBox {
   constructor(panelProps) {
-    panelProps.boxProps.matProps.useCase = 'STENCIL';
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.AlignOutsideBehindParent();
     this.panelProps = panelProps;
@@ -2110,7 +2144,7 @@ export class PanelEditText extends PanelBox {
 
 export class PanelInputText extends PanelBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(panelProps);
     const inputTextProps = defaultPanelInputTextProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new InputTextWidget(inputTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -2231,7 +2265,7 @@ export class BasePanel extends BaseTextBox {
       darkenMaterial(this.subPanelMaterial, 10);
       this.ctrlPanelMaterial = getMaterial(this.matProps, this.matProps.stencilRef);
       darkenMaterial(this.ctrlPanelMaterial, 20);
-      this.handleMaterial = this.CreateComplemetaryColorMaterial(this.matProps);
+      this.handleMaterial = this.textMaterial;
     }
 
     if(panelProps.topPanel == undefined){
@@ -2438,6 +2472,10 @@ export class BasePanel extends BaseTextBox {
           break;
         default:
           console.log('X');
+      }
+
+      if(ctrlBox.ctrlWidget!=undefined){
+        //ctrlBox.ctrlWidget.ReplaceMaterial(this.ctrlWidgetMaterial);
       }
 
       this.controlList.push(ctrlBox);
@@ -2954,7 +2992,7 @@ export class SliderWidget extends BaseWidget {
 
 };
 
-export function meterProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, draggable=true){
+export function meterProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, draggable=true, meterColor=SECONDARY_COLOR_A){
   return {
     'type': 'METER',
     'boxProps': boxProps,
@@ -2965,7 +3003,8 @@ export function meterProperties(boxProps, name='', horizontal=true, textProps=un
     'numeric': numeric,
     'valueProps': valueProps,
     'handleSize': handleSize,
-    'draggable': draggable
+    'draggable': draggable,
+    'meterColor': meterColor
   }
 };
 
@@ -2986,6 +3025,7 @@ export class MeterWidget extends SliderWidget {
     super(widgetProps);
     const meterBoxProps = {...widgetProps.boxProps}
     let meterMatProps = {...widgetProps.boxProps.matProps}
+    meterMatProps.color = widgetProps.meterColor;
     meterBoxProps.width = this.box.userData.size.width;
     meterBoxProps.height = this.box.userData.size.height;
     meterBoxProps.pivot = 'LEFT';
@@ -3152,9 +3192,6 @@ export class ColorWidget extends BaseWidget {
       this.alphaSlider.value = this.alphaSlider.box.userData.value;
     }
   }
-  SetValueTypes(){
-
-  }
   InitColorWidgetProps(sliderWidgetProps){
     let colors = ['red', 'blue', 'green'];
     let boxMatProps = ColorWidget.SliderMatProps(sliderWidgetProps.base);
@@ -3171,6 +3208,7 @@ export class ColorWidget extends BaseWidget {
 
     colors.forEach((color, index) =>{
       sliderWidgetProps[color].name = color;
+      sliderWidgetProps[color].meterColor = color;
       sliderWidgetProps[color].valueProps = valProps[color];
       sliderWidgetProps[color].boxProps.isPortal = true;
       sliderWidgetProps[color].boxProps = {...sliderBoxProps};
@@ -3831,13 +3869,14 @@ export class SelectorWidget extends BaseWidget {
         setupStencilChildMaterial(btn.box.material, this.box.material.stencilRef);
         setupStencilChildMaterial(btn.textMesh.material, this.box.material.stencilRef);
         btn.box.material.stencilRef = this.box.material.stencilRef;
-        btn.box.material.depthWrite = true;
         btn.textMesh.material.stencilRef = this.box.material.stencilRef;
         btn.textMesh.material.depthWrite = true;
         btn.box.renderOrder = 2;
         btn.textMesh.renderOrder = 2;
         btn.box.position.set(btn.box.position.x, btn.box.position.y, -btn.depth)
       }
+
+      btn.box.material.depthWrite = true;
 
       idx+=1;
     }
@@ -3851,7 +3890,7 @@ export class SelectorWidget extends BaseWidget {
     let selectedZ = btn.depth+(btn.depth+textSize.depth);
     let unselectedZ = btn.depth;
     if(btn.box.userData.properties.isPortal){
-      selectedZ = -btn.depth;
+      selectedZ = -btn.depth*2;
       unselectedZ = -(btn.depth+(btn.depth+textSize.depth));
     }
     btn.textMesh.userData.draggable = false;
@@ -3905,7 +3944,6 @@ export function createListSelectorPortal(listSelectorProps, selectors) {
   listSelectorProps.isPortal = true;
   createListSelector(listSelectorProps, selectors);
 };
-
 
 function ButtonElement(buttonProps){
   let btn = new BaseTextBox(buttonProps);
@@ -4158,6 +4196,7 @@ export function gltfProperties(boxProps, name='', gltf=undefined, listConfig=und
 export function defaultPanelGltfModelProps(name, parent, font, modelPath){
   const boxProps = defaultPanelGltfModelBoxProps(name, parent);
   boxProps.isPortal = true;
+  boxProps.matProps.useCase = 'STENCIL';
   const textProps = defaultWidgetTextProperties(font);
   return gltfProperties(boxProps, name, modelPath)
 }
