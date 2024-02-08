@@ -845,6 +845,13 @@ export function materialProperties(type='BASIC', color='white', transparent=fals
   }
 };
 
+export function materialRefProperties(type='PHONG', ref=undefined){
+  return {
+    type: type,
+    ref: ref
+  }
+};
+
 export function basicMatProperties(color='white'){
   return materialProperties('BASIC', color, false, 1, THREE.FrontSide, 'SIMPLE');
 };
@@ -1987,14 +1994,14 @@ export function defaultPanelButtonProps(name, parent, font){
   const boxProps = defaultPanelButtonBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
 
-  buttonProperties(boxProps, name, '', textProps, false, 'CENTER')
+  return buttonProperties(boxProps, name, '', textProps, false, 'CENTER')
 };
 
 export function defaultPanelEditTextButtonProps(name, parent, font){
   const boxProps = defaultEditTextButtonBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
 
-  buttonProperties(boxProps, name, '', textProps)
+  return buttonProperties(boxProps, name, '', textProps)
 };
 
 class BaseTextBox extends BaseBox {
@@ -2123,7 +2130,7 @@ export class PanelGltfModelValueMeter extends PanelGltfModelMeter{
     this.meterProps = defaultPanelValueMeterProps(this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
     this.loadedCallback = this.SetupValueMeter;
   }
-  SetupValueMeter(){this.panelProps
+  SetupValueMeter(){
     this.meterProps.boxProps.width = this.meterProps.boxProps.width-this.modelBox.size.width;
     this.ctrlWidget = new MeterWidget(this.meterProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -2153,7 +2160,7 @@ export class PanelInputText extends PanelBox {
 
 export class PanelBooleanToggle extends PanelBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(panelProps);
     this.DeleteText();
     const toggleProps = defaultPanelBooleanToggleProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new ToggleWidget(toggleProps);
@@ -2163,53 +2170,78 @@ export class PanelBooleanToggle extends PanelBox {
 
 export class PanelSlider extends PanelBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(panelProps);
     const section = panelProps.sections.data[panelProps.index];
     const valProps = section.data;
     const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
     this.ctrlWidget = new SliderWidget(sliderProps);
-
+    this.box.userData.ctrlWidget = this.ctrlWidget;
   }
 };
 
 export class PanelMeter extends PanelBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(panelProps);
     const section = panelProps.sections.data[panelProps.index];
     const valProps = section.data;
     const meterProps = defaultPanelMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
     this.ctrlWidget = new MeterWidget(meterProps);
-  }
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+  } 
 };
 
 export class PanelValueMeter extends PanelBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(panelProps);
     const section = panelProps.sections.data[panelProps.index];
     const valProps = section.data;
     const meterProps = defaultPanelValueMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
     this.ctrlWidget = new MeterWidget(meterProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
   }
 };
 
 export class PanelColorWidget extends PanelBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(panelProps);
     const colorWidgetProps = defaultPanelColorWidgetProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new ColorWidget(colorWidgetProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+  }
+};
+
+export class PanelMaterialColorWidget extends PanelBox {
+  constructor(panelProps) {
+    super(panelProps);
+    const section = panelProps.sections.data[panelProps.index];
+    const matRefProps = section.data;
+    this.colorWidgetProps = defaultPanelColorWidgetProps(panelProps.name, this.box, panelProps.textProps.font);
+    this.colorWidgetProps.materialRefProps = matRefProps;
+    this.ctrlWidget = new ColorWidget(this.colorWidgetProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
   }
 };
 
 export class PanelListSelector extends PanelBox {
   constructor(panelProps) {
     panelProps.boxProps.matProps.useCase = 'STENCIL';
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(panelProps);
     const section = panelProps.sections.data[panelProps.index];
     this.selectors = section.data;
     const listSelectorProps = defaultPanelListSelectorProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new SelectorWidget(listSelectorProps);
     this.ctrlWidget.box.userData.hoverZPos = this.size.depth*2;
     this.ctrlWidget.SetSelectors(this.selectors);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+  }
+};
+
+export class PanelButton extends PanelBox {
+  constructor(panelProps) {
+    super(panelProps);
+    const buttonProps = defaultPanelButtonProps(panelProps.name, this.box, panelProps.textProps.font)
+    this.ctrlWidget = ButtonElement(buttonProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
   }
 };
 
@@ -2464,11 +2496,17 @@ export class BasePanel extends BaseTextBox {
         case 'color_widget':
           ctrlBox = new PanelColorWidget(sectionProps);
           break;
+        case 'mat_color_widget':
+          ctrlBox = new PanelMaterialColorWidget(sectionProps);
+          break;
         case 'gltf':
           ctrlBox = new PanelGltfModel(sectionProps);
           break;
         case 'selector':
           ctrlBox = new PanelListSelector(sectionProps);
+          break;
+        case 'button':
+          ctrlBox = new PanelButton(sectionProps);
           break;
         default:
           console.log('X');
@@ -2652,6 +2690,7 @@ export class BaseWidget extends BaseBox {
     const boxProps = widgetProps.boxProps;
     const valBox = new ValueTextWidget(widgetProps);
     darkenMaterial(valBox.box.material, 30);
+    this.box.userData.valueBoxCtrl = valBox;
     this.box.userData.valueBox = valBox.box;
 
     this.Recenter(valBox.width);
@@ -2793,7 +2832,7 @@ class ValueTextWidget extends BaseTextBox{
     if(this.numeric){
       this.box.parent.userData.value = Number.parseFloat(this.box.parent.userData.value).toFixed(this.places);
     }
-    this.UpdateText(this.box.parent.userData.value);
+    this.UpdateText(this.box.parent.userData.value.toString());
     this.box.dispatchEvent({type:'onValueUpdated'});
   }
   EditableSetup(){
@@ -2873,7 +2912,7 @@ export class SliderWidget extends BaseWidget {
     this.UpdateSliderPosition();
 
   }
-  SetValue(val){
+  SetValue(value){
     this.box.userData.value = value;
     this.value = value;
     this.box.dispatchEvent({type:'update'});
@@ -3097,7 +3136,7 @@ export class ColorHandler {
   }
 };
 
-export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex' ){
+export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex', materialRefProps=undefined ){
   return {
     'type': 'COLOR_WIDGET',
     'boxProps': boxProps,
@@ -3106,13 +3145,14 @@ export function colorWidgetProperties(boxProps, name='', horizontal=true, defaul
     'defaultColor': defaultColor,
     'textProps': textProps,
     'useValueText': useValueText,
-    'valueProps': numberValueProperties( 0, 0, 255, 0, 0.001, true),
+    'valueProps': numberValueProperties( 0, 0, 1, 0, 0.001, true),
     'useAlpha': useAlpha,
     'handleSize': 0,
     'draggable': draggable,
     'alpha': alpha,
     'meter': meter,
-    'colorValueType': colorValueType
+    'colorValueType': colorValueType,
+    'materialRefProps': materialRefProps
   }
 };
 
@@ -3127,9 +3167,11 @@ export class ColorWidget extends BaseWidget {
     let colorWidgetProps = ColorWidget.ColorWidgetProps(widgetProps);
     super(colorWidgetProps.base);
     this.value = widgetProps.defaultColor;
+    this.isMeter = widgetProps.meter;
+    this.materialRefProps = widgetProps.materialRefProps;
 
     this.colorManipulator = MeterWidget;
-    if(!widgetProps.meter){
+    if(!this.isMeter){
       this.colorManipulator = SliderWidget;
     }
 
@@ -3148,8 +3190,28 @@ export class ColorWidget extends BaseWidget {
     }
 
     this.colorIndcator = new BaseBox(colorWidgetProps.indicator);
-    this.colorIndcator.material.transparent = true;
+    //this.colorIndcator.material.transparent = true;
     this.colorIndcator.AlignLeft();
+    this.materialView = undefined;
+
+    if(this.materialRefProps != undefined){
+      this.materialRef = this.materialRefProps.ref;
+      this.materialView = this.MaterialMesh(colorWidgetProps.indicator);
+      this.value = '#'+this.materialView.material.color.getHexString();
+      this.box.userData.value = this.value;
+      //let rgb = this.materialView.material.color;
+      let alpha = this.materialView.material.color.opacity;
+      let color = colorsea(this.value, alpha);
+      let rgba = color.rgba();
+
+      this.redSlider.box.userData.valueBoxCtrl.SetValueText(rgba[0]);
+      this.greenSlider.box.userData.valueBoxCtrl.SetValueText(rgba[1]);
+      this.blueSlider.box.userData.valueBoxCtrl.SetValueText(rgba[2]);
+      if(this.useAlpha){
+        this.alphaSlider.box.userData.valueBoxCtrl.SetValueText(rgba[3]);
+      }
+      this.UpdateColor();
+    }
 
     this.sliders.forEach((slider, index) =>{
       let pos = slider.TopCenterBoxPos();
@@ -3181,8 +3243,16 @@ export class ColorWidget extends BaseWidget {
       alpha = this.alphaSlider.value;
     }
     let color = colorsea(rgb, alpha);
-    this.colorIndcator.SetColor(color.hex());
-    this.colorIndcator.SetOpacity(alpha);
+
+    if(this.materialRef != undefined){
+      this.materialRef.color.set(color.hex());
+      this.materialRef.opacity = alpha;
+      this.materialView.material.color.set(color.hex());
+      this.materialView.material.opacity = alpha;
+    }else{
+      this.colorIndcator.SetColor(color.hex());
+      this.colorIndcator.SetOpacity(alpha);
+    }
   }
   UpdateSliderValues(){
     this.redSlider.value = this.redSlider.box.userData.value;
@@ -3191,6 +3261,20 @@ export class ColorWidget extends BaseWidget {
     if(this.useAlpha){
       this.alphaSlider.value = this.alphaSlider.box.userData.value;
     }
+  }
+  MaterialMesh(widgetProps){
+    const radius = this.colorIndcator.size.width/4;
+    const geometry = new THREE.SphereGeometry(radius, 32, 16);
+    const size = getGeometrySize(geometry)
+    const material = this.materialRef.clone();
+    setupStencilChildMaterial(material, this.colorIndcator.box.material.stencilRef);
+    const sphere = new THREE.Mesh( geometry, material );
+
+    this.colorIndcator.box.add(sphere);
+    sphere.position.set(0,0,0);
+    sphere.translateZ(-size.depth/2);
+
+    return sphere
   }
   InitColorWidgetProps(sliderWidgetProps){
     let colors = ['red', 'blue', 'green'];
@@ -3217,6 +3301,7 @@ export class ColorWidget extends BaseWidget {
     });
 
     sliderWidgetProps['indicator'].parent = this.box;
+    sliderWidgetProps['indicator'].isPortal = true;
     sliderWidgetProps['indicator'].matProps = boxMatProps['indicator'];
 
     return sliderWidgetProps
@@ -3247,6 +3332,10 @@ export class ColorWidget extends BaseWidget {
     blueMatProps.color = 'blue';
     let indicatorMatProps = {...boxMatProps};
     indicatorMatProps.color = widgetProps.defaultColor;
+    if(widgetProps.materialRefProps!=undefined){
+      indicatorMatProps.color = 'black';
+    }
+    indicatorMatProps.useCase = 'STENCIL';
     let props = {'red': redMatProps, 'blue': blueMatProps, 'green': greenMatProps, 'indicator': indicatorMatProps};
     if(widgetProps.useAlpha){
       let alphaMatProps = {...boxMatProps};
@@ -3890,8 +3979,8 @@ export class SelectorWidget extends BaseWidget {
     let selectedZ = btn.depth+(btn.depth+textSize.depth);
     let unselectedZ = btn.depth;
     if(btn.box.userData.properties.isPortal){
-      selectedZ = -btn.depth*2;
-      unselectedZ = -(btn.depth+(btn.depth+textSize.depth));
+      selectedZ = -btn.depth;
+      unselectedZ = -(btn.depth+(btn.depth+textSize.depth)*2);
     }
     btn.textMesh.userData.draggable = false;
     btn.textMesh.userData.key = key;
