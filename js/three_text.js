@@ -834,21 +834,25 @@ export function createTextGeometry(character, font, size, height, curveSegments,
 
 //MATERIAL CREATION
 //useCase='SIMPLE','STENCIL','STENCIL_CHILD'
-export function materialProperties(type='BASIC', color='white', transparent=false, opacity=1, side=THREE.FrontSide, useCase='SIMPLE'){
+export function materialProperties(type='BASIC', color='white', transparent=false, opacity=1, side=THREE.FrontSide, useCase='SIMPLE', emissive=false){
   return {
-    type: type,
-    color: color,
-    transparent: transparent,
-    opacity: opacity,
-    side: side,
-    useCase: useCase
+    'type': type,
+    'color': color,
+    'transparent': transparent,
+    'opacity': opacity,
+    'side': side,
+    'useCase': useCase,
+    'emissive': emissive
   }
 };
 
-export function materialRefProperties(type='PHONG', ref=undefined){
+export function materialRefProperties(matType='PHONG', ref=undefined, targetProp='color', valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false)){
   return {
-    type: type,
-    ref: ref
+    'type': 'MAT_REF',
+    'matType': matType,
+    'ref': ref,
+    'targetProp': targetProp,
+    'valueProps': valueProps
   }
 };
 
@@ -900,6 +904,18 @@ export function standardMatStencilChildProperties(color='white'){
   return materialProperties('STANDARD', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
 };
 
+export function pbrMatProperties(color='white'){
+  return materialProperties('PBR', color, false, 1, THREE.FrontSide, 'SIMPLE');
+};
+
+export function pbrMatStencilProperties(color='white'){
+  return materialProperties('PBR', color, false, 1, THREE.FrontSide, 'STENCIL');
+};
+
+export function pbrMatStencilChildProperties(color='white'){
+  return materialProperties('PBR', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
+};
+
 export function toonMatProperties(color='white'){
   return materialProperties('TOON', color, false, 1, THREE.FrontSide, 'SIMPLE');
 };
@@ -917,18 +933,27 @@ export function getBaseMaterial(color='white', type='BASIC', side=THREE.FrontSid
   switch (type) {
     case 'BASIC':
       mat = new THREE.MeshBasicMaterial({ color: color, side: side });
+      break;
       
     case 'PHONG':
       mat = new THREE.MeshPhongMaterial({ color: color, side: side });
+      break;
 
     case 'LAMBERT':
       mat = new THREE.MeshLambertMaterial({ color: color, side: side });
+      break;
 
     case 'STANDARD':
       mat = new THREE.MeshStandardMaterial({ color: color, side: side });
+      break;
+
+    case 'PBR':
+      mat = new THREE.MeshPhysicalMaterial({ color: color, side: side });
+      break;
 
     case 'TOON':
       mat = new THREE.MeshToonMaterial({ color: color, side: side });
+      break;
 
     default:
       mat = new THREE.MeshBasicMaterial({ color: color, side: side });
@@ -1156,7 +1181,7 @@ const W_TEXT_PADDING = 0.015;
 const W_TEXT_SIZE = 0.03;
 const W_TEXT_HEIGHT = 0.005;
 const W_TEXT_Z_OFFSET = 1;
-const W_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR_A);
+const W_TEXT_MAT_PROPS = basicMatProperties(SECONDARY_COLOR_A);
 const W_TEXT_MESH_PROPS = defaultWidgetTextMeshProperties();
 
 export function defaultWidgetTextProperties(font){
@@ -1178,7 +1203,7 @@ const VT_TEXT_PADDING = 0.025;
 const VT_TEXT_SIZE = 0.05;
 const VT_TEXT_HEIGHT = 0.05;
 const VT_TEXT_Z_OFFSET = 1;
-const VT_TEXT_MAT_PROPS = phongMatProperties(SECONDARY_COLOR_A);
+const VT_TEXT_MAT_PROPS = basicMatProperties(SECONDARY_COLOR_A);
 const VT_TEXT_MESH_PROPS = defaultValueTextMeshProperties();
 
 export function defaultValueTextProperties(font){
@@ -1516,7 +1541,7 @@ const SMOOTHNESS = 3;
 const RADIUS = 0.02;
 const Z_OFFSET = 0.025;
 const COMPLEX_MESH = true;
-const MAT_PROPS = phongMatProperties(PRIMARY_COLOR_A);
+const MAT_PROPS = basicMatProperties(PRIMARY_COLOR_A);
 const PIVOT = 'CENTER';
 const PADDING = 0;
 const IS_PORTAL = false;
@@ -1553,7 +1578,7 @@ export function defaultPanelWidgetPortalProps(name, parent){
   return boxProps
 };
 
-const PCTRL_MAT_PROPS = phongMatProperties(PRIMARY_COLOR_B);
+const PCTRL_MAT_PROPS = basicMatProperties(PRIMARY_COLOR_B);
 //default panel ctrl widget constants
 const PCTRL_HEIGHT = 0.13;
 const PCTRL_DEPTH = 0.01;
@@ -2179,6 +2204,17 @@ export class PanelSlider extends PanelBox {
   }
 };
 
+export class PanelMaterialSlider extends PanelBox {
+  constructor(panelProps) {
+    super(panelProps);
+    const section = panelProps.sections.data[panelProps.index];
+    const valProps = section.data;
+    const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    this.ctrlWidget = new SliderWidget(sliderProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+  }
+};
+
 export class PanelMeter extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2216,7 +2252,7 @@ export class PanelMaterialColorWidget extends PanelBox {
     const section = panelProps.sections.data[panelProps.index];
     const matRefProps = section.data;
     this.colorWidgetProps = defaultPanelColorWidgetProps(panelProps.name, this.box, panelProps.textProps.font);
-    this.colorWidgetProps.materialRefProps = matRefProps;
+    this.colorWidgetProps.objectTargetProps = matRefProps;
     this.ctrlWidget = new ColorWidget(this.colorWidgetProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -2245,7 +2281,7 @@ export class PanelButton extends PanelBox {
   }
 };
 
-//value types: container, controls, label, edit_text, toggle, int_slider, float_slider
+//value types: container, controls, label, edit_text, input_text, toggle, int_slider, float_slider
 export function panelSectionProperties(name='Section', value_type='container', data={}){
   return {
     'type': 'PANEL_SECTION',
@@ -2253,6 +2289,71 @@ export function panelSectionProperties(name='Section', value_type='container', d
     'value_type': value_type,
     'data': data
   }
+};
+
+export function panelMaterialSectionPropertySet(material, emissive=false){
+  let sectionData = {};
+  let matType = undefined;
+  //let props = ['color', 'shininess', 'specular', 'roughness', 'metalness', 'clearcoat', 'clearCoatRoughness', 'emissive']
+  let props = {}
+
+  switch (material.type) {
+    case 'MeshBasicMaterial':
+      matType = 'BASIC';
+      props['color'] = 'mat_color_widget';
+      break;
+    case 'MeshLambertMaterial':
+      matType = 'LAMBERT';
+      props['color'] = 'mat_color_widget';
+      break;
+    case 'MeshPhongMaterial':
+      matType = 'PHONG';
+      props['color'] = 'mat_color_widget';
+      props['shininess'] = 'mat_slider';
+      break;
+    case 'MeshStandardMaterial':
+      matType = 'STANDARD';
+      props['color'] = 'mat_color_widget';
+      props['shininess'] = 'mat_slider';
+      props['specular'] = 'mat_color_widget';
+      props['roughness'] = 'mat_slider';
+      props['metalness'] = 'mat_slider';
+      break;
+    case 'MeshPhysicalMaterial':
+      matType = 'PBR';
+      props = ['color', 'shininess', 'specular', 'roughness', 'metalness', 'clearcoat', 'clearCoatRoughness'];
+      props['color'] = 'mat_color_widget';
+      props['shininess'] = 'mat_slider';
+      props['specular'] = 'mat_color_widget';
+      props['roughness'] = 'mat_slider';
+      props['metalness'] = 'mat_slider';
+      props['clearcoat'] = 'mat_slider';
+      props['clearCoatRoughness'] = 'mat_slider';
+      break;
+    case 'MeshToonMaterial':
+      matType = 'TOON';
+      props['color'] = 'mat_color_widget';
+      break;
+    default:
+      console.log('X');
+  }
+
+  if(emissive){
+    props.push('emissive');
+    props.push('emissiveIntensity');
+  }
+
+  Object.keys(props).forEach((prop, idx) => {
+    let valProp = numberValueProperties( 0, 0, 1, 3, 0.001, false);
+    if(prop == 'color' || prop == 'specular' || prop == 'emissive'){
+      valProp = numberValueProperties( 0, 0, 255, 0, 0.001, false);
+    }
+     let matRefProp = materialRefProperties(matType, material, prop, valProp);
+     let widget = props[prop];
+     sectionData[material.name+'_'+prop] = panelSectionProperties(prop, widget, matRefProp);
+  });
+
+  return panelSectionProperties(material.name, 'container', sectionData)
 };
 
 export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
@@ -2512,10 +2613,6 @@ export class BasePanel extends BaseTextBox {
           console.log('X');
       }
 
-      if(ctrlBox.ctrlWidget!=undefined){
-        //ctrlBox.ctrlWidget.ReplaceMaterial(this.ctrlWidgetMaterial);
-      }
-
       this.controlList.push(ctrlBox);
       this.box.userData.widgetElements.push(ctrlBox.box);
 
@@ -2577,7 +2674,7 @@ export function CreateBasePanel(panelProps) {
   
 };
 
-export function widgetProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), listConfig=undefined, handleSize=2 ){
+export function widgetProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), listConfig=undefined, handleSize=2, objectTargetProps=undefined ){
   return {
     'type': 'WIDGET',
     'boxProps': boxProps,
@@ -2588,7 +2685,8 @@ export function widgetProperties(boxProps, name='', horizontal=true, on=false, t
     'useValueText': useValueText,
     'valueProps': valueProps,
     'listConfig': listConfig,
-    'handleSize': handleSize
+    'handleSize': handleSize,
+    'objectTargetProps': objectTargetProps
   }
 };
 
@@ -2601,6 +2699,7 @@ export class BaseWidget extends BaseBox {
     baseBoxProps.height = size.baseHeight;
     baseBoxProps.depth = size.baseDepth/2;
     super(baseBoxProps);
+    this.objectTargetProps = widgetProps.objectTargetProps;
     let zOffset = 1;
     this.value = widgetProps.valueProps.defaultValue;
     this.box.userData.horizontal = widgetProps.horizontal;
@@ -2639,6 +2738,24 @@ export class BaseWidget extends BaseBox {
     this.widgetText = this.WidgetText();
     this.widgetTextSize = getGeometrySize(this.widgetText.geometry);
 
+    if(this.objectTargetProps != undefined){
+      this.objectRef = this.objectTargetProps.ref;
+      this.targetProp = this.objectTargetProps.targetProp;
+    }
+
+  }
+  UpdateMaterialRefColor(hex, alpha=undefined){
+    if(!(this.targetProp == 'color' || this.targetProp == 'specular' || this.targetProp == 'emissive'))
+      return;
+    this.objectRef[this.targetProp].set(hex);
+    if(alpha!=undefined){
+      this.objectRef.opacity = alpha;
+    }
+  }
+  UpdateMaterialFloatValue(value){
+    if(!(this.targetProp == 'shininess' || this.targetProp == 'roughness' || this.targetProp == 'metalness' || this.targetProp == 'clearcoat' || this.targetProp == 'clearCoatRoughness' || this.targetProp == 'emissiveIntensity'))
+      return;
+    this.objectRef[this.targetProp] = value;
   }
   WidgetHandle(){
     let handleBoxProps = {...this.baseBoxProps};
@@ -2861,7 +2978,7 @@ class ValueTextWidget extends BaseTextBox{
 
 }
 
-export function sliderProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8){
+export function sliderProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, objectTargetProps=undefined){
   return {
     'type': 'SLIDER',
     'boxProps': boxProps,
@@ -2872,7 +2989,8 @@ export function sliderProperties(boxProps, name='', horizontal=true, textProps=u
     'numeric': numeric,
     'valueProps': valueProps,
     'handleSize': handleSize,
-    'draggable': true
+    'draggable': true,
+    'objectTargetProps': objectTargetProps
   }
 };
 
@@ -3136,7 +3254,7 @@ export class ColorHandler {
   }
 };
 
-export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex', materialRefProps=undefined ){
+export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex', objectTargetProps=undefined ){
   return {
     'type': 'COLOR_WIDGET',
     'boxProps': boxProps,
@@ -3152,7 +3270,7 @@ export function colorWidgetProperties(boxProps, name='', horizontal=true, defaul
     'alpha': alpha,
     'meter': meter,
     'colorValueType': colorValueType,
-    'materialRefProps': materialRefProps
+    'objectTargetProps': objectTargetProps
   }
 };
 
@@ -3168,7 +3286,6 @@ export class ColorWidget extends BaseWidget {
     super(colorWidgetProps.base);
     this.value = widgetProps.defaultColor;
     this.isMeter = widgetProps.meter;
-    this.materialRefProps = widgetProps.materialRefProps;
 
     this.colorManipulator = MeterWidget;
     if(!this.isMeter){
@@ -3194,20 +3311,20 @@ export class ColorWidget extends BaseWidget {
     this.colorIndcator.AlignLeft();
     this.materialView = undefined;
 
-    if(this.materialRefProps != undefined){
-      this.materialRef = this.materialRefProps.ref;
+    if(this.objectTargetProps != undefined && this.objectTargetProps.type == 'MAT_REF'){
       this.materialView = this.MaterialMesh(colorWidgetProps.indicator);
-      this.value = '#'+this.materialView.material.color.getHexString();
+      this.value = '#'+this.materialView.material[this.targetProp].getHexString();
       this.box.userData.value = this.value;
-      //let rgb = this.materialView.material.color;
-      let alpha = this.materialView.material.color.opacity;
+      let alpha = this.materialView.material[this.targetProp].opacity;
       let color = colorsea(this.value, alpha);
       let rgba = color.rgba();
 
-      this.redSlider.box.userData.valueBoxCtrl.SetValueText(rgba[0]);
-      this.greenSlider.box.userData.valueBoxCtrl.SetValueText(rgba[1]);
-      this.blueSlider.box.userData.valueBoxCtrl.SetValueText(rgba[2]);
+      this.sliders.forEach((slider, index) =>{
+        slider.box.userData.valueBoxCtrl.SetValueText(rgba[index]);
+      });
       if(this.useAlpha){
+        //this.colorIndcator.material.transparent = true;
+        this.materialView.material.transparent = true;
         this.alphaSlider.box.userData.valueBoxCtrl.SetValueText(rgba[3]);
       }
       this.UpdateColor();
@@ -3242,16 +3359,16 @@ export class ColorWidget extends BaseWidget {
     if(this.useAlpha){
       alpha = this.alphaSlider.value;
     }
+
     let color = colorsea(rgb, alpha);
 
-    if(this.materialRef != undefined){
-      this.materialRef.color.set(color.hex());
-      this.materialRef.opacity = alpha;
-      this.materialView.material.color.set(color.hex());
-      this.materialView.material.opacity = alpha;
+    if(this.objectRef != undefined && this.objectTargetProps.type == 'MAT_REF'){
+      this.UpdateMaterialRefColor(color.hex(), alpha);
+      this.materialView.material[this.targetProp].set(color.hex());
+      this.materialView.material.opacity = alpha*0.01;
     }else{
       this.colorIndcator.SetColor(color.hex());
-      this.colorIndcator.SetOpacity(alpha);
+      this.colorIndcator.SetOpacity(alpha*0.01);
     }
   }
   UpdateSliderValues(){
@@ -3266,7 +3383,7 @@ export class ColorWidget extends BaseWidget {
     const radius = this.colorIndcator.size.width/4;
     const geometry = new THREE.SphereGeometry(radius, 32, 16);
     const size = getGeometrySize(geometry)
-    const material = this.materialRef.clone();
+    const material = this.objectRef.clone();
     setupStencilChildMaterial(material, this.colorIndcator.box.material.stencilRef);
     const sphere = new THREE.Mesh( geometry, material );
 
@@ -3332,7 +3449,7 @@ export class ColorWidget extends BaseWidget {
     blueMatProps.color = 'blue';
     let indicatorMatProps = {...boxMatProps};
     indicatorMatProps.color = widgetProps.defaultColor;
-    if(widgetProps.materialRefProps!=undefined){
+    if(widgetProps.objectTargetProps!=undefined){
       indicatorMatProps.color = 'black';
     }
     indicatorMatProps.useCase = 'STENCIL';
