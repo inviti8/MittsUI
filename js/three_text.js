@@ -846,13 +846,14 @@ export function materialProperties(type='BASIC', color='white', transparent=fals
   }
 };
 
-export function materialRefProperties(matType='PHONG', ref=undefined, targetProp='color', valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false)){
+export function materialRefProperties(matType='PHONG', ref=undefined, targetProp='color', valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false){
   return {
     'type': 'MAT_REF',
     'matType': matType,
     'ref': ref,
     'targetProp': targetProp,
-    'valueProps': valueProps
+    'valueProps': valueProps,
+    'useMaterialView': useMaterialView
   }
 };
 
@@ -2208,8 +2209,9 @@ export class PanelMaterialSlider extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     const section = panelProps.sections.data[panelProps.index];
-    const valProps = section.data;
-    const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    const matRefProps = section.data;
+    const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, matRefProps.valueProps);
+    sliderProps.objectTargetProps = matRefProps;
     this.ctrlWidget = new SliderWidget(sliderProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -2252,6 +2254,11 @@ export class PanelMaterialColorWidget extends PanelBox {
     const section = panelProps.sections.data[panelProps.index];
     const matRefProps = section.data;
     this.colorWidgetProps = defaultPanelColorWidgetProps(panelProps.name, this.box, panelProps.textProps.font);
+    if(!matRefProps.targetProp=='color'){
+      this.colorWidgetProps.useAlpha = false;
+    }else{
+      matRefProps.useMaterialView = true;
+    }
     this.colorWidgetProps.objectTargetProps = matRefProps;
     this.ctrlWidget = new ColorWidget(this.colorWidgetProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -2321,7 +2328,6 @@ export function panelMaterialSectionPropertySet(material, emissive=false){
       break;
     case 'MeshPhysicalMaterial':
       matType = 'PBR';
-      props = ['color', 'shininess', 'specular', 'roughness', 'metalness', 'clearcoat', 'clearCoatRoughness'];
       props['color'] = 'mat_color_widget';
       props['shininess'] = 'mat_slider';
       props['specular'] = 'mat_color_widget';
@@ -2339,8 +2345,8 @@ export function panelMaterialSectionPropertySet(material, emissive=false){
   }
 
   if(emissive){
-    props.push('emissive');
-    props.push('emissiveIntensity');
+    props['emissive'] = 'mat_color_widget';
+    props['emissiveIntensity'] = 'mat_slider';
   }
 
   Object.keys(props).forEach((prop, idx) => {
@@ -2582,6 +2588,9 @@ export class BasePanel extends BaseTextBox {
         case 'slider':
           ctrlBox = new PanelSlider(sectionProps);
           break;
+        case 'mat_slider':
+          ctrlBox = new PanelMaterialSlider(sectionProps);
+          break;
         case 'meter':
           ctrlBox = new PanelMeter(sectionProps);
           break;
@@ -2741,19 +2750,21 @@ export class BaseWidget extends BaseBox {
     if(this.objectTargetProps != undefined){
       this.objectRef = this.objectTargetProps.ref;
       this.targetProp = this.objectTargetProps.targetProp;
+      if(this.objectTargetProps.type == 'MAT_REF'){
+        //this.box.userData.properties.valueProps = this.objectTargetProps.valueProps;
+      }
     }
-
   }
   UpdateMaterialRefColor(hex, alpha=undefined){
-    if(!(this.targetProp == 'color' || this.targetProp == 'specular' || this.targetProp == 'emissive'))
+    if(!BaseWidget.IsMaterialColorProp(this.targetProp))
       return;
     this.objectRef[this.targetProp].set(hex);
     if(alpha!=undefined){
       this.objectRef.opacity = alpha;
     }
   }
-  UpdateMaterialFloatValue(value){
-    if(!(this.targetProp == 'shininess' || this.targetProp == 'roughness' || this.targetProp == 'metalness' || this.targetProp == 'clearcoat' || this.targetProp == 'clearCoatRoughness' || this.targetProp == 'emissiveIntensity'))
+  UpdateMaterialRefFloatValue(value){
+    if(!BaseWidget.IsMaterialSliderProp(this.targetProp))
       return;
     this.objectRef[this.targetProp] = value;
   }
@@ -2856,6 +2867,12 @@ export class BaseWidget extends BaseBox {
     }
 
     return {baseWidth, baseHeight, baseDepth, handleWidth, handleHeight, handleDepth, subWidth, subHeight, subDepth}
+  }
+  static IsMaterialColorProp(prop){
+    return (prop == 'color' || prop == 'specular' || prop == 'emissive')
+  }
+  static IsMaterialSliderProp(prop){
+    return (prop == 'shininess' || prop == 'specular' || prop == 'roughness' || prop == 'metalness' || prop == 'clearcoat' || prop == 'clearCoatRoughness' || prop == 'emissive')
   }
 };
 
@@ -3018,6 +3035,14 @@ export class SliderWidget extends BaseWidget {
     }
 
     this.SetSliderUserData();
+    
+    if(this.objectTargetProps != undefined){
+      if(this.objectTargetProps.type == 'MAT_REF'){
+        if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
+          this.SetValue(this.objectRef[this.targetProp]);
+        }
+      }
+    }
 
     this.handle.addEventListener('action', function(event) {
       this.userData.targetElem.OnSliderMove();
@@ -3146,7 +3171,6 @@ export class SliderWidget extends BaseWidget {
     this.box.normalizedValue = (value-min)/(max-min);
     this.box.userData.normalizedValue = this.box.normalizedValue;
   }
-
 };
 
 export function meterProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, draggable=true, meterColor=SECONDARY_COLOR_A){
@@ -3307,27 +3331,32 @@ export class ColorWidget extends BaseWidget {
     }
 
     this.colorIndcator = new BaseBox(colorWidgetProps.indicator);
-    //this.colorIndcator.material.transparent = true;
     this.colorIndcator.AlignLeft();
     this.materialView = undefined;
 
-    if(this.objectTargetProps != undefined && this.objectTargetProps.type == 'MAT_REF'){
-      this.materialView = this.MaterialMesh(colorWidgetProps.indicator);
-      this.value = '#'+this.materialView.material[this.targetProp].getHexString();
-      this.box.userData.value = this.value;
-      let alpha = this.materialView.material[this.targetProp].opacity;
-      let color = colorsea(this.value, alpha);
-      let rgba = color.rgba();
+    if(this.objectTargetProps != undefined){
+      if(this.objectTargetProps.type == 'MAT_REF'){
+        this.value = '#'+this.objectRef[this.targetProp].getHexString();
+        this.box.userData.value = this.value;
+        let alpha = this.objectRef[this.targetProp].opacity;
+        let color = colorsea(this.value, alpha).rgba();
 
-      this.sliders.forEach((slider, index) =>{
-        slider.box.userData.valueBoxCtrl.SetValueText(rgba[index]);
-      });
-      if(this.useAlpha){
-        //this.colorIndcator.material.transparent = true;
-        this.materialView.material.transparent = true;
-        this.alphaSlider.box.userData.valueBoxCtrl.SetValueText(rgba[3]);
+        this.sliders.forEach((slider, index) =>{
+          slider.box.userData.valueBoxCtrl.SetValueText(color[index]);
+        });
+        if(this.objectTargetProps.useMaterialView){
+          this.materialView = this.MaterialMesh(colorWidgetProps.indicator);
+          if(this.useAlpha){
+            this.materialView.material.transparent = true;
+          }
+        }
+
+        if(this.useAlpha){
+          this.alphaSlider.box.userData.valueBoxCtrl.SetValueText(color[3]);
+        }
+
+        this.UpdateColor();
       }
-      this.UpdateColor();
     }
 
     this.sliders.forEach((slider, index) =>{
@@ -3364,19 +3393,34 @@ export class ColorWidget extends BaseWidget {
 
     if(this.objectRef != undefined && this.objectTargetProps.type == 'MAT_REF'){
       this.UpdateMaterialRefColor(color.hex(), alpha);
-      this.materialView.material[this.targetProp].set(color.hex());
-      this.materialView.material.opacity = alpha*0.01;
+      this.UpdateMaterialMesh(color.hex(), alpha);
+      if(this.materialView==undefined){
+        UpdateColorIndicator(hex, alpha);
+      }
     }else{
-      this.colorIndcator.SetColor(color.hex());
-      this.colorIndcator.SetOpacity(alpha*0.01);
+      UpdateColorIndicator(hex, alpha);
     }
   }
   UpdateSliderValues(){
-    this.redSlider.value = this.redSlider.box.userData.value;
-    this.greenSlider.value = this.greenSlider.box.userData.value;
-    this.blueSlider.value = this.blueSlider.box.userData.value;
+    this.sliders.forEach((slider, index) =>{
+      slider.value = slider.box.userData.value;
+    });
     if(this.useAlpha){
       this.alphaSlider.value = this.alphaSlider.box.userData.value;
+    }
+  }
+  UpdateColorIndicator(hex, alpha=undefined){
+    this.colorIndcator.SetColor(hex);
+    if(alpha!=undefined){
+      this.colorIndcator.SetOpacity(alpha*0.01);
+    }
+  }
+  UpdateMaterialMesh(hex, alpha=undefined){
+    if(this.materialView==undefined)
+      return;
+    this.materialView.material[this.targetProp].set(hex);
+    if(alpha!=undefined){
+      this.materialView.material.opacity = alpha*0.01;
     }
   }
   MaterialMesh(widgetProps){
@@ -3436,6 +3480,10 @@ export class ColorWidget extends BaseWidget {
 
     alphaProps.valueProps = numberValueProperties( 100, 0, 100, 0, 0.001, true);
 
+    if(alphaProps.objectTargetProps!=undefined && alphaProps.objectTargetProps.type == 'MAT_REF'){
+      alphaProps.objectTargetProps.valueProps = numberValueProperties( 100, 0, 100, 0, 0.001, true);
+    }
+
     return {'base': widgetProps, 'red': redProps, 'blue': blueProps, 'green': greenProps, 'alpha': alphaProps, 'indicator': indicatorBoxProps};
   }
   static SliderMatProps(widgetProps){
@@ -3449,7 +3497,7 @@ export class ColorWidget extends BaseWidget {
     blueMatProps.color = 'blue';
     let indicatorMatProps = {...boxMatProps};
     indicatorMatProps.color = widgetProps.defaultColor;
-    if(widgetProps.objectTargetProps!=undefined){
+    if(widgetProps.objectTargetProps!=undefined && widgetProps.objectTargetProps.useMaterialView){
       indicatorMatProps.color = 'black';
     }
     indicatorMatProps.useCase = 'STENCIL';
