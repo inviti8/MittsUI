@@ -834,7 +834,7 @@ export function createTextGeometry(character, font, size, height, curveSegments,
 
 //MATERIAL CREATION
 //useCase='SIMPLE','STENCIL','STENCIL_CHILD'
-export function materialProperties(type='BASIC', color='white', transparent=false, opacity=1, side=THREE.FrontSide, useCase='SIMPLE', emissive=false){
+export function materialProperties(type='BASIC', color='white', transparent=false, opacity=1, side=THREE.FrontSide, useCase='SIMPLE', emissive=false, reflective=false, iridescent=false){
   return {
     'type': type,
     'color': color,
@@ -842,7 +842,9 @@ export function materialProperties(type='BASIC', color='white', transparent=fals
     'opacity': opacity,
     'side': side,
     'useCase': useCase,
-    'emissive': emissive
+    'emissive': emissive,
+    'reflective': reflective,
+    'iridescent':iridescent
   }
 };
 
@@ -852,6 +854,17 @@ export function materialRefProperties(matType='PHONG', ref=undefined, targetProp
     'matType': matType,
     'ref': ref,
     'targetProp': targetProp,
+    'valueProps': valueProps,
+    'useMaterialView': useMaterialView
+  }
+};
+
+export function setRefProperties(setType='MATERIAL', meshRefs=[], materialIndex=0, valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false){
+  return {
+    'type': 'SET_REF',
+    'setType': setType,
+    'meshRefs': meshRefs,
+    'materialIndex': materialIndex,
     'valueProps': valueProps,
     'useMaterialView': useMaterialView
   }
@@ -2153,7 +2166,7 @@ export class PanelGltfModelMeter extends PanelGltfModel{
     this.DeleteText();
     this.loadedCallback = this.SetupMeter;
   }
-  SetupMeter(){this.panelProps
+  SetupMeter(){
     this.meterProps.boxProps.width = this.meterProps.boxProps.width-this.modelBox.size.width;
     this.ctrlWidget = new MeterWidget(this.meterProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -2231,7 +2244,7 @@ export class PanelMaterialSlider extends PanelBox {
     const matRefProps = section.data;
     matRefProps.valueProps.editable = true;
     const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, matRefProps.valueProps);
-    sliderProps.objectTargetProps = matRefProps;
+    sliderProps.objectControlProps = matRefProps;
     this.ctrlWidget = new SliderWidget(sliderProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -2285,11 +2298,31 @@ export class PanelMaterialColorWidget extends PanelBox {
       this.colorWidgetProps.useAlpha = false;
       matRefProps.useMaterialView = false;
     }
-    this.colorWidgetProps.objectTargetProps = matRefProps;
-    console.log('this.colorWidgetProps.objectTargetProps')
-    console.log(this.colorWidgetProps.objectTargetProps)
+    this.colorWidgetProps.objectControlProps = matRefProps;
     this.ctrlWidget = new ColorWidget(this.colorWidgetProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
+  }
+};
+
+export class PanelGltfMaterialSelector extends PanelGltfModel{
+  constructor(panelProps) {
+    super(panelProps);
+    this.SetParentPanel();
+    const section = panelProps.sections.data[panelProps.name];
+    this.selectors = section.data;
+    this.listSelectorProps = defaultPanelListSelectorProps(panelProps.name, this.box, panelProps.textProps.font);
+    this.DeleteText();
+    this.loadedCallback = this.SetupSelector;
+  }
+  SetupSelector(){
+    this.listSelectorProps.boxProps.width = this.meterProps.boxProps.width-this.modelBox.size.width;
+    this.ctrlWidget = new SelectorWidget(this.listSelectorProps);
+    this.ctrlWidget.box.userData.hoverZPos = this.size.depth*2;
+    this.ctrlWidget.SetSelectors(this.selectors);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+    this.modelBox.box.translateX(-(this.ctrlWidget.size.width/2+this.ctrlWidget.valueTextBox.width/2));
+    this.ctrlWidget.box.translateX(this.modelBox.size.width/2);
+    this.ctrlWidget.widgetText.translateX(-this.modelBox.size.width/2);
   }
 };
 
@@ -2328,10 +2361,9 @@ export function panelSectionProperties(name='Section', value_type='container', d
   }
 };
 
-export function panelMaterialSectionPropertySet(material, emissive=false){
+export function panelMaterialSectionPropertySet(material, emissive=false, reflective=false, iridescent=false, sheen=false){
   let sectionData = {};
   let matType = undefined;
-  //let props = ['color', 'shininess', 'specular', 'roughness', 'metalness', 'clearcoat', 'clearCoatRoughness', 'emissive']
   let props = {}
 
   switch (material.type) {
@@ -2360,13 +2392,20 @@ export function panelMaterialSectionPropertySet(material, emissive=false){
       props['color'] = 'mat_color_widget';
       props['roughness'] = 'mat_slider';
       props['metalness'] = 'mat_slider';
-      props['ior'] = 'mat_slider';
-      props['reflectivity'] = 'mat_slider';
-      props['iridescence'] = 'mat_slider';
-      props['iridescenceIOR'] = 'mat_slider';
-      props['sheen'] = 'mat_slider';
-      props['sheenRoughness'] = 'mat_slider';
-      props['sheenColor'] = 'mat_color_widget';
+      if(reflective){
+        props['ior'] = 'mat_slider';
+        props['reflectivity'] = 'mat_slider';
+      }
+      if(iridescent){
+        props['iridescence'] = 'mat_slider';
+        props['iridescenceIOR'] = 'mat_slider';
+      }
+      if(sheen){
+        props['sheen'] = 'mat_slider';
+        props['sheenRoughness'] = 'mat_slider';
+        props['sheenColor'] = 'mat_color_widget';
+      }
+      
       props['clearcoat'] = 'mat_slider';
       props['clearCoatRoughness'] = 'mat_slider';
       props['specularColor'] = 'mat_color_widget';
@@ -2742,7 +2781,7 @@ export function CreateBasePanel(panelProps) {
   
 };
 
-export function widgetProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), listConfig=undefined, handleSize=2, objectTargetProps=undefined ){
+export function widgetProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), listConfig=undefined, handleSize=2, objectControlProps=undefined ){
   return {
     'type': 'WIDGET',
     'boxProps': boxProps,
@@ -2754,7 +2793,7 @@ export function widgetProperties(boxProps, name='', horizontal=true, on=false, t
     'valueProps': valueProps,
     'listConfig': listConfig,
     'handleSize': handleSize,
-    'objectTargetProps': objectTargetProps
+    'objectControlProps': objectControlProps
   }
 };
 
@@ -2767,7 +2806,7 @@ export class BaseWidget extends BaseBox {
     baseBoxProps.height = size.baseHeight;
     baseBoxProps.depth = size.baseDepth/2;
     super(baseBoxProps);
-    this.objectTargetProps = widgetProps.objectTargetProps;
+    this.objectControlProps = widgetProps.objectControlProps;
     let zOffset = 1;
     this.value = widgetProps.valueProps.defaultValue;
     this.box.userData.horizontal = widgetProps.horizontal;
@@ -2806,15 +2845,21 @@ export class BaseWidget extends BaseBox {
     this.widgetText = this.WidgetText();
     this.widgetTextSize = getGeometrySize(this.widgetText.geometry);
 
-    if(this.objectTargetProps != undefined){
-      this.objectRef = this.objectTargetProps.ref;
-      this.targetProp = this.objectTargetProps.targetProp;
-      if(this.objectTargetProps.type == 'MAT_REF'){
+    if(this.objectControlProps != undefined){
+      if(this.objectControlProps.type == 'MAT_REF'){
+        this.objectRef = this.objectControlProps.ref;
+        this.targetProp = this.objectControlProps.targetProp;
         this.objectRef.userData.materialCtrls = [];
         this.objectRef.userData.refreshCallback = this.RefreshMaterialRefs;
         this.objectRef.addEventListener('refreshMaterialViews', function(event) {
           this.userData.refreshCallback(this);
         });
+      }else if(this.objectControlProps.type == 'SET_REF'){
+        if(this.objectControlProps.setType == 'MATERIAL'){
+
+        }else if(this.objectControlProps.setType == 'MESH'){
+          
+        } 
       }
     }
   }
@@ -3080,7 +3125,7 @@ class ValueTextWidget extends BaseTextBox{
 
 }
 
-export function sliderProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, objectTargetProps=undefined){
+export function sliderProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, objectControlProps=undefined){
   return {
     'type': 'SLIDER',
     'boxProps': boxProps,
@@ -3092,7 +3137,7 @@ export function sliderProperties(boxProps, name='', horizontal=true, textProps=u
     'valueProps': valueProps,
     'handleSize': handleSize,
     'draggable': true,
-    'objectTargetProps': objectTargetProps
+    'objectControlProps': objectControlProps
   }
 };
 
@@ -3121,8 +3166,8 @@ export class SliderWidget extends BaseWidget {
 
     this.SetSliderUserData();
     
-    if(this.objectTargetProps != undefined){
-      if(this.objectTargetProps.type == 'MAT_REF'){
+    if(this.objectControlProps != undefined){
+      if(this.objectControlProps.type == 'MAT_REF'){
         if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
           this.box.userData.valueBoxCtrl.SetValueText(this.objectRef[this.targetProp]);
           this.objectRef.userData.materialCtrls.push(this);
@@ -3370,7 +3415,7 @@ export class ColorHandler {
   }
 };
 
-export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex', objectTargetProps=undefined ){
+export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex', objectControlProps=undefined ){
   return {
     'type': 'COLOR_WIDGET',
     'boxProps': boxProps,
@@ -3386,7 +3431,7 @@ export function colorWidgetProperties(boxProps, name='', horizontal=true, defaul
     'alpha': alpha,
     'meter': meter,
     'colorValueType': colorValueType,
-    'objectTargetProps': objectTargetProps
+    'objectControlProps': objectControlProps
   }
 };
 
@@ -3429,8 +3474,8 @@ export class ColorWidget extends BaseWidget {
     this.colorIndicator.AlignLeft();
     this.materialView = undefined;
 
-    if(this.objectTargetProps != undefined){
-      if(this.objectTargetProps.type == 'MAT_REF'){
+    if(this.objectControlProps != undefined){
+      if(this.objectControlProps.type == 'MAT_REF'){
         this.value = '#'+this.objectRef[this.targetProp].getHexString();
         this.box.userData.value = this.value;
         let alpha = this.objectRef[this.targetProp].opacity;
@@ -3439,7 +3484,7 @@ export class ColorWidget extends BaseWidget {
         this.sliders.forEach((slider, index) =>{
           slider.box.userData.valueBoxCtrl.SetValueText(color[index]);
         });
-        if(this.objectTargetProps.useMaterialView){
+        if(this.objectControlProps.useMaterialView){
           this.materialView = this.MaterialViewMesh(colorWidgetProps.indicator);
           this.objectRef.userData.materialCtrls.push(this);
           if(this.useAlpha){
@@ -3494,7 +3539,7 @@ export class ColorWidget extends BaseWidget {
       alpha = this.alphaSlider.value;
     }
 
-    if(this.objectRef != undefined && this.objectTargetProps.type == 'MAT_REF'){
+    if(this.objectRef != undefined && this.objectControlProps.type == 'MAT_REF'){
       this.UpdateMaterialRefColor(color.hex(), alpha);
       this.UpdateMaterialView(color.hex(), alpha);
       if(this.materialView==undefined){
@@ -3593,8 +3638,8 @@ export class ColorWidget extends BaseWidget {
 
     alphaProps.valueProps = numberValueProperties( 100, 0, 100, 0, 0.001, true);
 
-    if(alphaProps.objectTargetProps!=undefined && alphaProps.objectTargetProps.type == 'MAT_REF'){
-      alphaProps.objectTargetProps.valueProps = numberValueProperties( 100, 0, 100, 0, 0.001, true);
+    if(alphaProps.objectControlProps!=undefined && alphaProps.objectControlProps.type == 'MAT_REF'){
+      alphaProps.objectControlProps.valueProps = numberValueProperties( 100, 0, 100, 0, 0.001, true);
     }
 
     return {'base': widgetProps, 'red': redProps, 'blue': blueProps, 'green': greenProps, 'alpha': alphaProps, 'indicator': indicatorBoxProps};
@@ -3610,7 +3655,7 @@ export class ColorWidget extends BaseWidget {
     blueMatProps.color = 'blue';
     let indicatorMatProps = {...boxMatProps};
     indicatorMatProps.color = widgetProps.defaultColor;
-    if(widgetProps.objectTargetProps!=undefined && widgetProps.objectTargetProps.useMaterialView){
+    if(widgetProps.objectControlProps!=undefined && widgetProps.objectControlProps.useMaterialView){
       indicatorMatProps.color = 'black';
     }
     indicatorMatProps.useCase = 'STENCIL';
@@ -4143,14 +4188,15 @@ export function createScrollableTextInputPortal(textInputProps) {
   createTextInput(textInputProps);
 };
 
-export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', textProps=undefined, animProps=undefined, listConfig=undefined){
+export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', textProps=undefined, animProps=undefined, listConfig=undefined, objectControlProps=undefined){
   return {
     'type': 'LIST_SELECTOR',
     'boxProps': boxProps,
     'name': name,
     'textProps': textProps,
     'animProps': animProps,
-    'listConfig': listConfig
+    'listConfig': listConfig,
+    'objectControlProps': objectControlProps
   }
 };
 
@@ -4158,7 +4204,14 @@ export function defaultPanelListSelectorProps(name, parent, font){
   const boxProps = defaultPanelListSelectorBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
   const listSelectorProps = listSelectorProperties(boxProps, name, textProps)
-  //listSelectorProps.isPortal = true;
+
+  return listSelectorProps
+};
+
+export function defaultPanelMaterialSetSelectorProps(name, parent, font){
+  const boxProps = defaultPanelListSelectorBoxProps(name, parent);
+  const textProps = defaultWidgetTextProperties(font);
+  const listSelectorProps = listSelectorProperties(boxProps, name, textProps)
 
   return listSelectorProps
 };
