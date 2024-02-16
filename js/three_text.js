@@ -2855,6 +2855,7 @@ export class BaseWidget extends BaseBox {
           this.userData.refreshCallback(this);
         });
       }else if(this.objectControlProps.type == 'SET_REF'){
+        this.setRef = this.objectControlProps.setRef;
         if(this.objectControlProps.setType == 'MATERIAL'){
 
         }else if(this.objectControlProps.setType == 'MESH'){
@@ -4591,6 +4592,159 @@ export function createImageBox(imageProps){
   }
 };
 
+function LoadHVYMData(gltf){
+  const scene = gltf.scene;
+  const extensions = gltf.userData.gltfExtensions
+  if(!('HVYM_nft_data' in extensions))
+    return;
+
+  return new HVYM_Data(extensions.HVYM_nft_data);
+}
+
+export class HVYM_Data {
+  constructor(gltf) {
+    const extensions = gltf.userData.gltfExtensions
+    if('HVYM_nft_data' in extensions){
+      this.contractProps = extensions.HVYM_nft_data.contract;
+      this.collections = {};
+      for (const [key, obj] of Object.entries(extensions.HVYM_nft_data)) {
+
+        if(key=='contract'){
+
+        }else{
+          this.collections[key] = this.hvymCollection(key, obj.collectionName);
+          this.collections[key].models = this.getCollectionModelRefs(gltf.scene, obj.nodes);
+          this.collections[key].materials = this.getGltfSceneMaterials(gltf.scene);
+
+          // obj.valProps.forEach((prop, index) =>{
+
+          // });
+
+          // obj.meshProps.forEach((prop, index) =>{
+
+          // });
+
+          for (const [k, v] of Object.entries(obj.meshSets)) {
+            let set = {};
+            v.forEach((m_ref, index) =>{
+              let mesh_ref = this.collections[key].models[m_ref.name]
+              let ref = this.hvymMeshSetRef(mesh_ref, m_ref.visible);
+              set[m_ref.name] = ref
+            });
+
+            this.collections[key].meshSets[k] = this.hvymMeshSet(set);
+          }
+
+          // obj.morphProps.forEach((prop, index) =>{
+
+          // });
+
+          // obj.animProps.forEach((prop, index) =>{
+
+          // });
+
+          // obj.materials.forEach((mat, index) =>{
+
+          // });
+
+          for (const [k, v] of Object.entries(obj.materialSets)) {
+            let mesh_set = this.collections[key].meshSets[v.mesh_set];
+            let mat_id = v.material_id;
+            if(mesh_set == undefined)
+              return;
+
+            let mat_set = {};
+
+            v.set.forEach((m_ref, index) =>{
+              let mat = this.collections[key].materials[m_ref.name];
+              let m_name = mat.name;
+              mat_set[m_name] = this.hvymMaterialSetRef(mat);
+            });
+
+            this.collections[key].materialSets[k] = this.hvymMaterialSet(mat_id, mat_set, mesh_set);
+          }
+
+        }
+
+      }
+    }
+  }
+  hvymCollection(id, collectionName){
+    return {
+      'type': 'HVYM_COLLECTION',
+      'id': id,
+      'collectionName': collectionName,
+      'valProps': {},
+      'morphProps': {},
+      'animProps': {},
+      'materials': {},
+      'meshSets': {},
+      'materialSets': {},
+      'models': {},
+      'materials': {}
+    }
+  }
+  hvymMeshSet(set){
+    return {
+      'type': 'HVYM_MESH_SET',
+      'set': set
+    }
+  }
+  hvymMeshSetRef(mesh_ref, visible){
+    return {
+      'type': 'HVYM_MESH_SET_REF',
+      'mesh_ref': mesh_ref,
+      'visible': visible
+    }
+  }
+  hvymMaterialSet(material_id, set, mesh_set){
+    return {
+      'type': 'HVYM_MAT_SET',
+      'material_id': material_id,
+      'set': set,
+      'mesh_set': mesh_set
+    }
+  }
+  hvymMaterialSetRef(mat_ref){
+    return {
+      'type': 'HVYM_MAT_SET_REF',
+      'mat_ref': mat_ref
+    }
+  }
+  getGltfSceneModel(scene, name){
+    let result = undefined;
+
+    scene.traverse( function( child ) {
+      if(child.name == name && child.isObject3D){
+        result = child;
+      } 
+    });
+
+    return result
+  }
+  getGltfSceneMaterials(scene){
+    let result = {};
+
+    scene.traverse( function( child ) {
+      if(child.isObject3D && child.hasOwnProperty('material')){
+        result[child.material.name] = child.material;
+      } 
+    });
+
+    return result
+  }
+  getCollectionModelRefs(scene, nodes){
+    let result = {};
+    nodes.forEach((node, index) =>{
+      let ref = this.getGltfSceneModel(scene, node.name);
+      let k = node.name;
+      result[k] = ref;
+    });
+
+    return result
+  }
+};
+
 export function modelValueProperties(path=0, rotX=false, rotY=false, useLabel=true, widgetValueProp=undefined){
   return {
     'type': 'MODEL_VALUE_PROPS',
@@ -4609,7 +4763,8 @@ export function gltfProperties(boxProps, name='', gltf=undefined, listConfig=und
     'name': name,
     'gltf': gltf,
     'listConfig': listConfig,
-    'zOffset': zOffset
+    'zOffset': zOffset,
+    'hvymData': undefined
   }
 };
 
@@ -4707,8 +4862,13 @@ export function createGLTFModel(gltfProps){
   if(typeof gltfProps.gltf === 'string'){
     // Instantiate a loader
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
+        console.log('gltf!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+        console.log(gltf)
         gltfProps.gltf = gltf;
         GLTFModelLoader(gltfProps);
+        let hvymData = new HVYM_Data(gltf)
+        console.log('hvymData&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
+        console.log(hvymData)
       },
       // called while loading is progressing
       function ( xhr ) {
