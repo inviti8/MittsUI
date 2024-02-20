@@ -1744,6 +1744,7 @@ function setGeometryPivot(mesh, boxProps){
 
 export class BaseBox {
   constructor(boxProps) {
+    this.is = 'BASE_BOX';
     this.parent = boxProps.parent;
     this.width = boxProps.width;
     this.height = boxProps.height;
@@ -2055,7 +2056,7 @@ export function defaultPanelEditTextButtonProps(name, parent, font){
 class BaseTextBox extends BaseBox {
   constructor(buttonProps) {
     super(buttonProps.boxProps);
-
+    this.is = 'BASE_TEXT_BOX';
     this.text = buttonProps.name;
     this.textProps = buttonProps.textProps;
     this.textProps.MultiLetterMeshes = false;
@@ -2102,6 +2103,7 @@ class BaseTextBox extends BaseBox {
 export class PanelBox extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.is = 'PANEL_BOX';
     this.SetParentPanel();
     this.DeleteText();
     this.AlignOutsideBehindParent();
@@ -2111,6 +2113,7 @@ export class PanelBox extends BaseTextBox {
 export class PanelLabel extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.is = 'PANEL_LABEL';
     this.SetParentPanel();
     this.AlignOutsideBehindParent();
   }
@@ -2119,6 +2122,7 @@ export class PanelLabel extends BaseTextBox {
 export class PanelGltfModel extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    this.is = 'PANEL_GLTF_MODEL';
     this.SetParentPanel();
     this.AlignOutsideBehindParent();
     this.panelProps = panelProps;
@@ -2134,6 +2138,7 @@ export class PanelGltfModel extends BaseTextBox {
     gltfProps.ctrl = this;
 
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
+        gltfProps.hvymData = new HVYM_Data(gltf);
         gltfProps.gltf = gltf;
         gltfProps.ctrl.modelBox = new GLTFModelWidget(gltfProps);
         gltfProps.ctrl.box.userData.modelBox = gltfProps.ctrl.ctrlWidget;
@@ -2161,6 +2166,7 @@ export class PanelGltfModel extends BaseTextBox {
 export class PanelGltfModelMeter extends PanelGltfModel{
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_GLTF_MODEL_METER';
     this.SetParentPanel();
     this.meterProps = defaultPanelMeterProps(this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
     this.DeleteText();
@@ -2179,6 +2185,7 @@ export class PanelGltfModelMeter extends PanelGltfModel{
 export class PanelGltfModelValueMeter extends PanelGltfModelMeter{
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_GLTF_MODEL_VALUE_METER';
     this.SetParentPanel();
     this.meterProps = defaultPanelValueMeterProps(this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
     this.loadedCallback = this.SetupValueMeter;
@@ -2197,6 +2204,7 @@ export class PanelEditText extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.SetParentPanel();
+    this.is = 'PANEL_EDIT_TEXT';
     const editTextProps = defaultPanelEditTextProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new InputTextWidget(editTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -2206,6 +2214,7 @@ export class PanelEditText extends PanelBox {
 export class PanelInputText extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_INPUT_TEXT';
     this.SetParentPanel();
     const inputTextProps = defaultPanelInputTextProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new InputTextWidget(inputTextProps);
@@ -2216,6 +2225,7 @@ export class PanelInputText extends PanelBox {
 export class PanelBooleanToggle extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_BOOLEAN_TOGGLE';
     this.SetParentPanel();
     this.DeleteText();
     const toggleProps = defaultPanelBooleanToggleProps(panelProps.name, this.box, panelProps.textProps.font);
@@ -2227,6 +2237,7 @@ export class PanelBooleanToggle extends PanelBox {
 export class PanelSlider extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_SLIDER';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     const valProps = section.data;
@@ -2239,6 +2250,7 @@ export class PanelSlider extends PanelBox {
 export class PanelMaterialSlider extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_MATERIAL_SLIDER';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     const matRefProps = section.data;
@@ -2253,6 +2265,7 @@ export class PanelMaterialSlider extends PanelBox {
 export class PanelMeter extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_METER';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     const valProps = section.data;
@@ -2265,6 +2278,7 @@ export class PanelMeter extends PanelBox {
 export class PanelValueMeter extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_VALUE_METER';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     const valProps = section.data;
@@ -2277,6 +2291,7 @@ export class PanelValueMeter extends PanelBox {
 export class PanelColorWidget extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_COLOR_WIDGET';
     this.SetParentPanel();
     const colorWidgetProps = defaultPanelColorWidgetProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new ColorWidget(colorWidgetProps);
@@ -2287,6 +2302,7 @@ export class PanelColorWidget extends PanelBox {
 export class PanelMaterialColorWidget extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_MATERIAL_COLOR_WIDGET';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     const matRefProps = section.data;
@@ -2307,6 +2323,7 @@ export class PanelMaterialColorWidget extends PanelBox {
 export class PanelGltfMaterialSelector extends PanelGltfModel{
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_GLTF_MATERIAL_SELECTOR';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     this.selectors = section.data;
@@ -2318,7 +2335,7 @@ export class PanelGltfMaterialSelector extends PanelGltfModel{
     this.listSelectorProps.boxProps.width = this.meterProps.boxProps.width-this.modelBox.size.width;
     this.ctrlWidget = new SelectorWidget(this.listSelectorProps);
     this.ctrlWidget.box.userData.hoverZPos = this.size.depth*2;
-    this.ctrlWidget.SetSelectors(this.selectors);
+    this.ctrlWidget.AssignSelectionSet(this.selectors);
     this.box.userData.ctrlWidget = this.ctrlWidget;
     this.modelBox.box.translateX(-(this.ctrlWidget.size.width/2+this.ctrlWidget.valueTextBox.width/2));
     this.ctrlWidget.box.translateX(this.modelBox.size.width/2);
@@ -2330,13 +2347,14 @@ export class PanelListSelector extends PanelBox {
   constructor(panelProps) {
     panelProps.boxProps.matProps.useCase = 'STENCIL';
     super(panelProps);
+    this.is = 'PANEL_LIST_SELECTOR';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     this.selectors = section.data;
     const listSelectorProps = defaultPanelListSelectorProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new SelectorWidget(listSelectorProps);
     this.ctrlWidget.box.userData.hoverZPos = this.size.depth*2;
-    this.ctrlWidget.SetSelectors(this.selectors);
+    this.ctrlWidget.AssignSelectionSet(this.selectors);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
 };
@@ -2344,6 +2362,7 @@ export class PanelListSelector extends PanelBox {
 export class PanelButton extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
+    this.is = 'PANEL_BUTTON';
     this.SetParentPanel();
     const buttonProps = defaultPanelButtonProps(panelProps.name, this.box, panelProps.textProps.font)
     this.ctrlWidget = ButtonElement(buttonProps);
@@ -2447,6 +2466,38 @@ export function panelMaterialSectionPropertySet(material, emissive=false, reflec
   return panelSectionProperties(material.name, 'controls', sectionData)
 };
 
+export function panelMaterialSetSectionPropertySet(materialSet){
+  let sectionData = {};
+  let matType = undefined;
+  let props = {}
+
+  return panelSectionProperties(materialSet.name, 'controls', sectionData)
+};
+
+export function panelCollectionPropertySet(parent, collections){
+  let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', parent);
+  let panelTextProps = defaultWidgetTextProperties(DEFAULT_FONT);
+  let colPanels = [];
+  const collectionKeys = ['valProps',]
+  for (const [colId, collection] of Object.entries(collections)) {
+    let data = panelSectionProperties('test', 'label', {})
+    let sectionData = {};
+    sectionData[data.name] = data
+    let topData1 = panelSectionProperties('section 1', 'controls', sectionData);
+    let topData = {};
+    topData[topData1.name] = topData1;
+    let topSectionData = panelSectionProperties('sections', 'container', topData);
+    let colPanel = panelProperties( panelBoxProps, collection.collectionName, panelTextProps, 'LEFT', topSectionData);
+    colPanels.push(colPanel);
+  }
+  console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+  console.log(colPanels)
+  console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+
+  return colPanels
+
+};
+
 export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
   return {
     'type': 'PANEL',
@@ -2464,10 +2515,15 @@ export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT
   }
 };
 
+export function hvymPanelProperties(parent, font){
+  let panelBoxProps = three_text.defaultPanelWidgetBoxProps('gltf-panel-box', parent);
+  let panelTextProps = three_text.defaultWidgetTextProperties(font);
+};
+
 export class BasePanel extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
-
+    this.is = 'BASE_PANEL';
     this.boxProps = panelProps.boxProps;
     this.name = panelProps.name;
     this.textProps = panelProps.textProps;
@@ -2497,12 +2553,6 @@ export class BasePanel extends BaseTextBox {
       this.handleMaterial = this.textMaterial;
     }
 
-    if(panelProps.topPanel == undefined){
-      panelProps.topPanel = this.box;
-      panelProps.topCtrl = this;
-      this.handleOpen = this.CreateTopHandle();
-    }
-
     this.box.userData.properties = panelProps;
     
     this.handleExpand = this.CreateHandle(panelProps);
@@ -2513,6 +2563,15 @@ export class BasePanel extends BaseTextBox {
     this.box.userData.handleExpand = this.handleExpand;
     this.handleExpand.userData.targetElem = this.box;
     this.handleExpand.position.set(this.width/2, this.height/2 - this.handleExpand.userData.size.height*2, this.depth/2);
+
+    if(panelProps.topPanel == undefined){
+      panelProps.topPanel = this.box;
+      panelProps.topCtrl = this;
+      this.handleOpen = this.CreateTopHandle();
+      this.box.renderOrder = 2;
+      this.bottom.box.renderOrder = 2;
+    }
+
 
     if(panelProps.expanded){
       this.handleExpand.rotation.z = this.handleExpand.rotation.z+0.8;
@@ -2730,6 +2789,7 @@ export class BasePanel extends BaseTextBox {
       ctrlBox.box.userData.index = index;
       ctrlBox.box.userData.expandedPos = new THREE.Vector3(ctrlBox.box.position.x, yPos, ctrlBox.box.position.z);
       ctrlBox.box.userData.closedPos = new THREE.Vector3().copy(ctrlBox.box.position);
+      ctrlBox.box.renderOrder = panelProps.topPanel.renderOrder-2;
       widgetHeight = ctrlBox.box.userData.height;
       
       index += 1;
@@ -2757,6 +2817,8 @@ export class BasePanel extends BaseTextBox {
       section.box.userData.index = index;
       section.box.userData.expandedPos.set(section.box.position.x, yPos, section.box.position.z);
       section.box.userData.closedPos = new THREE.Vector3().copy(section.box.position);
+      section.box.renderOrder = panelProps.topPanel.renderOrder-1;
+      section.bottom.box.renderOrder = section.box.renderOrder;
       panelProps.topPanel.userData.sectionElements.push(section.box);
       this.box.userData.panelList.push(section);
       this.panelList.push(section);
@@ -2806,6 +2868,7 @@ export class BaseWidget extends BaseBox {
     baseBoxProps.height = size.baseHeight;
     baseBoxProps.depth = size.baseDepth/2;
     super(baseBoxProps);
+    this.is = 'BASE_WIDGET';
     this.objectControlProps = widgetProps.objectControlProps;
     let zOffset = 1;
     this.value = widgetProps.valueProps.defaultValue;
@@ -2959,6 +3022,20 @@ export class BaseWidget extends BaseBox {
 
     return valBox
   }
+  static MaterialViewMesh(parentBox, objectRef){
+    const radius = parentBox.size.width/4;
+    const geometry = new THREE.SphereGeometry(radius, 32, 16);
+    const size = getGeometrySize(geometry)
+    const material = objectRef.clone();
+    setupStencilChildMaterial(material, parentBox.material.stencilRef);
+    const sphere = new THREE.Mesh( geometry, material );
+
+    parentBox.box.add(sphere);
+    sphere.position.set(0,0,0);
+    sphere.translateZ(-size.depth/2);
+
+    return sphere
+  }
   static CalculateElementSizeOffset(elementSize, horizontal, boxProps){
     let bProps = {...boxProps};
     if(horizontal){
@@ -3055,6 +3132,7 @@ class ValueTextWidget extends BaseTextBox{
       valBoxProps.width=widgetProps.boxProps.width;
     }
     super(buttonProperties(valBoxProps, defaultVal, widgetProps.value, textProps, false));
+    this.is = 'VALUE_TEXT_WIDGET';
     this.widgetSize = size;
     this.numeric = widgetProps.numeric;
     this.places = widgetProps.valueProps.places;
@@ -3152,6 +3230,7 @@ export class SliderWidget extends BaseWidget {
   constructor(widgetProps) {
     widgetProps.textProps.align = 'LEFT';
     super(widgetProps);
+    this.is = 'SLIDER_WIDGET';
     if(widgetProps.valueProps.editable){
       draggable.push(this.handle);
     }
@@ -3341,6 +3420,7 @@ export function defaultPanelValueMeterProps(name, parent, font, valueProps){
 export class MeterWidget extends SliderWidget {
   constructor(widgetProps) {
     super(widgetProps);
+    this.is = 'METER_WIDGET';
     const meterBoxProps = {...widgetProps.boxProps}
     let meterMatProps = {...widgetProps.boxProps.matProps}
     meterMatProps.color = widgetProps.meterColor;
@@ -3449,6 +3529,7 @@ export class ColorWidget extends BaseWidget {
       widgetProps.useAlpha = false;
     }
     super(colorWidgetProps.base);
+    this.is = 'COLOR_WIDGET';
     this.value = widgetProps.defaultColor;
     this.isMeter = widgetProps.meter;
 
@@ -3486,7 +3567,7 @@ export class ColorWidget extends BaseWidget {
           slider.box.userData.valueBoxCtrl.SetValueText(color[index]);
         });
         if(this.objectControlProps.useMaterialView){
-          this.materialView = this.MaterialViewMesh(colorWidgetProps.indicator);
+          this.materialView = BaseWidget.MaterialViewMesh(this.colorIndicator, this.objectRef);
           this.objectRef.userData.materialCtrls.push(this);
           if(this.useAlpha){
             this.materialView.material.transparent = true;
@@ -3581,20 +3662,6 @@ export class ColorWidget extends BaseWidget {
         this.materialView.material[prop] = this.objectRef[prop];
       }
     });
-  }
-  MaterialViewMesh(widgetProps){
-    const radius = this.colorIndicator.size.width/4;
-    const geometry = new THREE.SphereGeometry(radius, 32, 16);
-    const size = getGeometrySize(geometry)
-    const material = this.objectRef.clone();
-    setupStencilChildMaterial(material, this.colorIndicator.box.material.stencilRef);
-    const sphere = new THREE.Mesh( geometry, material );
-
-    this.colorIndicator.box.add(sphere);
-    sphere.position.set(0,0,0);
-    sphere.translateZ(-size.depth/2);
-
-    return sphere
   }
   InitColorWidgetProps(sliderWidgetProps){
     let colors = ['red', 'blue', 'green'];
@@ -3741,6 +3808,7 @@ export class ToggleWidget extends BaseWidget {
   constructor(widgetProps) {
 
     super(widgetProps);
+    this.is = 'TOGGLE_WIDGET';
     this.on = widgetProps.on;
     
     if(this.box.userData.hasSubObject){
@@ -3870,6 +3938,7 @@ export class TextBoxWidget extends BaseWidget {
     const textProps = textBoxProps.textProps;
     let widgetProps = widgetProperties(textBoxProps.boxProps, "", true, true, textProps, false, undefined, textBoxProps.listConfig, 0);
     super(widgetProps);
+    this.is = 'TEXT_BOX_WIDGET';
     this.textMeshMaterial = getMaterial(textProps.matProps);
     this.textProps = textProps;
     this.textMesh = this.BaseText.NewTextMesh('textMesh', textBoxProps.text);
@@ -4032,6 +4101,7 @@ export class InputTextWidget extends BaseWidget {
     const textProps = textInputProps.textProps;
     let widgetProps = widgetProperties(inputBoxProps, textInputProps.name, true, true, textProps, false, undefined, textInputProps.listConfig, 0)
     super(widgetProps);
+    this.is = 'INPUT_TEXT_WIDGET';
     this.BaseText.SetParent(this.box);
     this.inputText = this.BaseText.NewTextMesh('inputText', 'Enter Text');
     setupStencilChildMaterial(this.inputText.material, this.box.material.stencilRef);
@@ -4189,6 +4259,13 @@ export function createScrollableTextInputPortal(textInputProps) {
   createTextInput(textInputProps);
 };
 
+export function selectorSet(set){
+  return {
+    'type': 'SELECTOR_SET',
+    'set': set
+  }
+};
+
 export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', textProps=undefined, animProps=undefined, listConfig=undefined, objectControlProps=undefined){
   return {
     'type': 'LIST_SELECTOR',
@@ -4235,6 +4312,8 @@ export class SelectorWidget extends BaseWidget {
     }
     let widgetProps = widgetProperties(btnBoxProps, listSelectorProps.name, true, true, btnTextProps, false, undefined, listSelectorProps.listConfig, 0)
     super(widgetProps);
+    this.is = 'SELCTOR_WIDGET';
+    this.isHVYM = false;
     this.isPortal = isPortal;
     this.box.userData.properties = listSelectorProps;
     this.box.userData.selectors = [];
@@ -4245,11 +4324,18 @@ export class SelectorWidget extends BaseWidget {
     this.btnTextProps = btnTextProps;
     this.boxProps = btnBoxProps;
     this.selectors = {};
+    this.meshSet = undefined;
 
   }
-  SetSelectors(selectors){
-    this.selectors = selectors;
+  AssignSelectionSet(selectors){
+    this.selectors = selectors.set;
     this.CreateSelectors();
+    if(selectors.type == 'SELECTOR_SET'){
+      
+    }else if(selectors.type == 'HVYM_MAT_SET'){
+      this.isHVYM = true;
+      this.meshSet = selectors.mesh_set;
+    }
   }
   CreateSelectors(){
     let idx = 0;
@@ -4304,7 +4390,6 @@ export class SelectorWidget extends BaseWidget {
     if(this.isPortal){
       this.CreateHeightExpandedMorph(Object.keys(this.selectors).length);
     }
-
   }
   SetUserData(btn, key, value, index){
     const textSize = getGeometrySize(btn.textMesh.geometry);
@@ -4342,6 +4427,7 @@ export class SelectorWidget extends BaseWidget {
     base.userData.selectors.sort(function(x,y){ return x == first ? -1 : y == first ? 1 : 0; });
     selectorAnimation(selection.parent.parent, 'SELECT');
 
+    console.log(selection.userData.value)
   }
 };
 
@@ -4352,11 +4438,11 @@ export function createListSelector(listSelectorProps, selectors) {
     loader.load(listSelectorProps.textProps.font, (font) => {
       listSelectorProps.textProps.font = font;
       let widget = new SelectorWidget(listSelectorProps);
-      widget.SetSelectors(selectors);
+      widget.AssignSelectionSet(selectors);
     });
   }else if(listSelectorProps.textProps.font.isFont){
     let widget = new SelectorWidget(listSelectorProps);
-      widget.SetSelectors(selectors);
+      widget.AssignSelectionSet(selectors);
   }
 
 };
@@ -4550,6 +4636,7 @@ export class ImageWidget extends BaseWidget {
     imageProps.boxProps.isPortal = true;
     let widgetProps = widgetProperties(imageProps.boxProps, imageProps.name, true, true, textProps, false, undefined, imageProps.listConfig, 0);
     super(widgetProps);
+    this.is = 'IMAGE_WIDGET';
     this.map = new THREE.TextureLoader().load( imageProps.imgUrl );
     this.imageMaterial = new THREE.MeshBasicMaterial( { color: 'white', map: this.map } );
     this.box.material = this.imageMaterial;
@@ -4592,19 +4679,13 @@ export function createImageBox(imageProps){
   }
 };
 
-function LoadHVYMData(gltf){
-  const scene = gltf.scene;
-  const extensions = gltf.userData.gltfExtensions
-  if(!('HVYM_nft_data' in extensions))
-    return;
-
-  return new HVYM_Data(extensions.HVYM_nft_data);
-}
 
 export class HVYM_Data {
   constructor(gltf) {
-    const extensions = gltf.userData.gltfExtensions
-    if('HVYM_nft_data' in extensions){
+    this.is = 'EMPTY';
+    const extensions = gltf.userData.gltfExtensions;
+    if(extensions != undefined && extensions.hasOwnProperty('HVYM_nft_data' )){
+      this.is = 'HVYM_DATA';
       this.contractProps = extensions.HVYM_nft_data.contract;
       this.collections = {};
       for (const [key, obj] of Object.entries(extensions.HVYM_nft_data)) {
@@ -4624,15 +4705,17 @@ export class HVYM_Data {
 
           // });
 
-          for (const [k, v] of Object.entries(obj.meshSets)) {
-            let set = {};
-            v.forEach((m_ref, index) =>{
-              let mesh_ref = this.collections[key].models[m_ref.name]
-              let ref = this.hvymMeshSetRef(mesh_ref, m_ref.visible);
-              set[m_ref.name] = ref
-            });
+          if(obj.hasOwnProperty('meshSets')){
+            for (const [k, v] of Object.entries(obj.meshSets)) {
+              let set = {};
+              v.set.forEach((m_ref, index) =>{
+                let mesh_ref = this.collections[key].models[m_ref.name]
+                let ref = this.hvymMeshSetRef(mesh_ref, m_ref.visible);
+                set[m_ref.name] = ref
+              });
 
-            this.collections[key].meshSets[k] = this.hvymMeshSet(set);
+              this.collections[key].meshSets[k] = this.hvymMeshSet(set, v.widget);
+            }
           }
 
           // obj.morphProps.forEach((prop, index) =>{
@@ -4643,30 +4726,40 @@ export class HVYM_Data {
 
           // });
 
-          // obj.materials.forEach((mat, index) =>{
+          // obj.mat_props.forEach((mat, index) =>{
 
           // });
 
-          for (const [k, v] of Object.entries(obj.materialSets)) {
-            let mesh_set = this.collections[key].meshSets[v.mesh_set];
-            let mat_id = v.material_id;
-            if(mesh_set == undefined)
-              return;
+          if(obj.hasOwnProperty('materialSets')){
+            for (const [k, v] of Object.entries(obj.materialSets)) {
+              let mesh_set = this.collections[key].meshSets[v.mesh_set];
+              let mat_id = v.material_id;
+              let widget = v.widget;
+              if(mesh_set == undefined)
+                return;
 
-            let mat_set = {};
+              let mat_set = {};
 
-            v.set.forEach((m_ref, index) =>{
-              let mat = this.collections[key].materials[m_ref.name];
-              let m_name = mat.name;
-              mat_set[m_name] = this.hvymMaterialSetRef(mat);
-            });
+              v.set.forEach((m_ref, index) =>{
+                let mat = this.collections[key].materials[m_ref.name];
+                let m_name = mat.name;
+                mat_set[m_name] = this.hvymMaterialSetRef(mat);
+              });
 
-            this.collections[key].materialSets[k] = this.hvymMaterialSet(mat_id, mat_set, mesh_set);
+              this.collections[key].materialSets[k] = this.hvymMaterialSet(mat_id, mat_set, mesh_set, widget);
+            }
           }
 
         }
 
       }
+    }
+  }
+  buildDataPanel(){
+    for (const [hvym_id, collection] of Object.entries(this.collections)) {
+      collection.materialSets.forEach((mat, index) =>{
+
+      });
     }
   }
   hvymCollection(id, collectionName){
@@ -4677,17 +4770,18 @@ export class HVYM_Data {
       'valProps': {},
       'morphProps': {},
       'animProps': {},
-      'materials': {},
+      'matProps': {},
       'meshSets': {},
       'materialSets': {},
       'models': {},
       'materials': {}
     }
   }
-  hvymMeshSet(set){
+  hvymMeshSet(set, widget){
     return {
       'type': 'HVYM_MESH_SET',
-      'set': set
+      'set': set,
+      'widget': widget
     }
   }
   hvymMeshSetRef(mesh_ref, visible){
@@ -4697,12 +4791,13 @@ export class HVYM_Data {
       'visible': visible
     }
   }
-  hvymMaterialSet(material_id, set, mesh_set){
+  hvymMaterialSet(material_id, set, mesh_set, widget){
     return {
       'type': 'HVYM_MAT_SET',
       'material_id': material_id,
       'set': set,
-      'mesh_set': mesh_set
+      'mesh_set': mesh_set,
+      'widget': widget
     }
   }
   hvymMaterialSetRef(mat_ref){
@@ -4756,7 +4851,7 @@ export function modelValueProperties(path=0, rotX=false, rotY=false, useLabel=tr
   }
 };
 
-export function gltfProperties(boxProps, name='', gltf=undefined, listConfig=undefined, zOffset=0){
+export function gltfProperties(boxProps, name='', gltf=undefined, listConfig=undefined, zOffset=0, dataPanel=false){
   return {
     'type': 'GLTF',
     'boxProps': boxProps,
@@ -4764,6 +4859,7 @@ export function gltfProperties(boxProps, name='', gltf=undefined, listConfig=und
     'gltf': gltf,
     'listConfig': listConfig,
     'zOffset': zOffset,
+    'dataPanel': dataPanel,
     'hvymData': undefined
   }
 };
@@ -4781,6 +4877,8 @@ export class GLTFModelWidget extends BaseWidget {
     let textProps = {...DEFAULT_TEXT_PROPS};
     let widgetProps = widgetProperties(gltfProps.boxProps, gltfProps.name, true, true, textProps, false, undefined, gltfProps.listConfig, 0);
     super(widgetProps);
+    this.is = 'GLTF_MODEL_WIDGET';
+    this.hvymData = gltfProps.hvymData;
     this.box.properties = gltfProps;
     const boxSize = getGeometrySize(this.box.geometry);
     const parentSize = getGeometrySize(gltfProps.boxProps.parent.geometry);
@@ -4816,9 +4914,19 @@ export class GLTFModelWidget extends BaseWidget {
     }
     
     this.box.add( this.gltf.scene );
-
     this.HandleListConfig(gltfProps.listConfig);
 
+    if(this.hvymData != undefined && this.hvymData.is == 'HVYM_DATA'){
+      const panelPropList = panelCollectionPropertySet(this.box, this.hvymData.collections);
+
+      CreateBasePanel(panelPropList[0]);
+
+      // panelPropList.forEach((panelProps, index) =>{
+      //   CreateBasePanel(panelProps);
+      // });
+
+      
+    }
   }
   MakeModelPortalChild(stencilRef){
     this.gltf.scene.traverse( function( object ) {
@@ -4842,7 +4950,7 @@ export class GLTFModelWidget extends BaseWidget {
 
 };
 
-function GLTFModelLoader(gltfProps){
+function GLTFModelWidgetLoader(gltfProps){
   if(typeof DEFAULT_TEXT_PROPS.font === 'string'){
     // Load the font
     loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
@@ -4864,11 +4972,11 @@ export function createGLTFModel(gltfProps){
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
         console.log('gltf!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         console.log(gltf)
+        gltfProps.hvymData = new HVYM_Data(gltf);
         gltfProps.gltf = gltf;
-        GLTFModelLoader(gltfProps);
-        let hvymData = new HVYM_Data(gltf)
+        GLTFModelWidgetLoader(gltfProps);
         console.log('hvymData&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
-        console.log(hvymData)
+        console.log(gltfProps.hvymData)
       },
       // called while loading is progressing
       function ( xhr ) {
@@ -4880,7 +4988,8 @@ export function createGLTFModel(gltfProps){
       }
     );
   }else if(gltfProps.gltf.scene != undefined){
-    GLTFModelLoader(gltfProps);
+    gltfProps.hvymData = new HVYM_Data(gltf);
+    GLTFModelWidgetLoader(gltfProps);
   }
 
 };
@@ -4892,7 +5001,7 @@ export function createGLTFModelPortal(gltfProps){
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
         console.log(gltf)
         gltfProps.gltf = gltf;
-        GLTFModelLoader(gltfProps);
+        GLTFModelWidgetLoader(gltfProps);
       },
       // called while loading is progressing
       function ( xhr ) {
@@ -4904,7 +5013,7 @@ export function createGLTFModelPortal(gltfProps){
       }
     );
   }else if(gltfProps.gltf.scene != undefined){
-    GLTFModelLoader(gltfProps);
+    GLTFModelWidgetLoader(gltfProps);
   }
 }
 
@@ -4926,6 +5035,7 @@ export class ListItemBox extends BaseBox {
   constructor(listConfig) {
 
     super(listConfig.boxProps);
+    this.is = 'LIST_ITEM_BOX';
     this.box.userData.properties = listConfig;
     this.textProps = listConfig.textProps;
     this.listTextMaterial = getMaterial(listConfig.textProps.matProps);
