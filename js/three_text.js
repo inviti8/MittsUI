@@ -859,6 +859,36 @@ export function materialRefProperties(matType='PHONG', ref=undefined, targetProp
   }
 };
 
+export function materialRefPropertiesFromMaterial(material, prop){
+  let matType = 'BASIC';
+  valProp = materialNumberValueProperties(material, prop);
+
+  switch (material.type) {
+    case 'MeshBasicMaterial':
+      matType = 'BASIC';
+      break;
+    case 'MeshLambertMaterial':
+      matType = 'LAMBERT';
+      break;
+    case 'MeshPhongMaterial':
+      matType = 'PHONG';
+      break;
+    case 'MeshStandardMaterial':
+      matType = 'STANDARD';
+      break;
+    case 'MeshPhysicalMaterial':
+      matType = 'PBR';
+      break;
+    case 'MeshToonMaterial':
+      matType = 'TOON';
+      break;
+    default:
+      console.log('X');
+  }
+
+  return materialRefProperties(matType, material, prop, valProp);
+}
+
 export function setRefProperties(setType='MATERIAL', meshRefs=[], materialIndex=0, valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false){
   return {
     'type': 'SET_REF',
@@ -2039,7 +2069,7 @@ export class BaseBox {
 
 }
 
-export function buttonProperties(boxProps, name='Button', value='', textProps=undefined, mouseOver=false, attach='RIGHT'){
+export function buttonProperties(boxProps, name='Button', value='', textProps=undefined, mouseOver=false, attach='RIGHT', objectControlProps=undefined){
   return {
     'type': 'BUTTON',
     'boxProps': boxProps,
@@ -2047,7 +2077,8 @@ export function buttonProperties(boxProps, name='Button', value='', textProps=un
     'value': value,
     'textProps': textProps,
     'mouseOver': mouseOver,
-    'attach': attach
+    'attach': attach,
+    'objectControlProps': objectControlProps
   }
 };
 
@@ -2069,6 +2100,7 @@ class BaseTextBox extends BaseBox {
   constructor(buttonProps) {
     super(buttonProps.boxProps);
     this.is = 'BASE_TEXT_BOX';
+    this.objectControlProps = buttonProps.objectControlProps;
     this.text = buttonProps.name;
     this.textProps = buttonProps.textProps;
     this.textProps.MultiLetterMeshes = false;
@@ -2089,6 +2121,8 @@ class BaseTextBox extends BaseBox {
     this.box.userData.value = buttonProps.value;
     this.box.userData.properties = buttonProps;
     adjustBoxScaleRatio(this.box, this.parent);
+
+    BaseWidget.SetUpObjectControlProps(this);
 
   }
   CreateText(){
@@ -2434,18 +2468,8 @@ export function panelMaterialSectionPropertySet(material, emissive=false, reflec
   sectionData['Material Properties'] = panelSectionProperties('Material Properties', 'label', {});
 
   Object.keys(props).forEach((prop, idx) => {
-    let valProp = numberValueProperties( material[prop], 0, 1, 3, 0.001, false);
-    if(BaseWidget.IsMaterialColorProp(prop)){
-      valProp = numberValueProperties( material[prop], 0, 255, 0, 0.001, false);
-    }else if (BaseWidget.IsMaterialSliderProp(prop)){
-      valProp = numberValueProperties( material[prop], 0, 100, 3, 0.001, false);
-      if(BaseWidget.IsMaterialPBRSliderProp(prop)){
-        valProp = numberValueProperties( material[prop], 0, 1, 3, 0.001, false);
-        if(prop == 'ior' || prop == 'iridescenceIOR'){
-          valProp = numberValueProperties( material[prop], 1, 2.33, 3, 0.001, false);
-        }
-      }
-    }
+    let valProp = materialNumberValueProperties(material, prop);
+
      let matRefProp = materialRefProperties(matType, material, prop, valProp);
      let widget = props[prop];
      let i = (idx+1).toString();
@@ -2910,56 +2934,8 @@ export class BaseWidget extends BaseBox {
     this.widgetText = this.WidgetText();
     this.widgetTextSize = getGeometrySize(this.widgetText.geometry);
 
-    if(this.objectControlProps != undefined){
-      if(this.objectControlProps.type == 'MAT_REF'){
-        this.objectRef = this.objectControlProps.ref;
-        this.targetProp = this.objectControlProps.targetProp;
-        this.objectRef.userData.materialCtrls = [];
-        this.objectRef.userData.refreshCallback = this.RefreshMaterialRefs;
-        this.objectRef.addEventListener('refreshMaterialViews', function(event) {
-          this.userData.refreshCallback(this);
-        });
-      }else if(this.objectControlProps.type == 'SET_REF'){
-        this.setRef = this.objectControlProps.setRef;
-        if(this.objectControlProps.setType == 'MATERIAL'){
+    BaseWidget.SetUpObjectControlProps(this);
 
-        }else if(this.objectControlProps.setType == 'MESH'){
-          
-        } 
-      }
-    }
-  }
-  UpdateMaterialRefColor(hex, alpha=undefined){
-    if(!isNaN(this.objectRef[this.targetProp]) && !BaseWidget.IsMaterialColorProp(this.targetProp))
-      return;
-    this.objectRef[this.targetProp].set(hex);
-    if(alpha!=undefined){
-      this.objectRef.opacity = alpha;
-    }
-    this.objectRef.dispatchEvent({type:'refreshMaterialViews'});
-  }
-  UpdateMaterialRefFloatValue(value){
-    if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
-      value = parseFloat(value)
-      this.objectRef[this.targetProp] = value;
-    }
-    
-    this.objectRef.dispatchEvent({type:'refreshMaterialViews'});
-  }
-  RefreshMaterialRefs(mat){
-    if(mat==undefined)
-      return;
-    mat.userData.materialCtrls.forEach((ctrl) =>{
-      let parentPanel = ctrl.box.parent.userData.parentPanel;
-      if(parentPanel!=undefined){
-        parentPanel.controlList.forEach((elem) =>{
-          let widget = elem.ctrlWidget;
-          if(widget!=undefined && widget.RefreshMaterialView!=undefined){
-            widget.RefreshMaterialView();
-          }
-        });
-      }
-    });
   }
   WidgetHandle(){
     let handleBoxProps = {...this.baseBoxProps};
@@ -3023,6 +2999,58 @@ export class BaseWidget extends BaseBox {
     }
 
     return valBox
+  }
+  static UpdateMaterialRefColor(elem, hex, alpha=undefined){
+    if(!isNaN(elem.objectRef[elem.targetProp]) && !BaseWidget.IsMaterialColorProp(this.targetProp))
+      return;
+    elem.objectRef[elem.targetProp].set(hex);
+    if(alpha!=undefined){
+      elem.objectRef.opacity = alpha;
+    }
+    elem.objectRef.dispatchEvent({type:'refreshMaterialViews'});
+  }
+  static UpdateMaterialRefFloatValue(value){
+    if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
+      value = parseFloat(value)
+      this.objectRef[this.targetProp] = value;
+    }
+    
+    this.objectRef.dispatchEvent({type:'refreshMaterialViews'});
+  }
+  static RefreshMaterialRefs(mat){
+    if(mat==undefined)
+      return;
+    mat.userData.materialCtrls.forEach((ctrl) =>{
+      let parentPanel = ctrl.box.parent.userData.parentPanel;
+      if(parentPanel!=undefined){
+        parentPanel.controlList.forEach((elem) =>{
+          let widget = elem.ctrlWidget;
+          if(widget!=undefined && widget.RefreshMaterialView!=undefined){
+            widget.RefreshMaterialView();
+          }
+        });
+      }
+    });
+  }
+  static SetUpObjectControlProps(elem){
+    if(elem.objectControlProps != undefined){
+      if(elem.objectControlProps.type == 'MAT_REF'){
+        elem.objectRef = elem.objectControlProps.ref;
+        elem.targetProp = elem.objectControlProps.targetProp;
+        elem.objectRef.userData.materialCtrls = [];
+        elem.objectRef.userData.refreshCallback = BaseWidget.RefreshMaterialRefs;
+        elem.objectRef.addEventListener('refreshMaterialViews', function(event) {
+          elem.objectRef.userData.refreshCallback(this);
+        });
+      }else if(elem.objectControlProps.type == 'SET_REF'){
+        elem.setRef = elem.objectControlProps.setRef;
+        if(elem.objectControlProps.setType == 'MATERIAL'){
+
+        }else if(elem.objectControlProps.setType == 'MESH'){
+          
+        } 
+      }
+    }
   }
   static MaterialViewMesh(parentBox, objectRef){
     const radius = parentBox.size.width/4;
@@ -3113,6 +3141,24 @@ export function floatValueProperties( defaultValue=0, min=0, max=1){
 export function floatValuePropertiesEditable( defaultValue=0, min=0, max=1){
   return numberValueProperties( defaultValue, min, max, 3, 0.001, true)
 };
+
+export function materialNumberValueProperties(material, prop){
+  let result = undefined;
+
+  if(BaseWidget.IsMaterialColorProp(prop)){
+    result = numberValueProperties( material[prop], 0, 255, 0, 0.001, false);
+  }else if (BaseWidget.IsMaterialSliderProp(prop)){
+    result = numberValueProperties( material[prop], 0, 100, 3, 0.001, false);
+    if(BaseWidget.IsMaterialPBRSliderProp(prop)){
+      result = numberValueProperties( material[prop], 0, 1, 3, 0.001, false);
+      if(prop == 'ior' || prop == 'iridescenceIOR'){
+        result = numberValueProperties( material[prop], 1, 2.33, 3, 0.001, false);
+      }
+    }
+  }
+
+  return result
+}
 
 class ValueTextWidget extends BaseTextBox{
   constructor(widgetProps) {
@@ -3272,7 +3318,7 @@ export class SliderWidget extends BaseWidget {
     value = parseFloat(value);
     this.box.userData.value = value;
     this.value = value;
-    this.UpdateMaterialRefFloatValue(value);
+    BaseWidget.UpdateMaterialRefFloatValue(value);
     this.box.dispatchEvent({type:'update'});
   }
   SetSliderUserData(){
@@ -3336,7 +3382,7 @@ export class SliderWidget extends BaseWidget {
     this.box.userData.value = value;
     this.value = value;
     if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
-      this.UpdateMaterialRefFloatValue(value);
+      BaseWidget.UpdateMaterialRefFloatValue(value);
     }
 
     if(this.box.userData.valueBox != undefined){
@@ -3624,7 +3670,7 @@ export class ColorWidget extends BaseWidget {
     }
 
     if(this.objectRef != undefined && this.objectControlProps.type == 'MAT_REF'){
-      this.UpdateMaterialRefColor(color.hex(), alpha);
+      BaseWidget.UpdateMaterialRefColor(this, color.hex(), alpha);
       this.UpdateMaterialView(color.hex(), alpha);
       if(this.materialView==undefined){
         this.UpdateColorIndicator(color.hex(), alpha);
