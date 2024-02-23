@@ -2417,6 +2417,10 @@ export class PanelListSelector extends PanelBox {
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     this.selectors = section.data;
+
+    if(!dataIsHVYMWidget(this.selectors))
+      return;
+
     const listSelectorProps = defaultPanelListSelectorProps(panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new SelectorWidget(listSelectorProps);
     this.ctrlWidget.box.userData.hoverZPos = this.size.depth*2;
@@ -2524,24 +2528,41 @@ export function panelMaterialSetSectionPropertySet(materialSet){
   return panelSectionProperties(materialSet.name, 'controls', sectionData)
 };
 
+function hvymDataWidgetMap(){
+  return {
+    'materialSets': 'selector',
+    'meshSets': 'selector'
+  }
+}
+
+function createHVYMCollectionWidgetData(collection){
+  let widgetData = {};
+  const collectionKeys = ['materialSets', 'meshSets'];
+  const widgetMap = hvymDataWidgetMap();
+
+  collectionKeys.forEach((key, idx) => { 
+     for (const [name, obj] of Object.entries(collection[key])) {
+        let data = panelSectionProperties(name, widgetMap[key], obj);
+        widgetData[data.name] = data;
+      }   
+  });
+
+  return panelSectionProperties(collection.materialSetsLabel, 'controls', widgetData)
+}
+
 export function panelHVYMCollectionPropertyList(parent, textProps, collections){
   let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', parent);
   let colPanels = [];
-  //const collectionKeys = ['valProps',]
+
   for (const [colId, collection] of Object.entries(collections)) {
 
-    let controlData = {};
-    for (const [matSetName, matSet] of Object.entries(collection.materialSets)) {
-
-      let data = panelSectionProperties(matSetName, 'selector', matSet);
-      controlData[data.name] = data;
-    }
-    let matSets = panelSectionProperties(collection.materialSetsLabel, 'controls', controlData);
     let mainData = {};
-    mainData[matSets.name] = matSets;
+    let widgetData = createHVYMCollectionWidgetData(collection);
+    mainData[widgetData.name] = widgetData;
     let topSectionData = panelSectionProperties('sections', 'container', mainData);
     let colPanel = panelProperties( panelBoxProps, collection.collectionName, textProps, 'LEFT', topSectionData);
     colPanels.push(colPanel);
+
   }
 
 
@@ -4438,9 +4459,61 @@ export class SelectorWidget extends BaseWidget {
       
     }else if(selectors.type == 'HVYM_MAT_SET'){
       this.isHVYM = true;
-      this.meshSet = selectors.mesh_set;
+      this.matSet = selectors.set;
+      this.meshSet = selectors.mesh_set.set;
+    }else if(selectors.type == 'HVYM_MESH_SET'){
+      this.isHVYM = true;
+      this.meshSet = selectors.set;
     }
+    this.InitializeMatSet();
+    this.InitializeMeshSet();
     this.CreateSelectors();
+  }
+  InitializeMatSet(){
+    if(this.matSet==undefined)
+      return;
+
+    let idx = 0;
+    for (const [key, ref] of Object.entries(this.matSet)) {
+      ref.ctrl = this;
+    }
+  }
+  InitializeMeshSet(){
+    if(this.meshSet==undefined)
+      return;
+
+    let idx = 0;
+    for (const [key, ref] of Object.entries(this.meshSet)) {
+      if(idx == 0){
+        ref.visible  = true;
+      }else{
+        ref.visible = false;
+      }
+      ref.ctrl = this;
+    }
+  }
+  SetMeshRefVis(ref, visible){
+    if(ref.mesh_ref.isGroup){
+      ref.mesh_ref.children.forEach((c, idx) => {
+        c.visible = visible;
+      });
+    }else{
+      ref.mesh_ref.visible = visible;
+    }
+  }
+  UpdateMeshSet(key){
+    if(this.meshSet==undefined)
+      return;
+
+    for (const [k, ref] of Object.entries(this.meshSet)) {
+      if(k!=key){
+        ref.visible == false;
+        this.SetMeshRefVis(ref, false);
+      }else{
+        ref.visible == true;
+        this.SetMeshRefVis(ref, true);
+      }
+    }
   }
   CreateSelectors(){
     let idx = 0;
@@ -4454,6 +4527,7 @@ export class SelectorWidget extends BaseWidget {
       }
       let btn = new BaseTextBox(btnProps);
       btn.box.userData.properties = props;
+      btn.box.userData.ctrl = this;
 
       const editProps = editTextProperties(btn, '', this.btnTextProps.textMesh, this.btnTextProps.font, this.btnTextProps.size, this.btnTextProps.height, this.btnTextProps.zOffset, this.btnTextProps.letterSpacing, this.btnTextProps.lineSpacing, this.btnTextProps.wordSpacing, this.btnTextProps.padding, true, this.btnTextProps.meshProps);
       btn.textMesh.userData.textProps = editProps;
@@ -4502,7 +4576,7 @@ export class SelectorWidget extends BaseWidget {
     }
 
     if(Object.keys(this.selectors).length>0){
-      SelectorWidget.UpdateHVYMMatSetRef(this.selectors[Object.keys(this.selectors)[0]]);
+      SelectorWidget.HandleHVYMSelection(this.selectors[Object.keys(this.selectors)[0]]);
     }
     
   }
@@ -4526,22 +4600,33 @@ export class SelectorWidget extends BaseWidget {
     btn.box.userData.mouseOverParent = true;
     btn.box.userData.currentText = key;
   }
+  static HandleHVYMSelection(value){
+    if(!value.hasOwnProperty('type'))
+      return;
+
+    if(value.type == 'HVYM_MAT_SET_REF'){
+      SelectorWidget.UpdateHVYMMatSetRef(value);
+    } else if(value.type == 'HVYM_MESH_SET_REF'){
+      SelectorWidget.UpdateHVYMMeshSetRef(value);
+    }
+
+  }
   static UpdateHVYMMatSetRef(value){
-    if(value.hasOwnProperty('type') && value.type == 'HVYM_MAT_SET_REF'){
-      const material = value.mat_ref;
-      const mat_set = material.userData.mat_set;
-      const mat_id = mat_set.material_id;
-      for (const [meshName, mesh] of Object.entries(mat_set.mesh_set.set)) {
+    const material = value.mat_ref;
+    const mat_set = material.userData.mat_set;
+    const mat_id = mat_set.material_id;
+    for (const [meshName, mesh] of Object.entries(mat_set.mesh_set.set)) {
 
-        if(mesh.mesh_ref.isGroup){
-          mesh.mesh_ref.children[mat_id].material = material;
-        }else{
-          mesh.mesh_ref.material = material;
-        }
-
+      if(mesh.mesh_ref.isGroup){
+        mesh.mesh_ref.children[mat_id].material = material;
+      }else{
+        mesh.mesh_ref.material = material;
       }
 
     }
+  }
+  static UpdateHVYMMeshSetRef(value){
+    value.ctrl.UpdateMeshSet(value.mesh_ref.name);
   }
   static TextSelected(selection){
     let base = selection.parent.parent;
@@ -4558,7 +4643,7 @@ export class SelectorWidget extends BaseWidget {
     let first = selection.parent;
     base.userData.selectors.sort(function(x,y){ return x == first ? -1 : y == first ? 1 : 0; });
     selectorAnimation(selection.parent.parent, 'SELECT');
-    SelectorWidget.UpdateHVYMMatSetRef(selection.userData.value);
+    SelectorWidget.HandleHVYMSelection(selection.userData.value);
 
   }
 };
@@ -4811,6 +4896,15 @@ export function createImageBox(imageProps){
   }
 };
 
+export function dataIsHVYMWidget(data){
+  let result = false;
+
+  if(data.hasOwnProperty('widget')){
+    result = data.widget
+  }
+
+  return result
+}
 
 export class HVYM_Data {
   constructor(gltf) {
@@ -4934,7 +5028,8 @@ export class HVYM_Data {
     return {
       'type': 'HVYM_MESH_SET_REF',
       'mesh_ref': mesh_ref,
-      'visible': visible
+      'visible': visible,
+      'ctrl': undefined
     }
   }
   hvymMaterialSet(material_id, set, mesh_set, widget){
@@ -4949,7 +5044,8 @@ export class HVYM_Data {
   hvymMaterialSetRef(mat_ref){
     return {
       'type': 'HVYM_MAT_SET_REF',
-      'mat_ref': mat_ref
+      'mat_ref': mat_ref,
+      'ctrl': undefined
     }
   }
   getGltfSceneModel(scene, name){
