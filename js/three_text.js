@@ -4459,61 +4459,15 @@ export class SelectorWidget extends BaseWidget {
       
     }else if(selectors.type == 'HVYM_MAT_SET'){
       this.isHVYM = true;
+      this.collectionID = selectors.collection_id;
       this.matSet = selectors.set;
       this.meshSet = selectors.mesh_set.set;
     }else if(selectors.type == 'HVYM_MESH_SET'){
       this.isHVYM = true;
+      this.collectionID = selectors.collection_id;
       this.meshSet = selectors.set;
     }
-    this.InitializeMatSet();
-    this.InitializeMeshSet();
     this.CreateSelectors();
-  }
-  InitializeMatSet(){
-    if(this.matSet==undefined)
-      return;
-
-    let idx = 0;
-    for (const [key, ref] of Object.entries(this.matSet)) {
-      ref.ctrl = this;
-    }
-  }
-  InitializeMeshSet(){
-    if(this.meshSet==undefined)
-      return;
-
-    let idx = 0;
-    for (const [key, ref] of Object.entries(this.meshSet)) {
-      if(idx == 0){
-        ref.visible  = true;
-      }else{
-        ref.visible = false;
-      }
-      ref.ctrl = this;
-    }
-  }
-  SetMeshRefVis(ref, visible){
-    if(ref.mesh_ref.isGroup){
-      ref.mesh_ref.children.forEach((c, idx) => {
-        c.visible = visible;
-      });
-    }else{
-      ref.mesh_ref.visible = visible;
-    }
-  }
-  UpdateMeshSet(key){
-    if(this.meshSet==undefined)
-      return;
-
-    for (const [k, ref] of Object.entries(this.meshSet)) {
-      if(k!=key){
-        ref.visible == false;
-        this.SetMeshRefVis(ref, false);
-      }else{
-        ref.visible == true;
-        this.SetMeshRefVis(ref, true);
-      }
-    }
   }
   CreateSelectors(){
     let idx = 0;
@@ -4605,28 +4559,11 @@ export class SelectorWidget extends BaseWidget {
       return;
 
     if(value.type == 'HVYM_MAT_SET_REF'){
-      SelectorWidget.UpdateHVYMMatSetRef(value);
+      value.ctrl.UpdateMatSet(value);
     } else if(value.type == 'HVYM_MESH_SET_REF'){
-      SelectorWidget.UpdateHVYMMeshSetRef(value);
+      value.ctrl.UpdateMeshSet(value.collection_id, value.set_name, value.mesh_ref.name);
     }
 
-  }
-  static UpdateHVYMMatSetRef(value){
-    const material = value.mat_ref;
-    const mat_set = material.userData.mat_set;
-    const mat_id = mat_set.material_id;
-    for (const [meshName, mesh] of Object.entries(mat_set.mesh_set.set)) {
-
-      if(mesh.mesh_ref.isGroup){
-        mesh.mesh_ref.children[mat_id].material = material;
-      }else{
-        mesh.mesh_ref.material = material;
-      }
-
-    }
-  }
-  static UpdateHVYMMeshSetRef(value){
-    value.ctrl.UpdateMeshSet(value.mesh_ref.name);
   }
   static TextSelected(selection){
     let base = selection.parent.parent;
@@ -4943,11 +4880,11 @@ export class HVYM_Data {
               let set = {};
               v.set.forEach((m_ref, index) =>{
                 let mesh_ref = this.collections[key].models[m_ref.name]
-                let ref = this.hvymMeshSetRef(mesh_ref, m_ref.visible);
+                let ref = this.hvymMeshSetRef(k, key, mesh_ref, m_ref.visible);
                 set[m_ref.name] = ref
               });
 
-              this.collections[key].meshSets[k] = this.hvymMeshSet(set, v.widget);
+              this.collections[key].meshSets[k] = this.hvymMeshSet(key, set, v.widget);
             }
           }
 
@@ -4977,10 +4914,10 @@ export class HVYM_Data {
               v.set.forEach((m_ref, index) =>{
                 let mat = this.collections[key].materials[m_ref.name];
                 let m_name = mat.name;
-                mat_set[m_name] = this.hvymMaterialSetRef(mat);
+                mat_set[m_name] = this.hvymMaterialSetRef(k, key, mat);
               });
 
-              this.collections[key].materialSets[k] = this.hvymMaterialSet(mat_id, mat_set, mesh_set, widget);
+              this.collections[key].materialSets[k] = this.hvymMaterialSet(key, mat_id, mat_set, mesh_set, widget);
 
               //assign material ref to material userData
               for (const [matName, mat_set_ref] of Object.entries(mat_set)) {
@@ -4992,6 +4929,54 @@ export class HVYM_Data {
 
         }
 
+      }
+    }
+  }
+  CollectionHasProperty(key, prop){
+
+    if(!this.collections.hasOwnProperty(key))
+      return false;
+
+    if(!this.collections[key].hasOwnProperty(prop))
+      return false;
+
+    return true
+
+  }
+  SetMeshRefVis(ref, visible){
+    if(ref.mesh_ref.isGroup){
+      ref.mesh_ref.children.forEach((c, idx) => {
+        c.visible = visible;
+      });
+    }else{
+      ref.mesh_ref.visible = visible;
+    }
+  }
+  UpdateMatSet(mat_set_ref){
+    const material = mat_set_ref.mat_ref;
+    const mat_set = material.userData.mat_set;
+    const mat_id = mat_set.material_id;
+    for (const [meshName, mesh] of Object.entries(mat_set.mesh_set.set)) {
+
+      if(mesh.mesh_ref.isGroup){
+        mesh.mesh_ref.children[mat_id].material = material;
+      }else{
+        mesh.mesh_ref.material = material;
+      }
+
+    }
+  }
+  UpdateMeshSet(collection_id, set_name, mesh_name){
+    if(!this.CollectionHasProperty(collection_id, 'meshSets'))
+      return;
+
+    for (const [k, ref] of Object.entries(this.collections[collection_id].meshSets[set_name].set)) {
+      if(k!=mesh_name){
+        ref.visible == false;
+        this.SetMeshRefVis(ref, false);
+      }else{
+        ref.visible == true;
+        this.SetMeshRefVis(ref, true);
       }
     }
   }
@@ -5017,35 +5002,41 @@ export class HVYM_Data {
       'materials': {}
     }
   }
-  hvymMeshSet(set, widget){
+  hvymMeshSet(collection_id, set, widget){
     return {
       'type': 'HVYM_MESH_SET',
+      'collection_id': collection_id,
       'set': set,
       'widget': widget
     }
   }
-  hvymMeshSetRef(mesh_ref, visible){
+  hvymMeshSetRef(set_name, collection_id, mesh_ref, visible){
     return {
       'type': 'HVYM_MESH_SET_REF',
+      'set_name': set_name,
+      'collection_id': collection_id,
       'mesh_ref': mesh_ref,
       'visible': visible,
-      'ctrl': undefined
+      'ctrl': this
     }
   }
-  hvymMaterialSet(material_id, set, mesh_set, widget){
+  hvymMaterialSet(collection_id, material_id, set, mesh_set, widget){
     return {
       'type': 'HVYM_MAT_SET',
+      'collection_id': collection_id,
       'material_id': material_id,
       'set': set,
       'mesh_set': mesh_set,
       'widget': widget
     }
   }
-  hvymMaterialSetRef(mat_ref){
+  hvymMaterialSetRef(set_name, collection_id, mat_ref){
     return {
       'type': 'HVYM_MAT_SET_REF',
+      'set_name': set_name,
+      'collection_id': collection_id,
       'mat_ref': mat_ref,
-      'ctrl': undefined
+      'ctrl': this
     }
   }
   getGltfSceneModel(scene, name){
