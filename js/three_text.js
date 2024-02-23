@@ -832,6 +832,35 @@ export function createTextGeometry(character, font, size, height, curveSegments,
   });
 };
 
+export function materialTypeConstant(material){
+  let result = undefined;
+
+  switch (material.type) {
+    case 'MeshBasicMaterial':
+      result = 'BASIC';
+      break;
+    case 'MeshLambertMaterial':
+      result = 'LAMBERT';
+      break;
+    case 'MeshPhongMaterial':
+      result = 'PHONG';
+      break;
+    case 'MeshStandardMaterial':
+      result = 'STANDARD';
+      break;
+    case 'MeshPhysicalMaterial':
+      result = 'PBR';
+      break;
+    case 'MeshToonMaterial':
+      result = 'TOON';
+      break;
+    default:
+      console.log('X');
+  }
+
+  return result
+};
+
 //MATERIAL CREATION
 //useCase='SIMPLE','STENCIL','STENCIL_CHILD'
 export function materialProperties(type='BASIC', color='white', transparent=false, opacity=1, side=THREE.FrontSide, useCase='SIMPLE', emissive=false, reflective=false, iridescent=false){
@@ -859,34 +888,11 @@ export function materialRefProperties(matType='PHONG', ref=undefined, targetProp
   }
 };
 
-export function materialRefPropertiesFromMaterial(material, prop){
-  let matType = 'BASIC';
-  valProp = materialNumberValueProperties(material, prop);
+export function materialRefPropertiesFromMaterial(material, prop, useMaterialView=false){
+  let matType = materialTypeConstant(material);
+  let valProp = materialNumberValueProperties(material, prop);
 
-  switch (material.type) {
-    case 'MeshBasicMaterial':
-      matType = 'BASIC';
-      break;
-    case 'MeshLambertMaterial':
-      matType = 'LAMBERT';
-      break;
-    case 'MeshPhongMaterial':
-      matType = 'PHONG';
-      break;
-    case 'MeshStandardMaterial':
-      matType = 'STANDARD';
-      break;
-    case 'MeshPhysicalMaterial':
-      matType = 'PBR';
-      break;
-    case 'MeshToonMaterial':
-      matType = 'TOON';
-      break;
-    default:
-      console.log('X');
-  }
-
-  return materialRefProperties(matType, material, prop, valProp);
+  return materialRefProperties(matType, material, prop, valProp, useMaterialView);
 }
 
 export function setRefProperties(setType='MATERIAL', meshRefs=[], materialIndex=0, valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false){
@@ -899,6 +905,18 @@ export function setRefProperties(setType='MATERIAL', meshRefs=[], materialIndex=
     'useMaterialView': useMaterialView
   }
 };
+
+export function shallowCloneMaterial(material){
+  const matType = materialTypeConstant(material);
+  let clonedMat = getBaseMaterial('#'+material.color.getHexString(), matType);
+  Object.keys(material).forEach((prop, idx) => {
+    if(BaseWidget.IsMaterialSliderProp(prop) || BaseWidget.IsMaterialColorProp(prop)){
+      clonedMat[prop] = material[prop];
+    }
+  });
+
+  return clonedMat
+}
 
 export function basicMatProperties(color='white'){
   return materialProperties('BASIC', color, false, 1, THREE.FrontSide, 'SIMPLE');
@@ -1385,6 +1403,15 @@ export class BaseText {
   }
   LeftBottomCornerTextPos(key){
     this.meshes[key].position.copy(leftBottomCornerPos(this.parentSize, this.meshes[key].userData.size, this.zPosDir, this.padding));
+  }
+  OffsetTextX(key, offset){
+    this.meshes[key].translateX(offset);
+  }
+  OffsetTextY(key, offset){
+    this.meshes[key].translateY(offset);
+  }
+  OffsetTextZ(key, offset){
+    this.meshes[key].translateZ(offset);
   }
   DeleteTextGeometry(key){
     this.meshes[key].geometry.dispose();
@@ -2098,6 +2125,12 @@ export function defaultPanelEditTextButtonProps(name, parent, font){
 
 class BaseTextBox extends BaseBox {
   constructor(buttonProps) {
+    let indicatorBoxProps = undefined;
+    if(buttonProps.objectControlProps != undefined){
+      let adjustBoxProps = BaseWidget.ModelIndicatorBoxProps(buttonProps);
+      buttonProps.boxProps = adjustBoxProps.base;
+      indicatorBoxProps = adjustBoxProps.indicator;
+    }
     super(buttonProps.boxProps);
     this.is = 'BASE_TEXT_BOX';
     this.objectControlProps = buttonProps.objectControlProps;
@@ -2123,6 +2156,16 @@ class BaseTextBox extends BaseBox {
     adjustBoxScaleRatio(this.box, this.parent);
 
     BaseWidget.SetUpObjectControlProps(this);
+
+    if(indicatorBoxProps!=undefined){
+      indicatorBoxProps.parent = this.box;
+      BaseWidget.AddModelInnerIndicator(this, indicatorBoxProps);
+      if(this.objectControlProps.type == 'MAT_REF'){
+        BaseWidget.HandleMaterialMesh(this, this.useAlpha);
+        this.BaseText.OffsetTextX('btn_text', this.modelIndicator.size.width/2);
+      }
+      
+    }
 
   }
   CreateText(){
@@ -2405,32 +2448,27 @@ export function panelSectionProperties(name='Section', value_type='container', d
 
 export function panelMaterialSectionPropertySet(material, emissive=false, reflective=false, iridescent=false, sheen=false){
   let sectionData = {};
-  let matType = undefined;
+  let matType = materialTypeConstant(material);
   let props = {}
 
   switch (material.type) {
     case 'MeshBasicMaterial':
-      matType = 'BASIC';
       props['color'] = 'mat_color_widget';
       break;
     case 'MeshLambertMaterial':
-      matType = 'LAMBERT';
       props['color'] = 'mat_color_widget';
       break;
     case 'MeshPhongMaterial':
-      matType = 'PHONG';
       props['color'] = 'mat_color_widget';
       props['specular'] = 'mat_color_widget';
       props['shininess'] = 'mat_slider';
       break;
     case 'MeshStandardMaterial':
-      matType = 'STANDARD';
       props['color'] = 'mat_color_widget';
       props['roughness'] = 'mat_slider';
       props['metalness'] = 'mat_slider';
       break;
     case 'MeshPhysicalMaterial':
-      matType = 'PBR';
       props['color'] = 'mat_color_widget';
       props['roughness'] = 'mat_slider';
       props['metalness'] = 'mat_slider';
@@ -2453,7 +2491,6 @@ export function panelMaterialSectionPropertySet(material, emissive=false, reflec
       props['specularColor'] = 'mat_color_widget';
       break;
     case 'MeshToonMaterial':
-      matType = 'TOON';
       props['color'] = 'mat_color_widget';
       break;
     default:
@@ -2487,30 +2524,22 @@ export function panelMaterialSetSectionPropertySet(materialSet){
   return panelSectionProperties(materialSet.name, 'controls', sectionData)
 };
 
-export function panelCollectionPropertyList(parent, textProps, collections){
+export function panelHVYMCollectionPropertyList(parent, textProps, collections){
   let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', parent);
   let colPanels = [];
   //const collectionKeys = ['valProps',]
   for (const [colId, collection] of Object.entries(collections)) {
 
     let controlData = {};
-    let idx = 0;
     for (const [matSetName, matSet] of Object.entries(collection.materialSets)) {
 
-      let data = panelSectionProperties(matSetName, 'gltf_mat_selector', matSet);
-      //let data = panelSectionProperties(matSetName, 'label', {});
+      let data = panelSectionProperties(matSetName, 'selector', matSet);
       controlData[data.name] = data;
-      idx+=1;
     }
-
-
-    // let data = panelSectionProperties('test', 'label', {});
-    // controlData[data.name] = data;
-    
-    let topData1 = panelSectionProperties(collection.materialSetsLabel, 'controls', controlData);
-    let topData = {};
-    topData[topData1.name] = topData1;
-    let topSectionData = panelSectionProperties('sections', 'container', topData);
+    let matSets = panelSectionProperties(collection.materialSetsLabel, 'controls', controlData);
+    let mainData = {};
+    mainData[matSets.name] = matSets;
+    let topSectionData = panelSectionProperties('sections', 'container', mainData);
     let colPanel = panelProperties( panelBoxProps, collection.collectionName, textProps, 'LEFT', topSectionData);
     colPanels.push(colPanel);
   }
@@ -2796,9 +2825,6 @@ export class BasePanel extends BaseTextBox {
         case 'selector':
           ctrlBox = new PanelListSelector(sectionProps);
           break;
-        case 'gltf_mat_selector':
-          ctrlBox = new PanelListSelector(sectionProps);
-          break;
         case 'button':
           ctrlBox = new PanelButton(sectionProps);
           break;
@@ -3032,6 +3058,21 @@ export class BaseWidget extends BaseBox {
       }
     });
   }
+  static ModelIndicatorBoxProps(elemProps){
+    let baseBoxProps = {...elemProps.boxProps};
+    let indicatorBoxProps = {...elemProps.boxProps};
+    let indicatorMatProps = {...elemProps.boxProps.matProps};
+    indicatorMatProps.color = 'black';
+    indicatorMatProps.isPortal = true;
+
+    indicatorMatProps.useCase = 'STENCIL'
+    elemProps.boxProps.width = elemProps.boxProps.width-elemProps.boxProps.height;
+    indicatorBoxProps.width = elemProps.boxProps.height;
+    indicatorBoxProps.matProps = indicatorMatProps;
+
+
+    return {'base': baseBoxProps, 'indicator': indicatorBoxProps};
+  }
   static SetUpObjectControlProps(elem){
     if(elem.objectControlProps != undefined){
       if(elem.objectControlProps.type == 'MAT_REF'){
@@ -3052,11 +3093,24 @@ export class BaseWidget extends BaseBox {
       }
     }
   }
+  static AddModelInnerIndicator(elem, boxProps){
+    elem.modelIndicator = new BaseBox(boxProps);
+    elem.modelIndicator.AlignLeft();
+    elem.materialView = undefined;
+  }
+  static AddModelOuterIndicator(elem, boxProps){
+    elem.modelIndicator = new BaseBox(boxProps);
+    elem.modelIndicator.AlignOutsideLeft();
+    elem.materialView = undefined;
+  }
   static MaterialViewMesh(parentBox, objectRef){
-    const radius = parentBox.size.width/4;
+    let radius = parentBox.size.width/2;
+    if(parentBox.size.height<parentBox.size.width){
+      radius = parentBox.size.height/2;
+    }
     const geometry = new THREE.SphereGeometry(radius, 32, 16);
     const size = getGeometrySize(geometry)
-    const material = objectRef.clone();
+    const material = shallowCloneMaterial(objectRef);
     setupStencilChildMaterial(material, parentBox.material.stencilRef);
     const sphere = new THREE.Mesh( geometry, material );
 
@@ -3065,6 +3119,17 @@ export class BaseWidget extends BaseBox {
     sphere.translateZ(-size.depth/2);
 
     return sphere
+  }
+  static HandleMaterialMesh(elem, useAlpha=false){
+    if(elem.modelIndicator == undefined || !elem.objectControlProps.useMaterialView)
+      return;
+
+    elem.materialView = BaseWidget.MaterialViewMesh(elem.modelIndicator, elem.objectRef);
+    elem.objectRef.userData.materialCtrls.push(elem);
+
+    if(useAlpha){
+      elem.materialView.material.transparent = true;
+    }
   }
   static CalculateElementSizeOffset(elementSize, horizontal, boxProps){
     let bProps = {...boxProps};
@@ -3599,10 +3664,7 @@ export class ColorWidget extends BaseWidget {
       this.alphaSlider = new this.colorManipulator(colorWidgetProps.alpha);
       this.sliders.push(this.alphaSlider);
     }
-
-    this.colorIndicator = new BaseBox(colorWidgetProps.indicator);
-    this.colorIndicator.AlignLeft();
-    this.materialView = undefined;
+    BaseWidget.AddModelInnerIndicator(this, colorWidgetProps.indicator);
 
     if(this.objectControlProps != undefined){
       if(this.objectControlProps.type == 'MAT_REF'){
@@ -3614,13 +3676,8 @@ export class ColorWidget extends BaseWidget {
         this.sliders.forEach((slider, index) =>{
           slider.box.userData.valueBoxCtrl.SetValueText(color[index]);
         });
-        if(this.objectControlProps.useMaterialView){
-          this.materialView = BaseWidget.MaterialViewMesh(this.colorIndicator, this.objectRef);
-          this.objectRef.userData.materialCtrls.push(this);
-          if(this.useAlpha){
-            this.materialView.material.transparent = true;
-          }
-        }
+
+        BaseWidget.HandleMaterialMesh(this, this.useAlpha);
 
         if(this.useAlpha){
           this.alphaSlider.box.userData.valueBoxCtrl.SetValueText(color[3]);
@@ -3688,9 +3745,9 @@ export class ColorWidget extends BaseWidget {
     }
   }
   UpdateColorIndicator(hex, alpha=undefined){
-    this.colorIndicator.SetColor(hex);
+    this.modelIndicator.SetColor(hex);
     if(alpha!=undefined){
-      this.colorIndicator.SetOpacity(alpha*0.01);
+      this.modelIndicator.SetOpacity(alpha*0.01);
     }
   }
   UpdateMaterialView(hex, alpha=undefined){
@@ -4377,20 +4434,24 @@ export class SelectorWidget extends BaseWidget {
   }
   AssignSelectionSet(selectors){
     this.selectors = selectors.set;
-    this.CreateSelectors();
     if(selectors.type == 'SELECTOR_SET'){
       
     }else if(selectors.type == 'HVYM_MAT_SET'){
       this.isHVYM = true;
       this.meshSet = selectors.mesh_set;
     }
+    this.CreateSelectors();
   }
   CreateSelectors(){
     let idx = 0;
 
     for (const [key, val] of Object.entries(this.selectors)) {
       let props = this.box.userData.properties;
-      let btnProps = buttonProperties(this.btnBoxProps, key, val, props.textProps);
+      let btnProps = buttonProperties({...this.btnBoxProps}, key, val, props.textProps);
+      if(val.type == 'HVYM_MAT_SET_REF'){
+        val.mat_ref.userData.mat_ref_props = materialRefPropertiesFromMaterial(val.mat_ref, 'color', true);
+        btnProps.objectControlProps = val.mat_ref.userData.mat_ref_props;
+      }
       let btn = new BaseTextBox(btnProps);
       btn.box.userData.properties = props;
 
@@ -4429,7 +4490,7 @@ export class SelectorWidget extends BaseWidget {
         btn.textMesh.material.depthWrite = true;
         btn.box.renderOrder = 2;
         btn.textMesh.renderOrder = 2;
-        btn.box.position.set(btn.box.position.x, btn.box.position.y, -btn.depth)
+        btn.box.position.set(btn.box.position.x, btn.box.position.y, -btn.depth);
       }
 
       btn.box.material.depthWrite = true;
@@ -5009,7 +5070,7 @@ export class GLTFModelWidget extends BaseWidget {
         // Load the font
         loader.load(panelTextProps.font, (font) => {
           panelTextProps.font = font;
-          const panelPropList = panelCollectionPropertyList(this.box, panelTextProps, this.hvymData.collections);
+          const panelPropList = panelHVYMCollectionPropertyList(this.box, panelTextProps, this.hvymData.collections);
           this.CreateHVYMPanel(panelPropList);
         });
       }
