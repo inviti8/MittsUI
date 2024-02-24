@@ -3074,6 +3074,14 @@ export class BaseWidget extends BaseBox {
 
     return valBox
   }
+  UpdateMaterialRefFloatValue(value){
+    if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
+      value = parseFloat(value)
+      this.objectRef[this.targetProp] = value;
+    }
+    
+    this.objectRef.dispatchEvent({type:'refreshMaterialViews'});
+  }
   static UpdateMaterialRefColor(elem, hex, alpha=undefined){
     if(!isNaN(elem.objectRef[elem.targetProp]) && !BaseWidget.IsMaterialColorProp(this.targetProp))
       return;
@@ -3082,15 +3090,6 @@ export class BaseWidget extends BaseBox {
       elem.objectRef.opacity = alpha;
     }
     elem.objectRef.dispatchEvent({type:'refreshMaterialViews'});
-  }
-  static UpdateMaterialRefFloatValue(value){
-    console.log(this)
-    if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
-      value = parseFloat(value)
-      this.objectRef[this.targetProp] = value;
-    }
-    
-    this.objectRef.dispatchEvent({type:'refreshMaterialViews'});
   }
   static RefreshMaterialRefs(mat){
     if(mat==undefined)
@@ -3411,6 +3410,8 @@ export class SliderWidget extends BaseWidget {
     if(this.objectControlProps != undefined){
       if(this.objectControlProps.type == 'MAT_REF'){
         if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
+          console.log('MAT_REF!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+          console.log(this)
           this.box.userData.valueBoxCtrl.SetValueText(this.objectRef[this.targetProp]);
           this.objectRef.userData.materialCtrls.push(this);
         }
@@ -3432,7 +3433,7 @@ export class SliderWidget extends BaseWidget {
     value = parseFloat(value);
     this.box.userData.value = value;
     this.value = value;
-    BaseWidget.UpdateMaterialRefFloatValue(value);
+    this.UpdateMaterialRefFloatValue(value);
     this.box.dispatchEvent({type:'update'});
   }
   SetSliderUserData(){
@@ -3496,7 +3497,7 @@ export class SliderWidget extends BaseWidget {
     this.box.userData.value = value;
     this.value = value;
     if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
-      BaseWidget.UpdateMaterialRefFloatValue(value);
+      this.UpdateMaterialRefFloatValue(value);
     }
 
     if(this.box.userData.valueBox != undefined){
