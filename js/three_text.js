@@ -2538,13 +2538,13 @@ function hvymDataWidgetMap(){
 function hvymDataLabelMap(){
   return {
     'materialSets': 'materialSetsLabel',
-    'meshSets': 'meshSetsLabel'
+    'meshSets': 'meshSetsLabel',
+    'meshProps': 'meshPropsLabel'
   }
 }
 
 function createHVYMCollectionWidgetData(collection){
   let mainData = {};
-  let widgetData = {};
   const collectionKeys = ['materialSets', 'meshSets', 'matProps'];
   const widgetMap = hvymDataWidgetMap();
   const labelMap = hvymDataLabelMap();
@@ -2553,6 +2553,7 @@ function createHVYMCollectionWidgetData(collection){
     let label = collection[labelMap[key]];
     if(Object.keys(collection[key]).length==0)
       return;
+    let widgetData = {};
     if(key=='matProps'){
         let matProps = collection[key];
         for (const [name, obj] of Object.entries(collection[key])) {
@@ -2566,11 +2567,10 @@ function createHVYMCollectionWidgetData(collection){
         widgetData[data.name] = data;
       }
 
-      mainData[widgetData.name] = panelSectionProperties(label, 'controls', widgetData);
+      mainData[label] = panelSectionProperties(label, 'controls', widgetData);
     }
       
   });
-
 
   return panelSectionProperties('sections', 'container', mainData);
 }
@@ -3410,8 +3410,6 @@ export class SliderWidget extends BaseWidget {
     if(this.objectControlProps != undefined){
       if(this.objectControlProps.type == 'MAT_REF'){
         if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
-          console.log('MAT_REF!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-          console.log(this)
           this.box.userData.valueBoxCtrl.SetValueText(this.objectRef[this.targetProp]);
           this.objectRef.userData.materialCtrls.push(this);
         }
@@ -4893,6 +4891,11 @@ export class HVYM_Data {
           if(obj.hasOwnProperty('propLabelData')){
             this.collections[key].meshSetsLabel = obj.propLabelData.mesh_set_label;
             this.collections[key].materialSetsLabel = obj.propLabelData.mat_set_label;
+            this.collections[key].morphSetsLabel = obj.propLabelData.morph_set_label;
+            this.collections[key].materialPropsLabel = obj.propLabelData.mat_prop_label;
+            this.collections[key].animPropsLabel = obj.propLabelData.anim_prop_label;
+            this.collections[key].valuePropsLabel = obj.propLabelData.value_prop_label;
+            this.collections[key].meshPropsLabel = obj.propLabelData.mesh_prop_label;
           }
 
           this.HandleHVYMProps(key, obj)
@@ -5014,13 +5017,6 @@ export class HVYM_Data {
         ref.visible == true;
         this.SetMeshRefVis(ref, true);
       }
-    }
-  }
-  buildDataPanel(){
-    for (const [hvym_id, collection] of Object.entries(this.collections)) {
-      collection.materialSets.forEach((mat, index) =>{
-
-      });
     }
   }
   hvymCollection(id, collectionName){
