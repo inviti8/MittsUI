@@ -2535,19 +2535,44 @@ function hvymDataWidgetMap(){
   }
 }
 
+function hvymDataLabelMap(){
+  return {
+    'materialSets': 'materialSetsLabel',
+    'meshSets': 'meshSetsLabel'
+  }
+}
+
 function createHVYMCollectionWidgetData(collection){
+  let mainData = {};
   let widgetData = {};
-  const collectionKeys = ['materialSets', 'meshSets'];
+  const collectionKeys = ['materialSets', 'meshSets', 'matProps'];
   const widgetMap = hvymDataWidgetMap();
+  const labelMap = hvymDataLabelMap();
 
   collectionKeys.forEach((key, idx) => { 
-     for (const [name, obj] of Object.entries(collection[key])) {
+    let label = collection[labelMap[key]];
+    if(Object.keys(collection[key]).length==0)
+      return;
+    if(key=='matProps'){
+        let matProps = collection[key];
+        for (const [name, obj] of Object.entries(collection[key])) {
+          let data = panelMaterialSectionPropertySet(obj.mat_ref, obj.emissive, obj.reflective, obj.iridescent, obj.sheen);
+          mainData[data.name] = data;
+        }
+    }else{
+
+      for (const [name, obj] of Object.entries(collection[key])) {
         let data = panelSectionProperties(name, widgetMap[key], obj);
         widgetData[data.name] = data;
-      }   
+      }
+
+      mainData[widgetData.name] = panelSectionProperties(label, 'controls', widgetData);
+    }
+      
   });
 
-  return panelSectionProperties(collection.materialSetsLabel, 'controls', widgetData)
+
+  return panelSectionProperties('sections', 'container', mainData);
 }
 
 export function panelHVYMCollectionPropertyList(parent, textProps, collections){
@@ -2556,10 +2581,12 @@ export function panelHVYMCollectionPropertyList(parent, textProps, collections){
 
   for (const [colId, collection] of Object.entries(collections)) {
 
-    let mainData = {};
-    let widgetData = createHVYMCollectionWidgetData(collection);
-    mainData[widgetData.name] = widgetData;
-    let topSectionData = panelSectionProperties('sections', 'container', mainData);
+    // let mainData = {};
+    // let widgetData = createHVYMCollectionWidgetData(collection);
+    // mainData[widgetData.name] = widgetData;
+    let topSectionData = createHVYMCollectionWidgetData(collection);
+    console.log('topSectionData!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+    console.log(topSectionData)
     let colPanel = panelProperties( panelBoxProps, collection.collectionName, textProps, 'LEFT', topSectionData);
     colPanels.push(colPanel);
 
@@ -3057,6 +3084,7 @@ export class BaseWidget extends BaseBox {
     elem.objectRef.dispatchEvent({type:'refreshMaterialViews'});
   }
   static UpdateMaterialRefFloatValue(value){
+    console.log(this)
     if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
       value = parseFloat(value)
       this.objectRef[this.targetProp] = value;
@@ -4843,6 +4871,7 @@ export function dataIsHVYMWidget(data){
   return result
 }
 
+
 export class HVYM_Data {
   constructor(gltf) {
     this.is = 'EMPTY';
@@ -4864,72 +4893,78 @@ export class HVYM_Data {
             this.collections[key].meshSetsLabel = obj.propLabelData.mesh_set_label;
             this.collections[key].materialSetsLabel = obj.propLabelData.mat_set_label;
           }
+
+          this.HandleHVYMProps(key, obj)
           
-
-          // obj.valProps.forEach((prop, index) =>{
-
-          // });
-
-          // obj.meshProps.forEach((prop, index) =>{
-
-          // });
-
-          if(obj.hasOwnProperty('meshSets')){
-            for (const [k, v] of Object.entries(obj.meshSets)) {
-              let label = obj.propLabelData.mesh_set_label;
-              let set = {};
-              v.set.forEach((m_ref, index) =>{
-                let mesh_ref = this.collections[key].models[m_ref.name]
-                let ref = this.hvymMeshSetRef(k, key, mesh_ref, m_ref.visible);
-                set[m_ref.name] = ref
-              });
-
-              this.collections[key].meshSets[k] = this.hvymMeshSet(key, set, v.widget);
-            }
-          }
-
-          // obj.morphProps.forEach((prop, index) =>{
-
-          // });
-
-          // obj.animProps.forEach((prop, index) =>{
-
-          // });
-
-          // obj.mat_props.forEach((mat, index) =>{
-
-          // });
-
-          if(obj.hasOwnProperty('materialSets')){
-            for (const [k, v] of Object.entries(obj.materialSets)) {
-              let label = obj.propLabelData.mat_set_label;
-              let mesh_set = this.collections[key].meshSets[v.mesh_set];
-              let mat_id = v.material_id;
-              let widget = v.widget;
-              if(mesh_set == undefined)
-                return;
-
-              let mat_set = {};
-
-              v.set.forEach((m_ref, index) =>{
-                let mat = this.collections[key].materials[m_ref.name];
-                let m_name = mat.name;
-                mat_set[m_name] = this.hvymMaterialSetRef(k, key, mat);
-              });
-
-              this.collections[key].materialSets[k] = this.hvymMaterialSet(key, mat_id, mat_set, mesh_set, widget);
-
-              //assign material ref to material userData
-              for (const [matName, mat_set_ref] of Object.entries(mat_set)) {
-                mat_set_ref.mat_ref.userData.mat_set = this.collections[key].materialSets[k];
-              }
-
-            }
-          }
-
         }
 
       }
+    }
+  }
+  HandleHVYMProps(colID, data){
+    for (const [key, obj] of Object.entries(data)) {
+      switch (key) {
+        case 'materialSets':
+          this.HandleMaterialSets(colID, obj);
+          break;
+        case 'meshSets':
+          this.HandleMeshSets(colID, obj);
+          break;
+        case 'matProps':
+          this.HandleMaterialProps(colID, obj);
+          break;
+        default:
+          console.log('X');
+      }
+    }
+  }
+  HandleMaterialProps(colID, matProps){
+    for (const [matPropName, matProp] of Object.entries(matProps)) {
+      let mat_ref = this.collections[colID].materials[matProp.name];
+      let mat_name = matProp.name;
+      let emissive = matProp.emissive;
+      let irridescent = matProp.irridescent;
+      let sheen = matProp.sheen;
+      let widget = matProp.widget;
+      this.collections[colID].matProps[matPropName] = this.hvymMatProps(colID, mat_name, emissive, irridescent, sheen, mat_ref, widget);
+    }
+  }
+  HandleMaterialSets(colID, materialSet){
+    for (const [k, v] of Object.entries(materialSet)) {
+        
+        let mesh_set = this.collections[colID].meshSets[v.mesh_set];
+        let mat_id = v.material_id;
+        let widget = v.widget;
+        if(mesh_set == undefined)
+          return;
+
+        let mat_set = {};
+
+        v.set.forEach((m_ref, index) =>{
+          let mat = this.collections[colID].materials[m_ref.name];
+          let m_name = mat.name;
+          mat_set[m_name] = this.hvymMaterialSetRef(k, colID, mat);
+        });
+
+        this.collections[colID].materialSets[k] = this.hvymMaterialSet(colID, mat_id, mat_set, mesh_set, widget);
+
+        //assign material ref to material userData
+        for (const [matName, mat_set_ref] of Object.entries(mat_set)) {
+          mat_set_ref.mat_ref.userData.mat_set = this.collections[colID].materialSets[k];
+        }
+
+    }
+  }
+  HandleMeshSets(colID, meshSets){
+    for (const [k, v] of Object.entries(meshSets)) {
+      let set = {};
+      v.set.forEach((m_ref, index) =>{
+        let mesh_ref = this.collections[colID].models[m_ref.name]
+        let ref = this.hvymMeshSetRef(k, colID, mesh_ref, m_ref.visible);
+        set[m_ref.name] = ref
+      });
+
+      this.collections[colID].meshSets[k] = this.hvymMeshSet(colID, set, v.widget);
     }
   }
   CollectionHasProperty(key, prop){
@@ -5036,6 +5071,19 @@ export class HVYM_Data {
       'set_name': set_name,
       'collection_id': collection_id,
       'mat_ref': mat_ref,
+      'ctrl': this
+    }
+  }
+  hvymMatProps(collection_id, mat_name, emissive, irridescent, sheen, mat_ref, widget){
+    return {
+      'type': 'HVYM_MAT_PROPS',
+      'collection_id': collection_id,
+      'mat_name': mat_name,
+      'emissive': emissive,
+      'irridescent': irridescent,
+      'sheen': sheen,
+      'mat_ref': mat_ref,
+      'widget': widget,
       'ctrl': this
     }
   }
