@@ -2329,7 +2329,10 @@ export class PanelSlider extends PanelBox {
     this.is = 'PANEL_SLIDER';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
-    const valProps = section.data;
+    let valProps = section.data;
+    if(valProps.type == 'HVYM_VAL_PROP_REF'){
+      valProps = valProps.val_props;
+    }
     const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
     this.ctrlWidget = new SliderWidget(sliderProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -2357,7 +2360,10 @@ export class PanelMeter extends PanelBox {
     this.is = 'PANEL_METER';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
-    const valProps = section.data;
+    let valProps = section.data;
+    if(valProps.type == 'HVYM_VAL_PROP_REF'){
+      valProps = valProps.val_props;
+    }
     const meterProps = defaultPanelMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
     this.ctrlWidget = new MeterWidget(meterProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -2370,7 +2376,10 @@ export class PanelValueMeter extends PanelBox {
     this.is = 'PANEL_VALUE_METER';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
-    const valProps = section.data;
+    let valProps = section.data;
+    if(valProps.type == 'HVYM_VAL_PROP_REF'){
+      valProps = valProps.val_props;
+    }
     const meterProps = defaultPanelValueMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
     this.ctrlWidget = new MeterWidget(meterProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -2526,75 +2535,6 @@ export function panelMaterialSetSectionPropertySet(materialSet){
   let props = {}
 
   return panelSectionProperties(materialSet.name, 'controls', sectionData)
-};
-
-function hvymDataWidgetMap(){
-  return {
-    'materialSets': 'selector',
-    'meshSets': 'selector'
-  }
-}
-
-function hvymDataLabelMap(){
-  return {
-    'materialSets': 'materialSetsLabel',
-    'meshSets': 'meshSetsLabel',
-    'meshProps': 'meshPropsLabel'
-  }
-}
-
-function createHVYMCollectionWidgetData(collection){
-  let mainData = {};
-  const collectionKeys = ['materialSets', 'meshSets', 'matProps'];
-  const widgetMap = hvymDataWidgetMap();
-  const labelMap = hvymDataLabelMap();
-
-  collectionKeys.forEach((key, idx) => { 
-    let label = collection[labelMap[key]];
-    if(Object.keys(collection[key]).length==0)
-      return;
-    let widgetData = {};
-    if(key=='matProps'){
-        let matProps = collection[key];
-        for (const [name, obj] of Object.entries(collection[key])) {
-          let data = panelMaterialSectionPropertySet(obj.mat_ref, obj.emissive, obj.reflective, obj.iridescent, obj.sheen);
-          mainData[data.name] = data;
-        }
-    }else{
-
-      for (const [name, obj] of Object.entries(collection[key])) {
-        let data = panelSectionProperties(name, widgetMap[key], obj);
-        widgetData[data.name] = data;
-      }
-
-      mainData[label] = panelSectionProperties(label, 'controls', widgetData);
-    }
-      
-  });
-
-  return panelSectionProperties('sections', 'container', mainData);
-}
-
-export function panelHVYMCollectionPropertyList(parent, textProps, collections){
-  let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', parent);
-  let colPanels = [];
-
-  for (const [colId, collection] of Object.entries(collections)) {
-
-    // let mainData = {};
-    // let widgetData = createHVYMCollectionWidgetData(collection);
-    // mainData[widgetData.name] = widgetData;
-    let topSectionData = createHVYMCollectionWidgetData(collection);
-    console.log('topSectionData!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-    console.log(topSectionData)
-    let colPanel = panelProperties( panelBoxProps, collection.collectionName, textProps, 'LEFT', topSectionData);
-    colPanels.push(colPanel);
-
-  }
-
-
-  return colPanels
-
 };
 
 export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
@@ -4908,6 +4848,9 @@ export class HVYM_Data {
   HandleHVYMProps(colID, data){
     for (const [key, obj] of Object.entries(data)) {
       switch (key) {
+        case 'valProps':
+          this.HandleValueProps(colID, obj);
+          break;
         case 'materialSets':
           this.HandleMaterialSets(colID, obj);
           break;
@@ -4920,6 +4863,18 @@ export class HVYM_Data {
         default:
           console.log('X');
       }
+    }
+  }
+  HandleValueProps(colID, valProps){
+    for (const [valPropName, valProp] of Object.entries(valProps)) {
+      let name = valPropName;
+      let default_val = valProp.default;
+      let min = valProp.min;
+      let max = valProp.max;
+      let action_type = valProp.prop_action_type;
+      let slider_type = valProp.prop_slider_type;
+      let widget = valProp.widget;
+      this.collections[colID].valProps[valPropName] = this.hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget);
     }
   }
   HandleMaterialProps(colID, matProps){
@@ -5019,6 +4974,71 @@ export class HVYM_Data {
       }
     }
   }
+  hvymDataWidgetMap(){
+    return {
+      'valProps': 'meter',
+      'materialSets': 'selector',
+      'meshSets': 'selector'
+    }
+  }
+  hvymDataLabelMap(){
+    return {
+      'valProps': 'valuePropsLabel',
+      'materialSets': 'materialSetsLabel',
+      'meshSets': 'meshSetsLabel',
+      'meshProps': 'meshPropsLabel'
+    }
+  }
+  createHVYMCollectionWidgetData(collection){
+    let mainData = {};
+    const collectionKeys = ['valProps', 'materialSets', 'meshSets', 'matProps'];
+    const widgetMap = this.hvymDataWidgetMap();
+    const labelMap = this.hvymDataLabelMap();
+
+    collectionKeys.forEach((key, idx) => { 
+      let label = collection[labelMap[key]];
+      if(Object.keys(collection[key]).length==0)
+        return;
+      let widgetData = {};
+      if(key=='matProps'){
+          let matProps = collection[key];
+          for (const [name, obj] of Object.entries(collection[key])) {
+            let data = panelMaterialSectionPropertySet(obj.mat_ref, obj.emissive, obj.reflective, obj.iridescent, obj.sheen);
+            mainData[data.name] = data;
+          }
+      }else{
+
+        for (const [name, obj] of Object.entries(collection[key])) {
+
+          let widget = widgetMap[key];
+          if(obj.type == 'HVYM_VAL_PROP_REF'){
+            widget = obj.slider_type;
+          }
+          let data = panelSectionProperties(name, widget, obj);
+          widgetData[data.name] = data;
+        }
+
+        mainData[label] = panelSectionProperties(label, 'controls', widgetData);
+      }
+        
+    });
+
+    return panelSectionProperties('sections', 'container', mainData);
+  }
+  panelHVYMCollectionPropertyList(parent, textProps){
+    let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', parent);
+    let colPanels = [];
+
+    for (const [colId, collection] of Object.entries(this.collections)) {
+      let topSectionData = this.createHVYMCollectionWidgetData(collection);
+      let colPanel = panelProperties( panelBoxProps, collection.collectionName, textProps, 'LEFT', topSectionData);
+      colPanels.push(colPanel);
+    }
+
+
+    return colPanels
+
+  }
   hvymCollection(id, collectionName){
     return {
       'type': 'HVYM_COLLECTION',
@@ -5080,6 +5100,21 @@ export class HVYM_Data {
       'irridescent': irridescent,
       'sheen': sheen,
       'mat_ref': mat_ref,
+      'widget': widget,
+      'ctrl': this
+    }
+  }
+  hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget){
+    let editable = true;
+    if(action_type == 'Immutable'){
+      editable = false;
+    }
+    return {
+      'type': 'HVYM_VAL_PROP_REF',
+      'name': name,
+      'val_props': numberValueProperties(default_val, min, max, 0, 0.001, editable),
+      'action_type': action_type,
+      'slider_type': slider_type,
       'widget': widget,
       'ctrl': this
     }
@@ -5202,7 +5237,8 @@ export class GLTFModelWidget extends BaseWidget {
         // Load the font
         loader.load(panelTextProps.font, (font) => {
           panelTextProps.font = font;
-          const panelPropList = panelHVYMCollectionPropertyList(this.box, panelTextProps, this.hvymData.collections);
+          const panelPropList = this.hvymData.panelHVYMCollectionPropertyList(this.box, panelTextProps);
+
           this.CreateHVYMPanel(panelPropList);
         });
       }
