@@ -877,14 +877,15 @@ export function materialProperties(type='BASIC', color='white', transparent=fals
   }
 };
 
-export function materialRefProperties(matType='PHONG', ref=undefined, targetProp='color', valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false){
+export function materialRefProperties(matType='PHONG', ref=undefined, targetProp='color', valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false, isHVYM=false){
   return {
     'type': 'MAT_REF',
     'matType': matType,
     'ref': ref,
     'targetProp': targetProp,
     'valueProps': valueProps,
-    'useMaterialView': useMaterialView
+    'useMaterialView': useMaterialView,
+    'isHVYM': isHVYM
   }
 };
 
@@ -1217,6 +1218,18 @@ export function leftTopCornerPos(parentSize, childSize, zPosDir=1, padding=0.025
 export function leftBottomCornerPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(-(parentSize.width/2)+childSize.width/2+padding, -(parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
+
+export function meshRefProperties(isGroup=false, ref=undefined, valueProps=stringValueProperties(), targetProp='visbility', useMaterialView=false, isHVYM=false){
+  return {
+    'type': 'MESH_REF',
+    'isGroup': isGroup,
+    'ref': ref,
+    'targetProp': targetProp,
+    'valueProps': valueProps,
+    'useMaterialView': useMaterialView,
+    'isHVYM': isHVYM
+  }
+};
 
 export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties(), meshProps=textMeshProperties(), align='CENTER', editText=false) {
   return {
@@ -2438,6 +2451,20 @@ export class PanelListSelector extends PanelBox {
   }
 };
 
+export class PanelToggle extends PanelBox {
+  constructor(panelProps) {
+    super(panelProps);
+    this.is = 'PANEL_TOGGLE';
+    this.SetParentPanel();
+    const section = panelProps.sections.data[panelProps.name];
+    const meshRefProps = section.data;
+    const toggleProps = defaultPanelBooleanToggleProps(meshRefProps.name, this.box, panelProps.textProps.font, meshRefProps.visible);
+    toggleProps.objectControlProps = meshRefProps.mesh_set_ref;
+    this.ctrlWidget = new ToggleWidget(toggleProps);
+    this.box.userData.ctrlWidget = this.ctrlWidget;
+  }
+};
+
 export class PanelButton extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2816,6 +2843,9 @@ export class BasePanel extends BaseTextBox {
         case 'button':
           ctrlBox = new PanelButton(sectionProps);
           break;
+        case 'toggle':
+          ctrlBox = new PanelToggle(sectionProps);
+          break;
         default:
           console.log('X');
       }
@@ -2909,6 +2939,7 @@ export class BaseWidget extends BaseBox {
     baseBoxProps.depth = size.baseDepth/2;
     super(baseBoxProps);
     this.is = 'BASE_WIDGET';
+    this.isHVYM = false;
     this.objectControlProps = widgetProps.objectControlProps;
     let zOffset = 1;
     this.value = widgetProps.valueProps.defaultValue;
@@ -3066,6 +3097,7 @@ export class BaseWidget extends BaseBox {
       if(elem.objectControlProps.type == 'MAT_REF'){
         elem.objectRef = elem.objectControlProps.ref;
         elem.targetProp = elem.objectControlProps.targetProp;
+        elem.isHVYM = elem.objectControlProps.isHVYM;
         elem.objectRef.userData.materialCtrls = [];
         elem.objectRef.userData.refreshCallback = BaseWidget.RefreshMaterialRefs;
         elem.objectRef.addEventListener('refreshMaterialViews', function(event) {
@@ -3078,6 +3110,10 @@ export class BaseWidget extends BaseBox {
         }else if(elem.objectControlProps.setType == 'MESH'){
           
         } 
+      }else if(elem.objectControlProps.type == 'MESH_REF'){
+        elem.objectRef = elem.objectControlProps.ref;
+        elem.targetProp = elem.objectControlProps.targetProp;
+        elem.isHVYM = elem.objectControlProps.isHVYM;
       }
     }
   }
@@ -3877,7 +3913,7 @@ export function stringValueProperties(defaultValue='Off', onValue='On', offValue
   }
 };
 
-export function toggleProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), handleSize=2 ){
+export function toggleProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), handleSize=2, objectControlProps=undefined ){
   return {
     'type': 'TOGGLE',
     'boxProps': boxProps,
@@ -3887,7 +3923,8 @@ export function toggleProperties(boxProps, name='', horizontal=true, on=false, t
     'textProps': textProps,
     'useValueText': useValueText,
     'valueProps': valueProps,
-    'handleSize': handleSize
+    'handleSize': handleSize,
+    'objectControlProps': objectControlProps
   }
 };
 
@@ -3944,6 +3981,7 @@ export class ToggleWidget extends BaseWidget {
     this.box.userData.horizontal = toggleProps.horizontal;
     this.box.userData.valueProps = toggleProps.valueProps;
     this.box.userData.value = toggleProps.valueProps.defaultValue;
+    this.updateBooleanValue();
 
     this.handle.userData.type = 'TOGGLE';
     this.handle.userData.size = {'width': this.widgetSize.handleWidth, 'height': this.widgetSize.handleHeight, 'depth': this.widgetSize.handleDepth};
@@ -3953,6 +3991,13 @@ export class ToggleWidget extends BaseWidget {
     this.handle.userData.on = false;
     this.handle.userData.targetElem = this;
 
+  }
+  updateBooleanValue(){
+    let result = true;
+    if(this.box.userData.value=='Off'){
+      result = false;
+    }
+    this.box.userData.booleanValue = result;
   }
   handleToggleValueText(toggle){
     if(toggle.box.userData.valueBox != undefined){
@@ -3966,6 +4011,13 @@ export class ToggleWidget extends BaseWidget {
       toggle.box.userData.valueBox.dispatchEvent({type:'update'});
     }
   }
+  static HandleHVYMToggle(toggle){
+    let visible = toggle.box.userData.booleanValue;
+    if(toggle.objectRef!=undefined){
+      toggle.objectRef.userData.hvymCtrl.SetMeshVis(toggle.objectRef, visible);
+    }
+
+  }
   static DoToggle(toggle){
     toggle.handle.userData.on=!toggle.handle.userData.on;
     if(toggle.box.userData.valueBox != undefined){
@@ -3974,6 +4026,12 @@ export class ToggleWidget extends BaseWidget {
         toggle.box.userData.value = toggle.box.userData.valueProps.offValue;
       }else{
         toggle.box.userData.value = toggle.box.userData.valueProps.onValue;
+      }
+
+      toggle.updateBooleanValue();
+
+      if(toggle.isHVYM){
+        ToggleWidget.HandleHVYMToggle(toggle);
       }
 
       toggle.box.userData.valueBox.dispatchEvent({type:'update'});
@@ -4444,6 +4502,7 @@ export class SelectorWidget extends BaseWidget {
       let btnProps = buttonProperties({...this.btnBoxProps}, key, val, props.textProps);
       if(val.type == 'HVYM_MAT_SET_REF'){
         val.mat_ref.userData.mat_ref_props = materialRefPropertiesFromMaterial(val.mat_ref, 'color', true);
+        val.mat_ref.userData.mat_ref_props.isHVYM = this.isHVYM;
         btnProps.objectControlProps = val.mat_ref.userData.mat_ref_props;
       }
       let btn = new BaseTextBox(btnProps);
@@ -4857,6 +4916,9 @@ export class HVYM_Data {
         case 'meshSets':
           this.HandleMeshSets(colID, obj);
           break;
+        case 'meshProps':
+          this.HandleMeshProps(colID, obj);
+          break;
         case 'matProps':
           this.HandleMaterialProps(colID, obj);
           break;
@@ -4873,8 +4935,9 @@ export class HVYM_Data {
       let max = valProp.max;
       let action_type = valProp.prop_action_type;
       let slider_type = valProp.prop_slider_type;
+      let widget_type = valProp.widget_type;
       let widget = valProp.widget;
-      this.collections[colID].valProps[valPropName] = this.hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget);
+      this.collections[colID].valProps[valPropName] = this.hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget_type, widget);
     }
   }
   HandleMaterialProps(colID, matProps){
@@ -4884,8 +4947,17 @@ export class HVYM_Data {
       let emissive = matProp.emissive;
       let irridescent = matProp.irridescent;
       let sheen = matProp.sheen;
+      let widget_type = matProp.widget_type;
       let widget = matProp.widget;
-      this.collections[colID].matProps[matPropName] = this.hvymMatProps(colID, mat_name, emissive, irridescent, sheen, mat_ref, widget);
+      this.collections[colID].matProps[matPropName] = this.hvymMatProps(colID, mat_name, emissive, irridescent, sheen, mat_ref, widget_type, widget);
+    }
+  }
+  HandleMeshProps(colID, meshProps){
+    for (const [meshPropName, meshProp] of Object.entries(meshProps)) {
+      let mesh = this.collections[colID].models[meshProp.name];
+      let mesh_ref = meshRefProperties(mesh.isGroup, mesh, 'visbility');
+      mesh_ref.isHVYM = true;
+      this.collections[colID].meshProps[meshPropName] = this.hvymMeshPropRef(meshProp.name, meshProp.visible, mesh_ref, meshProp.widget_type, meshProp.widget);
     }
   }
   HandleMaterialSets(colID, materialSet){
@@ -4893,6 +4965,7 @@ export class HVYM_Data {
         
         let mesh_set = this.collections[colID].meshSets[v.mesh_set];
         let mat_id = v.material_id;
+        let widget_type = v.widget_type;
         let widget = v.widget;
         if(mesh_set == undefined)
           return;
@@ -4905,7 +4978,7 @@ export class HVYM_Data {
           mat_set[m_name] = this.hvymMaterialSetRef(k, colID, mat);
         });
 
-        this.collections[colID].materialSets[k] = this.hvymMaterialSet(colID, mat_id, mat_set, mesh_set, widget);
+        this.collections[colID].materialSets[k] = this.hvymMaterialSet(colID, mat_id, mat_set, mesh_set, widget_type, widget);
 
         //assign material ref to material userData
         for (const [matName, mat_set_ref] of Object.entries(mat_set)) {
@@ -4923,7 +4996,7 @@ export class HVYM_Data {
         set[m_ref.name] = ref
       });
 
-      this.collections[colID].meshSets[k] = this.hvymMeshSet(colID, set, v.widget);
+      this.collections[colID].meshSets[k] = this.hvymMeshSet(colID, set, v.widget_type, v.widget);
     }
   }
   CollectionHasProperty(key, prop){
@@ -4937,14 +5010,17 @@ export class HVYM_Data {
     return true
 
   }
-  SetMeshRefVis(ref, visible){
-    if(ref.mesh_ref.isGroup){
-      ref.mesh_ref.children.forEach((c, idx) => {
+  SetMeshVis(mesh, visible){
+    if(mesh.isGroup){
+      mesh.children.forEach((c, idx) => {
         c.visible = visible;
       });
     }else{
-      ref.mesh_ref.visible = visible;
+      mesh.visible = visible;
     }
+  }
+  SetMeshRefVis(ref, visible){
+    this.SetMeshVis(ref.mesh_ref, visible)
   }
   UpdateMatSet(mat_set_ref){
     const material = mat_set_ref.mat_ref;
@@ -4991,7 +5067,7 @@ export class HVYM_Data {
   }
   createHVYMCollectionWidgetData(collection){
     let mainData = {};
-    const collectionKeys = ['valProps', 'materialSets', 'meshSets', 'matProps'];
+    const collectionKeys = ['valProps', 'materialSets', 'meshSets', 'meshProps', 'matProps'];
     const widgetMap = this.hvymDataWidgetMap();
     const labelMap = this.hvymDataLabelMap();
 
@@ -5003,16 +5079,21 @@ export class HVYM_Data {
       if(key=='matProps'){
           let matProps = collection[key];
           for (const [name, obj] of Object.entries(collection[key])) {
+            if(!obj.widget)
+            return;
+
             let data = panelMaterialSectionPropertySet(obj.mat_ref, obj.emissive, obj.reflective, obj.iridescent, obj.sheen);
             mainData[data.name] = data;
           }
       }else{
 
         for (const [name, obj] of Object.entries(collection[key])) {
+          if(!obj.widget)
+            return;
 
           let widget = widgetMap[key];
-          if(obj.type == 'HVYM_VAL_PROP_REF'){
-            widget = obj.slider_type;
+          if(obj.type.includes('HVYM')){
+            widget = obj.widget_type;
           }
           let data = panelSectionProperties(name, widget, obj);
           widgetData[data.name] = data;
@@ -5049,16 +5130,18 @@ export class HVYM_Data {
       'animProps': {},
       'matProps': {},
       'meshSets': {},
+      'meshProps': {},
       'materialSets': {},
       'models': {},
       'materials': {}
     }
   }
-  hvymMeshSet(collection_id, set, widget){
+  hvymMeshSet(collection_id, set, widget_type, widget){
     return {
       'type': 'HVYM_MESH_SET',
       'collection_id': collection_id,
       'set': set,
+      'widget_type': widget_type,
       'widget': widget
     }
   }
@@ -5072,13 +5155,14 @@ export class HVYM_Data {
       'ctrl': this
     }
   }
-  hvymMaterialSet(collection_id, material_id, set, mesh_set, widget){
+  hvymMaterialSet(collection_id, material_id, set, mesh_set, widget_type, widget){
     return {
       'type': 'HVYM_MAT_SET',
       'collection_id': collection_id,
       'material_id': material_id,
       'set': set,
       'mesh_set': mesh_set,
+      'widget_type': widget_type,
       'widget': widget
     }
   }
@@ -5091,7 +5175,7 @@ export class HVYM_Data {
       'ctrl': this
     }
   }
-  hvymMatProps(collection_id, mat_name, emissive, irridescent, sheen, mat_ref, widget){
+  hvymMatProps(collection_id, mat_name, emissive, irridescent, sheen, mat_ref, widget_type, widget){
     return {
       'type': 'HVYM_MAT_PROPS',
       'collection_id': collection_id,
@@ -5100,11 +5184,12 @@ export class HVYM_Data {
       'irridescent': irridescent,
       'sheen': sheen,
       'mat_ref': mat_ref,
+      'widget_type': widget_type,
       'widget': widget,
       'ctrl': this
     }
   }
-  hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget){
+  hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget_type, widget){
     let editable = true;
     if(action_type == 'Immutable'){
       editable = false;
@@ -5115,6 +5200,18 @@ export class HVYM_Data {
       'val_props': numberValueProperties(default_val, min, max, 0, 0.001, editable),
       'action_type': action_type,
       'slider_type': slider_type,
+      'widget': widget,
+      'widget_type': widget_type,
+      'ctrl': this
+    }
+  }
+  hvymMeshPropRef(name, visible, mesh_set_ref, widget_type, widget){
+    return {
+      'type': 'HVYM_MESH_PROP_REF',
+      'name': name,
+      'visible': visible,
+      'mesh_set_ref': mesh_set_ref,
+      'widget_type': widget_type,
       'widget': widget,
       'ctrl': this
     }
@@ -5136,6 +5233,7 @@ export class HVYM_Data {
     scene.traverse( function( child ) {
       if(child.isObject3D && child.hasOwnProperty('material')){
         result[child.material.name] = child.material;
+        child.material.userData.hvymCtrl = this;
       } 
     });
 
@@ -5146,7 +5244,10 @@ export class HVYM_Data {
     nodes.forEach((node, index) =>{
       let ref = this.getGltfSceneModel(scene, node.name);
       let k = node.name;
-      result[k] = ref;
+      if(ref!=undefined){
+        result[k] = ref;
+        ref.userData.hvymCtrl = this;
+      }
     });
 
     return result
