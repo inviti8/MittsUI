@@ -4922,6 +4922,9 @@ export class HVYM_Data {
         case 'matProps':
           this.HandleMaterialProps(colID, obj);
           break;
+        case 'morphProps':
+          this.HandleMorphProps(colID, obj);
+          break;
         default:
           console.log('X');
       }
@@ -4950,6 +4953,18 @@ export class HVYM_Data {
       let widget_type = matProp.widget_type;
       let widget = matProp.widget;
       this.collections[colID].matProps[matPropName] = this.hvymMatProps(colID, mat_name, emissive, irridescent, sheen, mat_ref, widget_type, widget);
+    }
+  }
+  HandleMorphProps(colID, morphProps){
+    for (const [morphPropName, morphProp] of Object.entries(morphProps)) {
+      let mesh_ref = this.collections[colID].models[morphProp.model_ref.name];
+      let morph_set = {};
+
+      morphProp.set.forEach((m_prop, index) =>{
+        morph_set[m_prop.name] = this.hvymMorphSetRef(m_prop.name, morphPropName, colID, mesh_ref, m_prop.default, m_prop.min, m_prop.max);
+      });
+
+      this.collections[colID].morphProps[morphPropName] = this.hvymMorphSet(colID, morph_set, mesh_ref, morphProp.widget_type, morphProp.widget);
     }
   }
   HandleMeshProps(colID, meshProps){
@@ -5172,6 +5187,29 @@ export class HVYM_Data {
       'set_name': set_name,
       'collection_id': collection_id,
       'mat_ref': mat_ref,
+      'ctrl': this
+    }
+  }
+  hvymMorphSet(collection_id, set, mesh_ref, widget_type, widget){
+    return {
+      'type': 'HVYM_MORPH_SET',
+      'collection_id': collection_id,
+      'set': set,
+      'mesh_ref': mesh_ref,
+      'widget_type': widget_type,
+      'widget': widget
+    }
+  }
+  hvymMorphSetRef(morph_name, set_name, collection_id, mesh_ref, default_val, min, max){
+    return {
+      'type': 'HVYM_MORPH_SET_REF',
+      'morph_name': morph_name,
+      'set_name': set_name,
+      'collection_id': collection_id,
+      'mesh_ref': mesh_ref,
+      'default': default_val,
+      'min': min,
+      'max': max,
       'ctrl': this
     }
   }
