@@ -4945,7 +4945,7 @@ export class HVYM_Data {
         case 'matProps':
           this.HandleMaterialProps(colID, obj);
           break;
-        case 'morphProps':
+        case 'morphSets':
           this.HandleMorphProps(colID, obj);
           break;
         default:
@@ -4978,8 +4978,8 @@ export class HVYM_Data {
       this.collections[colID].matProps[matPropName] = this.hvymMatProps(colID, mat_name, emissive, irridescent, sheen, mat_ref, widget_type, widget);
     }
   }
-  HandleMorphProps(colID, morphProps){
-    for (const [morphPropName, morphProp] of Object.entries(morphProps)) {
+  HandleMorphProps(colID, morphSets){
+    for (const [morphPropName, morphProp] of Object.entries(morphSets)) {
       let mesh_ref = this.collections[colID].models[morphProp.model_ref.name];
       let morph_set = {};
 
@@ -4987,7 +4987,7 @@ export class HVYM_Data {
         morph_set[m_prop.name] = this.hvymMorphSetRef(m_prop.name, morphPropName, colID, mesh_ref, m_prop.default, m_prop.min, m_prop.max);
       });
 
-      this.collections[colID].morphProps[morphPropName] = this.hvymMorphSet(colID, morph_set, mesh_ref, morphProp.widget_type, morphProp.widget);
+      this.collections[colID].morphSets[morphPropName] = this.hvymMorphSet(colID, morph_set, mesh_ref, morphProp.widget_type, morphProp.widget);
     }
   }
   HandleMeshProps(colID, meshProps){
@@ -5114,12 +5114,12 @@ export class HVYM_Data {
       'materialSets': 'materialSetsLabel',
       'meshSets': 'meshSetsLabel',
       'meshProps': 'meshPropsLabel',
-      'morphProps': 'morphSetsLabel'
+      'morphSets': 'morphSetsLabel'
     }
   }
   createHVYMCollectionWidgetData(collection){
     let mainData = {};
-    const collectionKeys = ['valProps', 'materialSets', 'meshSets', 'meshProps', 'matProps', 'morphProps'];
+    const collectionKeys = ['valProps', 'materialSets', 'meshSets', 'meshProps', 'matProps', 'morphSets'];
     const widgetMap = this.hvymDataWidgetMap();
     const labelMap = this.hvymDataLabelMap();
 
@@ -5137,11 +5137,11 @@ export class HVYM_Data {
             let data = panelMaterialSectionPropertySet(obj.mat_ref, obj.emissive, obj.reflective, obj.iridescent, obj.sheen);
             mainData[data.name] = data;
           }
-      }else if(key=='morphProps'){
-        let morphProps = collection[key];
+      }else if(key=='morphSets'){
+        let morphSets = collection[key];
         let widgetData = {};
 
-        for (const [name, obj] of Object.entries(morphProps)) {
+        for (const [name, obj] of Object.entries(morphSets)) {
           if(obj.widget_type == 'none')
             return;
           for (const [morphName, morphObj] of Object.entries(obj.set)) {
@@ -5193,7 +5193,7 @@ export class HVYM_Data {
       'id': id,
       'collectionName': collectionName,
       'valProps': {},
-      'morphProps': {},
+      'morphSets': {},
       'animProps': {},
       'matProps': {},
       'meshSets': {},
