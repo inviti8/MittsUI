@@ -1219,7 +1219,7 @@ export function leftBottomCornerPos(parentSize, childSize, zPosDir=1, padding=0.
   return new THREE.Vector3(-(parentSize.width/2)+childSize.width/2+padding, -(parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
-export function meshRefProperties(isGroup=false, ref=undefined, valueProps=stringValueProperties(), targetProp='visbility', useMaterialView=false, isHVYM=false){
+export function meshRefProperties(isGroup=false, ref=undefined, valueProps=stringValueProperties(), targetProp='visbility', useMaterialView=false, targetMorph=undefined, isHVYM=false){
   return {
     'type': 'MESH_REF',
     'isGroup': isGroup,
@@ -1227,6 +1227,7 @@ export function meshRefProperties(isGroup=false, ref=undefined, valueProps=strin
     'targetProp': targetProp,
     'valueProps': valueProps,
     'useMaterialView': useMaterialView,
+    'targetMorph': targetMorph,
     'isHVYM': isHVYM
   }
 };
@@ -2343,10 +2344,17 @@ export class PanelSlider extends PanelBox {
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     let valProps = section.data;
-    if(valProps.type == 'HVYM_VAL_PROP_REF'){
+    let objectControlProps = undefined;
+    if(section.data.type.includes('HVYM')){
       valProps = valProps.val_props;
+      if(section.data.type.includes('MORPH_SET_REF')){
+        objectControlProps = meshRefProperties(section.data.mesh_ref.isGroup, section.data.mesh_ref, valProps, 'morph', false, section.data.morph_name, true);
+      }
     }
     const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    if(objectControlProps!=undefined){
+      sliderProps.objectControlProps = objectControlProps;
+    }
     this.ctrlWidget = new SliderWidget(sliderProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -3053,6 +3061,13 @@ export class BaseWidget extends BaseBox {
     
     this.objectRef.dispatchEvent({type:'refreshMaterialViews'});
   }
+  UpdateMeshRefFloatValue(value){
+    if(BaseWidget.IsMorphSliderProp(this.targetProp)){
+      value = parseFloat(value);
+      this.objectRef.userData.hvymCtrl.UpdateMorph(this.objectControlProps, value);
+    }
+    
+  }
   static UpdateMaterialRefColor(elem, hex, alpha=undefined){
     if(!isNaN(elem.objectRef[elem.targetProp]) && !BaseWidget.IsMaterialColorProp(this.targetProp))
       return;
@@ -3114,6 +3129,9 @@ export class BaseWidget extends BaseBox {
         elem.objectRef = elem.objectControlProps.ref;
         elem.targetProp = elem.objectControlProps.targetProp;
         elem.isHVYM = elem.objectControlProps.isHVYM;
+        if(elem.targetProp=='morph'){
+          elem.targetMorph = elem.objectControlProps.targetMorph;
+        }
       }
     }
   }
@@ -3200,6 +3218,9 @@ export class BaseWidget extends BaseBox {
   }
   static IsMaterialPBRSliderProp(prop){
     return (prop == 'roughness' || prop == 'metalness' || prop == 'clearcoat' || prop == 'clearCoatRoughness' || prop == 'ior' || prop == 'reflectivity' || prop == 'iridescence' || prop == 'sheen' || prop == 'sheenRoughness' || prop == 'specularIntensity')
+  }
+  static IsMorphSliderProp(prop){
+    return (prop == 'morph')
   }
 };
 
@@ -3472,6 +3493,8 @@ export class SliderWidget extends BaseWidget {
     this.value = value;
     if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
       this.UpdateMaterialRefFloatValue(value);
+    }else if(BaseWidget.IsMorphSliderProp(this.targetProp)){
+      this.UpdateMeshRefFloatValue(value);
     }
 
     if(this.box.userData.valueBox != undefined){
@@ -5037,6 +5060,19 @@ export class HVYM_Data {
   SetMeshRefVis(ref, visible){
     this.SetMeshVis(ref.mesh_ref, visible)
   }
+  SetMeshMorph(mesh, name, value){
+    let idx = mesh.morphTargetDictionary[name];
+    mesh.morphTargetInfluences[idx] = value;
+  }
+  UpdateMorph(object_cntrl_props, value){
+    if(object_cntrl_props.isGroup){
+      object_cntrl_props.ref.children.forEach((m, idx) => {
+        this.SetMeshMorph(m, object_cntrl_props.targetMorph, value);
+      });
+    }else{
+      this.SetMeshMorph(m, object_cntrl_props.targetMorph, value);
+    }
+  }
   UpdateMatSet(mat_set_ref){
     const material = mat_set_ref.mat_ref;
     const mat_set = material.userData.mat_set;
@@ -5077,12 +5113,13 @@ export class HVYM_Data {
       'valProps': 'valuePropsLabel',
       'materialSets': 'materialSetsLabel',
       'meshSets': 'meshSetsLabel',
-      'meshProps': 'meshPropsLabel'
+      'meshProps': 'meshPropsLabel',
+      'morphProps': 'morphSetsLabel'
     }
   }
   createHVYMCollectionWidgetData(collection){
     let mainData = {};
-    const collectionKeys = ['valProps', 'materialSets', 'meshSets', 'meshProps', 'matProps'];
+    const collectionKeys = ['valProps', 'materialSets', 'meshSets', 'meshProps', 'matProps', 'morphProps'];
     const widgetMap = this.hvymDataWidgetMap();
     const labelMap = this.hvymDataLabelMap();
 
@@ -5093,17 +5130,32 @@ export class HVYM_Data {
       let widgetData = {};
       if(key=='matProps'){
           let matProps = collection[key];
-          for (const [name, obj] of Object.entries(collection[key])) {
-            if(!obj.widget)
+          for (const [name, obj] of Object.entries(matProps)) {
+            if(obj.widget_type == 'none')
             return;
 
             let data = panelMaterialSectionPropertySet(obj.mat_ref, obj.emissive, obj.reflective, obj.iridescent, obj.sheen);
             mainData[data.name] = data;
           }
+      }else if(key=='morphProps'){
+        let morphProps = collection[key];
+        let widgetData = {};
+
+        for (const [name, obj] of Object.entries(morphProps)) {
+          if(obj.widget_type == 'none')
+            return;
+          for (const [morphName, morphObj] of Object.entries(obj.set)) {
+            let data = panelSectionProperties(morphName, 'slider', morphObj);
+            widgetData[data.name] = data;
+          }
+
+          mainData[name] = panelSectionProperties(name, 'controls', widgetData);
+        }
+
       }else{
 
         for (const [name, obj] of Object.entries(collection[key])) {
-          if(!obj.widget)
+          if(obj.widget_type == 'none')
             return;
 
           let widget = widgetMap[key];
@@ -5206,10 +5258,8 @@ export class HVYM_Data {
       'morph_name': morph_name,
       'set_name': set_name,
       'collection_id': collection_id,
+      'val_props': numberValueProperties(default_val, min, max, 3, 0.001, true),
       'mesh_ref': mesh_ref,
-      'default': default_val,
-      'min': min,
-      'max': max,
       'ctrl': this
     }
   }
