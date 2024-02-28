@@ -4909,6 +4909,12 @@ export class HVYM_Data {
           this.collections[key] = this.hvymCollection(key, obj.collectionName);
           this.collections[key].models = this.getCollectionModelRefs(gltf.scene, obj.nodes);
           this.collections[key].materials = this.getGltfSceneMaterials(gltf.scene);
+          this.collections[key].hasAnimation = false;
+
+          if(extensions.HVYM_nft_data[key].hasOwnProperty('animProps')){
+            this.collections[key].hasAnimation = true;
+            this.collections[key].animations = this.getGltfAnimations(extensions.HVYM_nft_data[key].animProps, gltf)
+          }
 
           if(obj.hasOwnProperty('propLabelData')){
             this.collections[key].meshSetsLabel = obj.propLabelData.mesh_set_label;
@@ -4946,7 +4952,10 @@ export class HVYM_Data {
           this.HandleMaterialProps(colID, obj);
           break;
         case 'morphSets':
-          this.HandleMorphProps(colID, obj);
+          this.HandleMorphSetProps(colID, obj);
+          break;
+        case 'animProps':
+          this.HandleAnimProps(colID, obj);
           break;
         default:
           console.log('X');
@@ -4978,16 +4987,16 @@ export class HVYM_Data {
       this.collections[colID].matProps[matPropName] = this.hvymMatProps(colID, mat_name, emissive, irridescent, sheen, mat_ref, widget_type, widget);
     }
   }
-  HandleMorphProps(colID, morphSets){
-    for (const [morphPropName, morphProp] of Object.entries(morphSets)) {
-      let mesh_ref = this.collections[colID].models[morphProp.model_ref.name];
+  HandleMorphSetProps(colID, morphSets){
+    for (const [morphSetName, morphSet] of Object.entries(morphSets)) {
+      let mesh_ref = this.collections[colID].models[morphSet.model_ref.name];
       let morph_set = {};
 
-      morphProp.set.forEach((m_prop, index) =>{
-        morph_set[m_prop.name] = this.hvymMorphSetRef(m_prop.name, morphPropName, colID, mesh_ref, m_prop.default, m_prop.min, m_prop.max);
+      morphSet.set.forEach((m_prop, index) =>{
+        morph_set[m_prop.name] = this.hvymMorphSetRef(m_prop.name, morphSetName, colID, mesh_ref, m_prop.default, m_prop.min, m_prop.max);
       });
 
-      this.collections[colID].morphSets[morphPropName] = this.hvymMorphSet(colID, morph_set, mesh_ref, morphProp.widget_type, morphProp.widget);
+      this.collections[colID].morphSets[morphSetName] = this.hvymMorphSet(colID, morph_set, mesh_ref, morphSet.widget_type, morphSet.widget);
     }
   }
   HandleMeshProps(colID, meshProps){
@@ -4996,6 +5005,15 @@ export class HVYM_Data {
       let mesh_ref = meshRefProperties(mesh.isGroup, mesh, 'visbility');
       mesh_ref.isHVYM = true;
       this.collections[colID].meshProps[meshPropName] = this.hvymMeshPropRef(meshProp.name, meshProp.visible, mesh_ref, meshProp.widget_type, meshProp.widget);
+    }
+  }
+  HandleAnimProps(colID, animProps){
+    for (const [animPropName, animProp] of Object.entries(animProps)) {
+      if(!this.collections[colID].hasAnimation)
+        return
+
+      let anim = this.collections[colID].animations[animProp.name];
+      this.collections[colID].animProps[animPropName] = this.hvymAnimProp(colID, animProp.name, animProp.start, animProp.end, animProp.loop, anim, animProp.widget_type, animProp.widget);
     }
   }
   HandleMaterialSets(colID, materialSet){
@@ -5061,6 +5079,9 @@ export class HVYM_Data {
     this.SetMeshVis(ref.mesh_ref, visible)
   }
   SetMeshMorph(mesh, name, value){
+    if(!mesh.hasOwnProperty('morphTargetDictionary') || !mesh.morphTargetDictionary.hasOwnProperty(name))
+      return;
+
     let idx = mesh.morphTargetDictionary[name];
     mesh.morphTargetInfluences[idx] = value;
   }
@@ -5277,6 +5298,20 @@ export class HVYM_Data {
       'ctrl': this
     }
   }
+  hvymAnimProp(collection_id, anim_name, start, end, loop, anim_ref, widget_type, widget){
+    return {
+      'type': 'HVYM_ANIM_PROP',
+      'collection_id': collection_id,
+      'anim_name': anim_name,
+      'start': start,
+      'end': end,
+      'loop': loop,
+      'anim_ref': anim_ref,
+      'widget_type': widget_type,
+      'widget': widget,
+      'ctrl': this
+    }
+  }
   hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget_type, widget){
     let editable = true;
     if(action_type == 'Immutable'){
@@ -5324,6 +5359,21 @@ export class HVYM_Data {
         child.material.userData.hvymCtrl = this;
       } 
     });
+
+    return result
+  }
+  getGltfAnimations(animProps, gltf){
+    let result = {};
+    if(!gltf.hasOwnProperty('animations'))
+      return
+
+    for (const [animPropName, animProp] of Object.entries(animProps)) {
+      gltf.animations.forEach((anim, index) =>{
+        if(anim.name==animPropName){
+          result[animPropName] = anim;
+        }
+      });
+    }
 
     return result
   }
