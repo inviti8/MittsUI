@@ -55,6 +55,7 @@ let stencilRefs = [];//For assigning a unique stencil ref to each clipped materi
 let meshViews = [];
 let portals = [];
 let panels = [];
+let gltfModels = [];
 
 //Need pools for scenes to manage meshView content
 const SCENE_MAX = 32;
@@ -877,7 +878,7 @@ export function materialProperties(type='BASIC', color='white', transparent=fals
   }
 };
 
-export function materialRefProperties(matType='PHONG', ref=undefined, targetProp='color', valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false, isHVYM=false){
+export function materialRefProperties(matType='PHONG', ref=undefined, targetProp='color', valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false, isHVYM=false, hvymCtrl=undefined){
   return {
     'type': 'MAT_REF',
     'matType': matType,
@@ -885,7 +886,8 @@ export function materialRefProperties(matType='PHONG', ref=undefined, targetProp
     'targetProp': targetProp,
     'valueProps': valueProps,
     'useMaterialView': useMaterialView,
-    'isHVYM': isHVYM
+    'isHVYM': isHVYM,
+    'hvymCtrl': hvymCtrl
   }
 };
 
@@ -1219,7 +1221,22 @@ export function leftBottomCornerPos(parentSize, childSize, zPosDir=1, padding=0.
   return new THREE.Vector3(-(parentSize.width/2)+childSize.width/2+padding, -(parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
-export function meshRefProperties(isGroup=false, ref=undefined, valueProps=stringValueProperties(), targetProp='visbility', useMaterialView=false, targetMorph=undefined, isHVYM=false){
+export function animRefProperties( start, end, loop='loopRepeat', ref=undefined, valueProps=stringValueProperties(), targetProp='animation', useMaterialView=false, isHVYM=false, hvymCtrl=undefined){
+  return {
+    'type': 'ANIM_REF',
+    'start': start,
+    'end': end,
+    'loop': loop,
+    'ref': ref,
+    'targetProp': targetProp,
+    'valueProps': valueProps,
+    'useMaterialView': useMaterialView,
+    'isHVYM': isHVYM,
+    'hvymCtrl': hvymCtrl
+  }
+};
+
+export function meshRefProperties(isGroup=false, ref=undefined, valueProps=stringValueProperties(), targetProp='visbility', useMaterialView=false, targetMorph=undefined, isHVYM=false, hvymCtrl=undefined){
   return {
     'type': 'MESH_REF',
     'isGroup': isGroup,
@@ -1228,7 +1245,8 @@ export function meshRefProperties(isGroup=false, ref=undefined, valueProps=strin
     'valueProps': valueProps,
     'useMaterialView': useMaterialView,
     'targetMorph': targetMorph,
-    'isHVYM': isHVYM
+    'isHVYM': isHVYM,
+    'hvymCtrl': hvymCtrl
   }
 };
 
@@ -2465,9 +2483,16 @@ export class PanelToggle extends PanelBox {
     this.is = 'PANEL_TOGGLE';
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
-    const meshRefProps = section.data;
-    const toggleProps = defaultPanelBooleanToggleProps(meshRefProps.name, this.box, panelProps.textProps.font, meshRefProps.visible);
-    toggleProps.objectControlProps = meshRefProps.mesh_set_ref;
+    const sectionProps = section.data;
+    let on = false;
+    let toggleProps = defaultPanelBooleanToggleProps(sectionProps.name, this.box, panelProps.textProps.font, false);
+    if(sectionProps.type == 'HVYM_MESH_PROP_REF'){
+      toggleProps.on = sectionProps.visible;
+      toggleProps.objectControlProps = sectionProps.val_props;
+    }else if(sectionProps.type == 'HVYM_ANIM_PROP'){
+      toggleProps.objectControlProps = sectionProps.val_props;
+    }
+    
     this.ctrlWidget = new ToggleWidget(toggleProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -3107,12 +3132,15 @@ export class BaseWidget extends BaseBox {
 
     return {'base': baseBoxProps, 'indicator': indicatorBoxProps};
   }
+  static SetObjectRef(elem){
+    elem.objectRef = elem.objectControlProps.ref;
+    elem.targetProp = elem.objectControlProps.targetProp;
+    elem.isHVYM = elem.objectControlProps.isHVYM;
+  }
   static SetUpObjectControlProps(elem){
     if(elem.objectControlProps != undefined){
       if(elem.objectControlProps.type == 'MAT_REF'){
-        elem.objectRef = elem.objectControlProps.ref;
-        elem.targetProp = elem.objectControlProps.targetProp;
-        elem.isHVYM = elem.objectControlProps.isHVYM;
+        BaseWidget.SetObjectRef(elem);
         elem.objectRef.userData.materialCtrls = [];
         elem.objectRef.userData.refreshCallback = BaseWidget.RefreshMaterialRefs;
         elem.objectRef.addEventListener('refreshMaterialViews', function(event) {
@@ -3126,12 +3154,14 @@ export class BaseWidget extends BaseBox {
           
         } 
       }else if(elem.objectControlProps.type == 'MESH_REF'){
-        elem.objectRef = elem.objectControlProps.ref;
-        elem.targetProp = elem.objectControlProps.targetProp;
-        elem.isHVYM = elem.objectControlProps.isHVYM;
+        BaseWidget.SetObjectRef(elem);
         if(elem.targetProp=='morph'){
           elem.targetMorph = elem.objectControlProps.targetMorph;
         }
+      }else if(elem.objectControlProps.type == 'ANIM_REF'){
+        elem.objectRef = elem.objectControlProps;
+        elem.targetProp = elem.objectControlProps.targetProp;
+        elem.isHVYM = elem.objectControlProps.isHVYM;
       }
     }
   }
@@ -4035,9 +4065,11 @@ export class ToggleWidget extends BaseWidget {
     }
   }
   static HandleHVYMToggle(toggle){
-    let visible = toggle.box.userData.booleanValue;
-    if(toggle.objectRef!=undefined){
-      toggle.objectRef.userData.hvymCtrl.SetMeshVis(toggle.objectRef, visible);
+    let bool = toggle.box.userData.booleanValue;
+    if(toggle.objectRef.isObject3D && toggle.objectRef!=undefined){
+      toggle.objectRef.userData.hvymCtrl.SetMeshVis(toggle.objectRef, bool);
+    } else if(toggle.objectRef.type == 'ANIM_REF'){
+      toggle.objectRef.hvymCtrl.ToggleAnimation(toggle.objectRef.ref, bool);
     }
 
   }
@@ -4912,8 +4944,9 @@ export class HVYM_Data {
           this.collections[key].hasAnimation = false;
 
           if(extensions.HVYM_nft_data[key].hasOwnProperty('animProps')){
+            this.mixer = new THREE.AnimationMixer( gltf.scene );
             this.collections[key].hasAnimation = true;
-            this.collections[key].animations = this.getGltfAnimations(extensions.HVYM_nft_data[key].animProps, gltf)
+            this.collections[key].animations = this.getGltfAnimations(extensions.HVYM_nft_data[key].animProps, gltf);
           }
 
           if(obj.hasOwnProperty('propLabelData')){
@@ -5002,9 +5035,7 @@ export class HVYM_Data {
   HandleMeshProps(colID, meshProps){
     for (const [meshPropName, meshProp] of Object.entries(meshProps)) {
       let mesh = this.collections[colID].models[meshProp.name];
-      let mesh_ref = meshRefProperties(mesh.isGroup, mesh, 'visbility');
-      mesh_ref.isHVYM = true;
-      this.collections[colID].meshProps[meshPropName] = this.hvymMeshPropRef(meshProp.name, meshProp.visible, mesh_ref, meshProp.widget_type, meshProp.widget);
+      this.collections[colID].meshProps[meshPropName] = this.hvymMeshPropRef(meshProp.name, meshProp.visible, mesh, meshProp.widget_type, meshProp.widget);
     }
   }
   HandleAnimProps(colID, animProps){
@@ -5065,6 +5096,13 @@ export class HVYM_Data {
 
     return true
 
+  }
+  ToggleAnimation(clip, on){
+    if(on){
+      clip.play();
+    }else{
+      clip.stop();
+    }
   }
   SetMeshVis(mesh, visible){
     if(mesh.isGroup){
@@ -5135,12 +5173,13 @@ export class HVYM_Data {
       'materialSets': 'materialSetsLabel',
       'meshSets': 'meshSetsLabel',
       'meshProps': 'meshPropsLabel',
-      'morphSets': 'morphSetsLabel'
+      'morphSets': 'morphSetsLabel',
+      'animProps': 'animPropsLabel'
     }
   }
   createHVYMCollectionWidgetData(collection){
     let mainData = {};
-    const collectionKeys = ['valProps', 'materialSets', 'meshSets', 'meshProps', 'matProps', 'morphSets'];
+    const collectionKeys = ['valProps', 'materialSets', 'meshSets', 'meshProps', 'matProps', 'morphSets', 'animProps'];
     const widgetMap = this.hvymDataWidgetMap();
     const labelMap = this.hvymDataLabelMap();
 
@@ -5183,6 +5222,7 @@ export class HVYM_Data {
           if(obj.type.includes('HVYM')){
             widget = obj.widget_type;
           }
+
           let data = panelSectionProperties(name, widget, obj);
           widgetData[data.name] = data;
         }
@@ -5298,15 +5338,12 @@ export class HVYM_Data {
       'ctrl': this
     }
   }
-  hvymAnimProp(collection_id, anim_name, start, end, loop, anim_ref, widget_type, widget){
+  hvymAnimProp(collection_id, name, start, end, loop, anim_ref, widget_type, widget){
     return {
       'type': 'HVYM_ANIM_PROP',
       'collection_id': collection_id,
-      'anim_name': anim_name,
-      'start': start,
-      'end': end,
-      'loop': loop,
-      'anim_ref': anim_ref,
+      'name': name,
+      'val_props': animRefProperties(start, end, loop, anim_ref, stringValueProperties(), 'animation', false, true, this),
       'widget_type': widget_type,
       'widget': widget,
       'ctrl': this
@@ -5328,12 +5365,12 @@ export class HVYM_Data {
       'ctrl': this
     }
   }
-  hvymMeshPropRef(name, visible, mesh_set_ref, widget_type, widget){
+  hvymMeshPropRef(name, visible, mesh, widget_type, widget){
     return {
       'type': 'HVYM_MESH_PROP_REF',
       'name': name,
       'visible': visible,
-      'mesh_set_ref': mesh_set_ref,
+      'val_props': meshRefProperties(mesh.isGroup, mesh, stringValueProperties(), 'visbility', false, undefined, true, this),
       'widget_type': widget_type,
       'widget': widget,
       'ctrl': this
@@ -5370,7 +5407,8 @@ export class HVYM_Data {
     for (const [animPropName, animProp] of Object.entries(animProps)) {
       gltf.animations.forEach((anim, index) =>{
         if(anim.name==animPropName){
-          result[animPropName] = anim;
+          let clip = this.mixer.clipAction( anim )
+          result[animPropName] = clip;
         }
       });
     }
@@ -5483,6 +5521,11 @@ export class GLTFModelWidget extends BaseWidget {
       }
     }
   }
+  UpdateAnimation(delta){
+    if(this.hvymData != undefined && this.hvymData.mixer != undefined){
+      this.hvymData.mixer.update(delta);
+    }
+  }
   CreateHVYMPanel(panelPropList){
     panelPropList.forEach((panelProps, index) =>{
       let panel = undefined;
@@ -5530,11 +5573,13 @@ function GLTFModelWidgetLoader(gltfProps){
     loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
       DEFAULT_TEXT_PROPS.font = font;
       SetListConfigFont(gltfProps.listConfig, font);
-      new GLTFModelWidget(gltfProps);
+      let model = new GLTFModelWidget(gltfProps);
+      gltfModels.push(model);
     });
   }else if(DEFAULT_TEXT_PROPS.font.isFont){
     SetListConfigFont(gltfProps.listConfig, DEFAULT_TEXT_PROPS.font);
-    new GLTFModelWidget(gltfProps);
+    let model = new GLTFModelWidget(gltfProps);
+    gltfModels.push(model);
   }
 }
 
@@ -5888,7 +5933,6 @@ export function createGLTFContentList(gltfProps, contentArr) {
   gltfProps.boxProps.isPortal = false;
 
   contentArr.forEach((gltfUrl, index) =>{
-    console.log(gltfUrl)
     let props = {...gltfProps};
     let lConfig = listItemConfig(listConfig.boxProps, listConfig.textProps, listConfig.animProps, listConfig.infoProps, listConfig.useTimeStamp, listConfig.spacing, listConfig.childInset, index);
     props.listConfig = lConfig;
@@ -6156,4 +6200,10 @@ export function doubleClickHandler(raycaster){
       });
     }
 }
+
+export function hvymUpdate(delta){
+  gltfModels.forEach((model, idx) => {
+    model.UpdateAnimation(delta);
+  });
+};
 
