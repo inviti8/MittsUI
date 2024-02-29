@@ -1236,6 +1236,22 @@ export function animRefProperties( start, end, loop='loopRepeat', ref=undefined,
   }
 };
 
+export function animSeekRefProperties( start, end, loop='loopRepeat', ref=undefined, mixer, valueProps=stringValueProperties(), targetProp='animation', useMaterialView=false, isHVYM=false, hvymCtrl=undefined){
+  return {
+    'type': 'ANIM_SEEK_REF',
+    'start': start,
+    'end': end,
+    'loop': loop,
+    'ref': ref,
+    'mixer': mixer,
+    'targetProp': targetProp,
+    'valueProps': valueProps,
+    'useMaterialView': useMaterialView,
+    'isHVYM': isHVYM,
+    'hvymCtrl': hvymCtrl
+  }
+};
+
 export function meshRefProperties(isGroup=false, ref=undefined, valueProps=stringValueProperties(), targetProp='visbility', useMaterialView=false, targetMorph=undefined, isHVYM=false, hvymCtrl=undefined){
   return {
     'type': 'MESH_REF',
@@ -2367,6 +2383,9 @@ export class PanelSlider extends PanelBox {
       valProps = valProps.val_props;
       if(section.data.type.includes('MORPH_SET_REF')){
         objectControlProps = meshRefProperties(section.data.mesh_ref.isGroup, section.data.mesh_ref, valProps, 'morph', false, section.data.morph_name, true);
+      }else if(section.data.type.includes('ANIM_PROP')){
+        objectControlProps = section.data.val_props;
+        valProps = section.data.val_props.valueProps
       }
     }
     const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
@@ -3093,6 +3112,13 @@ export class BaseWidget extends BaseBox {
     }
     
   }
+  UpdateAnimRefFloatValue(value){
+    if(BaseWidget.IsAnimationSliderProp(this.targetProp)){
+      value = parseFloat(value);
+      this.objectRef.hvymCtrl.SetAnimWeight(this.objectRef.ref, value);
+    }
+    
+  }
   static UpdateMaterialRefColor(elem, hex, alpha=undefined){
     if(!isNaN(elem.objectRef[elem.targetProp]) && !BaseWidget.IsMaterialColorProp(this.targetProp))
       return;
@@ -3158,7 +3184,7 @@ export class BaseWidget extends BaseBox {
         if(elem.targetProp=='morph'){
           elem.targetMorph = elem.objectControlProps.targetMorph;
         }
-      }else if(elem.objectControlProps.type == 'ANIM_REF'){
+      }else if(elem.objectControlProps.type.includes('ANIM')){
         elem.objectRef = elem.objectControlProps;
         elem.targetProp = elem.objectControlProps.targetProp;
         elem.isHVYM = elem.objectControlProps.isHVYM;
@@ -3251,6 +3277,9 @@ export class BaseWidget extends BaseBox {
   }
   static IsMorphSliderProp(prop){
     return (prop == 'morph')
+  }
+  static IsAnimationSliderProp(prop){
+    return (prop == 'animation')
   }
 };
 
@@ -3521,10 +3550,13 @@ export class SliderWidget extends BaseWidget {
     let value = this.SliderValue();
     this.box.userData.value = value;
     this.value = value;
+
     if(BaseWidget.IsMaterialSliderProp(this.targetProp)){
       this.UpdateMaterialRefFloatValue(value);
     }else if(BaseWidget.IsMorphSliderProp(this.targetProp)){
       this.UpdateMeshRefFloatValue(value);
+    }else if(BaseWidget.IsAnimationSliderProp(this.targetProp)){
+      this.UpdateAnimRefFloatValue(value);
     }
 
     if(this.box.userData.valueBox != undefined){
@@ -4931,6 +4963,7 @@ export class HVYM_Data {
     const extensions = gltf.userData.gltfExtensions;
     if(extensions != undefined && extensions.hasOwnProperty('HVYM_nft_data' )){
       this.is = 'HVYM_DATA';
+      this.scene = gltf.scene;
       this.contractProps = extensions.HVYM_nft_data.contract;
       this.collections = {};
       for (const [key, obj] of Object.entries(extensions.HVYM_nft_data)) {
@@ -4944,7 +4977,7 @@ export class HVYM_Data {
           this.collections[key].hasAnimation = false;
 
           if(extensions.HVYM_nft_data[key].hasOwnProperty('animProps')){
-            this.mixer = new THREE.AnimationMixer( gltf.scene );
+            this.mixer = new THREE.AnimationMixer( this.scene );
             this.collections[key].hasAnimation = true;
             this.collections[key].animations = this.getGltfAnimations(extensions.HVYM_nft_data[key].animProps, gltf);
           }
@@ -5044,7 +5077,14 @@ export class HVYM_Data {
         return
 
       let anim = this.collections[colID].animations[animProp.name];
-      this.collections[colID].animProps[animPropName] = this.hvymAnimProp(colID, animProp.name, animProp.start, animProp.end, animProp.loop, anim, animProp.widget_type, animProp.widget);
+      this.collections[colID].animProps[animPropName] = this.hvymAnimProp(colID, animProp.name, animProp.start, animProp.end, animProp.loop, animProp.blending, anim, animProp.widget_type, animProp.widget);
+      if(animProp.widget_type == 'slider'){
+        let val_props = numberValueProperties(animProp.start, animProp.start, anim.duration, 3, 0.001, true);
+        let ref_props = animRefProperties(animProp.start, animProp.end, animProp.loop, anim, val_props, 'animation', false, true, this);
+        this.collections[colID].animProps[animPropName].val_props = ref_props;
+        anim.weight = animProp.start;
+        anim.play();
+      }
     }
   }
   HandleMaterialSets(colID, materialSet){
@@ -5096,6 +5136,9 @@ export class HVYM_Data {
 
     return true
 
+  }
+  SetAnimWeight(clip, weight){
+    clip.weight = weight;
   }
   ToggleAnimation(clip, on){
     if(on){
@@ -5175,6 +5218,17 @@ export class HVYM_Data {
       'meshProps': 'meshPropsLabel',
       'morphSets': 'morphSetsLabel',
       'animProps': 'animPropsLabel'
+    }
+  }
+  hvymAnimLoopMap(){
+    return{
+      'NONE': THREE.LoopOnce,
+      'LoopOnce': THREE.LoopOnce,
+      'LoopForever': THREE.LoopRepeat,
+      'PingPong': THREE.LoopPingPong,
+      'Clamp': THREE.LoopOnce,
+      'ClampToggle': THREE.LoopOnce,
+      'Seek': THREE.LoopOnce
     }
   }
   createHVYMCollectionWidgetData(collection){
@@ -5338,14 +5392,16 @@ export class HVYM_Data {
       'ctrl': this
     }
   }
-  hvymAnimProp(collection_id, name, start, end, loop, anim_ref, widget_type, widget){
+  hvymAnimProp(collection_id, name, start, end, loop, blend, anim_ref, widget_type, widget){
     return {
       'type': 'HVYM_ANIM_PROP',
       'collection_id': collection_id,
       'name': name,
       'val_props': animRefProperties(start, end, loop, anim_ref, stringValueProperties(), 'animation', false, true, this),
+      'blend': blend,
       'widget_type': widget_type,
       'widget': widget,
+      'mixer': undefined,
       'ctrl': this
     }
   }
@@ -5403,11 +5459,19 @@ export class HVYM_Data {
     let result = {};
     if(!gltf.hasOwnProperty('animations'))
       return
+    const loopMap = this.hvymAnimLoopMap();
 
     for (const [animPropName, animProp] of Object.entries(animProps)) {
       gltf.animations.forEach((anim, index) =>{
         if(anim.name==animPropName){
           let clip = this.mixer.clipAction( anim )
+          if(animProp.blend=='ADD'){
+            THREE.AnimationUtils.makeClipAdditive( clip );
+          }
+          clip.setLoop(loopMap[animProp.loop]);
+          if(animProp.loop == 'Clamp' || animProp.loop == 'ClampToggle'){
+            clip.clampWhenFinished = true;
+          }
           result[animPropName] = clip;
         }
       });
