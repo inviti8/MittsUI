@@ -5077,12 +5077,11 @@ export class HVYM_Data {
         return
 
       let anim = this.collections[colID].animations[animProp.name];
+      anim.weight = animProp.weight;
       this.collections[colID].animProps[animPropName] = this.hvymAnimProp(colID, animProp.name, animProp.start, animProp.end, animProp.loop, animProp.blending, anim, animProp.widget_type, animProp.widget);
       if(animProp.widget_type == 'slider'){
-        let val_props = numberValueProperties(animProp.start, animProp.start, anim.duration, 3, 0.001, true);
-        let ref_props = animRefProperties(animProp.start, animProp.end, animProp.loop, anim, val_props, 'animation', false, true, this);
-        this.collections[colID].animProps[animPropName].val_props = ref_props;
-        anim.weight = animProp.start;
+        let val_props = numberValueProperties(animProp.weight, 0, 1, 3, 0.001, true);
+        this.collections[colID].animProps[animPropName].val_props = animRefProperties(animProp.start, animProp.end, animProp.loop, anim, val_props, 'animation', false, true, this);;
         anim.play();
       }
     }
@@ -6066,44 +6065,10 @@ export function mouseDownHandler(raycaster){
 export function mouseUpHandler(){
   mouseDown = false;
   isDragging = false;
+  lastDragged = undefined;
 }
 
 export function mouseMoveHandler(raycaster, event){
-  if (lastDragged != undefined && lastDragged.userData.draggable && mouseDown && isDragging) {
-    const deltaX = event.clientX - previousMouseX;
-    const deltaY = event.clientY - previousMouseY;
-    const dragPosition = lastDragged.position.clone();
-    if(!lastDragged.userData.horizontal){
-      dragDistY = deltaY;
-
-      if(deltaY<0){
-        moveDir=1
-      }else{
-        moveDir=-1;
-      }
-      // Limit scrolling
-      dragPosition.y = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll, dragPosition.y - deltaY * 0.01));
-      lastDragged.position.copy(dragPosition);
-      previousMouseY = event.clientY;
-      lastDragged.dispatchEvent({type:'action'});
-    }else{
-      dragDistX = deltaX;
-
-      if(deltaX<0){
-        moveDir=1
-      }else{
-        moveDir=-1;
-      }
-
-      // Limit scrolling
-      dragPosition.x = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll, dragPosition.x + deltaX * 0.01));
-      lastDragged.position.copy(dragPosition);
-      previousMouseX = event.clientX;
-      lastDragged.dispatchEvent({type:'action'});
-    }
-    
-  }
-
   const intersectsMouseOverable = raycaster.intersectObjects(mouseOverable);
   const intersectsselectorElems = raycaster.intersectObjects(selectorElems);
   let canMouseOver = true;
@@ -6146,6 +6111,42 @@ export function mouseMoveHandler(raycaster, event){
       }
     });
   }
+
+  if (lastDragged != undefined && lastDragged.userData.draggable && mouseDown && isDragging) {
+    const deltaX = event.clientX - previousMouseX;
+    const deltaY = event.clientY - previousMouseY;
+    const dragPosition = lastDragged.position.clone();
+    if(!lastDragged.userData.horizontal){
+      dragDistY = deltaY;
+
+      if(deltaY<0){
+        moveDir=1
+      }else{
+        moveDir=-1;
+      }
+      // Limit scrolling
+      dragPosition.y = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll, dragPosition.y - deltaY * 0.01));
+      lastDragged.position.copy(dragPosition);
+      previousMouseY = event.clientY;
+      lastDragged.dispatchEvent({type:'action'});
+    }else{
+      dragDistX = deltaX;
+
+      if(deltaX<0){
+        moveDir=1
+      }else{
+        moveDir=-1;
+      }
+
+      // Limit scrolling
+      dragPosition.x = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll, dragPosition.x + deltaX * 0.01));
+      lastDragged.position.copy(dragPosition);
+      previousMouseX = event.clientX;
+      lastDragged.dispatchEvent({type:'action'});
+    }
+    
+  }
+
 }
 
 function inputTextYPosition(event, textMesh, boxSize, padding){
