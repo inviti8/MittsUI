@@ -5,6 +5,7 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as CameraUtils from 'three/addons/utils/CameraUtils.js';
 import colorsea from 'colorsea'
 
@@ -74,11 +75,52 @@ let dragDistY = 0;
 let lastClick = 0;
 let mouseOver = [];
 
+let SCENE_CTRLS = undefined;
+
 const DEFAULT_FONT = 'fonts/Generic_Techno_Regular.json';
 let DEFAULT_TEXT_PROPS = textProperties( DEFAULT_FONT, 0.02, 0.1, 0.1, 0.1, 0.05, 0.05, 1);
 loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
   DEFAULT_TEXT_PROPS.font = font;
 });
+
+export function CamControlProperties(autoRotate=true, minPolarAngle=0, maxPolarAngle=Math.PI, enableZoom=true, minDistance=0, maxDistance=Infinity, enableDamping=true, camControls=undefined){
+  return {
+    'type': 'CAM_CTRL_PROPS',
+    'autoRotate': autoRotate,
+    'minPolarAngle': minPolarAngle,
+    'maxPolarAngle': maxPolarAngle,
+    'enableZoom': enableZoom,
+    'minDistance': minDistance,
+    'maxDistance': maxDistance,
+    'enableDamping': enableDamping,
+    'camControls': camControls
+  }
+};
+
+export function MainSceneProperties(scene=undefined, mouse=undefined, camera=undefined, renderer=undefined, raycaster=undefined, raycastLayer=0, camControlProps=undefined){
+  return {
+    'type': 'MAIN_SCENE_PROPS',
+    'scene': scene,
+    'mouse': mouse,
+    'camera': camera,
+    'renderer': renderer,
+    'raycaster': raycaster,
+    'raycastLayer': raycastLayer,
+    'camControlProps': camControlProps
+  }
+};
+
+export function createMainSceneControls(mainSceneProps){
+  SCENE_CTRLS = new OrbitControls(mainSceneProps.camera, mainSceneProps.renderer.domElement);
+  SCENE_CTRLS.update(); // This is important to initialize the controls
+}
+
+function toggleSceneCtrls(state){
+  if(!SCENE_CTRLS)
+    return;
+  
+  SCENE_CTRLS.enabled = state;
+}
 
 export function createMainSceneLighting(scene){
   const ambientLight = new THREE.AmbientLight(0x404040);
@@ -129,90 +171,6 @@ function getMainDirectionalLight(scene){
 
   return result
 }
-
-function addSceneToPool(){
-  
-  if (scenePool.length >= SCENE_MAX)
-    return;
-
-  const scene = new THREE.Scene();
-  scenePool.push(scene);
-  const layer_index = scenePool.indexOf(scene)+1;
-  scene.userData.layer_index = layer_index;
-
-  return scene
-}
-
-function removeSceneFromPool(scene){
-  index = scenePool.indexOf(scene);
-  scenePool.splice(index, 1);
-}
-
-function addCameraToPool(scene){
-  
-  if (cameraPool.length >= SCENE_MAX)
-    return;
-
-  const mainCam = getMainCam(scene);
-  const camera = mainCam.clone();
-  mainCam.add(camera);
-  cameraPool.push(camera);
-  const layer_index = cameraPool.indexOf(camera)+1;
-  camera.userData.layer_index = layer_index;
-
-  return camera
-}
-
-function removeCameraFromPool(camera){
-  index = cameraPool.indexOf(camera);
-  cameraPool.splice(index, 1);
-}
-
-function computeScreenSpaceBoundingBox(boundingBox, meshView, camera) {
-
-  const positionAttribute = meshView.box.geometry.getAttribute( 'position' );
-  const vertex = new THREE.Vector3();
-  let min = new THREE.Vector3(1, 1, 1);
-  let max = new THREE.Vector3(-1, -1, -1);
-  
-  boundingBox.set(min, max);
-
-  for ( let vertexIndex = 0; vertexIndex < positionAttribute.count; vertexIndex ++ ) {
-
-    let vertexWorldCoord = vertex.copy(vertex.fromBufferAttribute( positionAttribute, vertexIndex )).applyMatrix4(meshView.box.matrixWorld);
-    vertexWorldCoord.y -= meshView.height;
-    let vertexScreenSpace = vertexWorldCoord.project(camera);
-
-    boundingBox.min.min(vertexScreenSpace);
-    boundingBox.max.max(vertexScreenSpace);
-  }
-
-  return boundingBox
-}
-
-function normalizedToPixels(boundingBox) {
-  const renderWidth = window.innerWidth;
-  const renderHeight = window.innerHeight;
-  const renderWidthHalf = renderWidth / 2;
-  const renderHeightHalf = renderHeight / 2;
-
-  const bboxHeight =  boundingBox.max.y - boundingBox.min.y;
-
-  //console.log(bboxHeight)
-
-  // Convert normalized screen coordinates [-1, 1] to pixel coordinates:
-  const x = (1 + boundingBox.min.x) * renderWidthHalf;
-  const y = (1 + boundingBox.max.y) * renderHeightHalf;
-  const w = (boundingBox.max.x - boundingBox.min.x) * renderWidthHalf;
-  const h = (boundingBox.max.y - boundingBox.min.y) * renderHeightHalf;
-  // const x = (boundingBox.min.x + 1) * renderWidthHalf;
-  // const y = (1 - boundingBox.max.y) * renderHeightHalf;
-  // const w = (boundingBox.max.x - boundingBox.min.x) * renderWidthHalf;
-  // const h = (boundingBox.max.y - boundingBox.min.y) * renderHeightHalf;
-
-  return {'x': x, 'y': y, 'w': w, 'h': h}
-}
-
 
 function randomNumber(min, max) {
   return Math.random() * (max - min) + min;
@@ -6066,6 +6024,7 @@ export function mouseUpHandler(){
   mouseDown = false;
   isDragging = false;
   lastDragged = undefined;
+  toggleSceneCtrls(true);
 }
 
 export function mouseMoveHandler(raycaster, event){
@@ -6116,6 +6075,7 @@ export function mouseMoveHandler(raycaster, event){
     const deltaX = event.clientX - previousMouseX;
     const deltaY = event.clientY - previousMouseY;
     const dragPosition = lastDragged.position.clone();
+    toggleSceneCtrls(false);
     if(!lastDragged.userData.horizontal){
       dragDistY = deltaY;
 
