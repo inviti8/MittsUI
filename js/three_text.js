@@ -118,7 +118,7 @@ export function createMainSceneControls(mainSceneProps){
 function toggleSceneCtrls(state){
   if(!SCENE_CTRLS)
     return;
-  
+
   SCENE_CTRLS.enabled = state;
 }
 
@@ -1032,6 +1032,15 @@ export function setupStencilMaterial(mat, stencilRef){
 export function setupStencilChildMaterial(mat, stencilRef){
   mat.depthWrite = false;
   mat.stencilWrite = true;
+  mat.stencilTest = true;
+  mat.stencilRef = stencilRef;
+  mat.stencilFunc = THREE.EqualStencilFunc;
+};
+
+export function setupStencilChildDepthMaterial(mat, stencilRef){
+  mat.depthWrite = true;
+  mat.stencilWrite = true;
+  mat.stencilTest = true;
   mat.stencilRef = stencilRef;
   mat.stencilFunc = THREE.EqualStencilFunc;
 };
@@ -1851,6 +1860,24 @@ export class BaseBox {
       this.box.position.copy(this.CenterBoxPos());
       //this.box.position.set(this.box.position.x, this.box.position.y, this.parentSize.depth/2);
     }
+    
+    this.stencilRef = this.box.material.stencilRef;
+    this.box.userData.stencilRef = this.box.material.stencilRef;
+    this.box.userData.boxCtrl = this;
+
+  }
+  MakePortalChild(stencilRef){
+    this.stencilRef = stencilRef;
+    this.box.userData.stencilRef = stencilRef;
+    setupStencilChildMaterial(this.box.material, stencilRef)
+    this.MakeChidrenStencilChild(this.box, stencilRef);
+  }
+  MakeChidrenStencilChild(child, stencilRef){
+    child.traverse( function( object ) {
+        if(object.isMesh){
+          setupStencilChildDepthMaterial(object.material, stencilRef);
+        }
+    });
   }
   CreateBoxGeometry(boxProps) {
     let result = undefined;
@@ -2615,8 +2642,10 @@ export class BasePanel extends BaseTextBox {
     this.siblingPanel = undefined;
     this.box.userData.panelProps = this.panelProps;
     this.box.userData.panelCtrl = this;
+    this.panelMaterials = [];
 
     this.SetParentPanel();
+
 
     if(this.isSubPanel){
       this.subPanelMaterial = panelProps.topCtrl.subPanelMaterial;
@@ -2625,9 +2654,12 @@ export class BasePanel extends BaseTextBox {
     }else{
       this.subPanelMaterial = getMaterial(this.matProps, this.matProps.stencilRef);
       darkenMaterial(this.subPanelMaterial, 10);
+      this.panelMaterials.push(this.subPanelMaterial);
       this.ctrlPanelMaterial = getMaterial(this.matProps, this.matProps.stencilRef);
       darkenMaterial(this.ctrlPanelMaterial, 20);
+      this.panelMaterials.push(this.ctrlPanelMaterial);
       this.handleMaterial = this.textMaterial;
+      this.panelMaterials.push(this.textMaterial);
     }
 
     this.box.userData.properties = panelProps;
@@ -5535,7 +5567,7 @@ export class GLTFModelWidget extends BaseWidget {
         // Load the font
         loader.load(panelTextProps.font, (font) => {
           panelTextProps.font = font;
-          const panelPropList = this.hvymData.panelHVYMCollectionPropertyList(this.box, panelTextProps);
+          const panelPropList = this.hvymData.panelHVYMCollectionPropertyList(this.box, panelTextProps, this.isPortal);
 
           this.CreateHVYMPanel(panelPropList);
         });
@@ -5562,18 +5594,16 @@ export class GLTFModelWidget extends BaseWidget {
       if(panel != undefined){
         this.hvymPanels.push(panel);
       }
-
     });
+
+    if(this.isPortal && this.hvymPanels.length>0){
+      this.hvymPanels[0].MakePortalChild(this.stencilRef);
+    }
     
   }
   MakeModelPortalChild(stencilRef){
-    this.gltf.scene.traverse( function( object ) {
-        if(object.isMesh){
-          object.material.stencilWrite = true;
-          object.material.stencilRef = stencilRef;
-          object.material.stencilFunc = THREE.EqualStencilFunc;
-        }
-    } );
+    this.stencilRef = stencilRef;
+    this.MakeChidrenStencilChild(this.gltf.scene, stencilRef);
   }
   ConvertToPortalChild(stencilRef){
     setupStencilChildMaterial(this.box.material, stencilRef);
@@ -5640,6 +5670,7 @@ export function createGLTFModelPortal(gltfProps){
     // Instantiate a loader
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
         console.log(gltf)
+        gltfProps.hvymData = new HVYM_Data(gltf);
         gltfProps.gltf = gltf;
         GLTFModelWidgetLoader(gltfProps);
       },
@@ -5729,8 +5760,6 @@ export class ListItemBox extends BaseBox {
     if(this.titleText!=undefined && content.widgetText!=undefined){
       content.box.parent.remove(content.widgetText);
     }
-    let boxZOffset = 1;
-    
     this.box.add(content.box);
     
     if(content.box.userData.properties.boxProps.isPortal && !this.isPortal){
@@ -5738,14 +5767,15 @@ export class ListItemBox extends BaseBox {
       this.box.material.depthWrite = false;
     }
     if(this.isPortal){
-      let boxZOffset = -1;
-      //let zPos = -(this.textZPos+(content.textMeshSize.depth*3));
       if(content.gltf!=undefined){
         this.box.add(content.gltf.scene)
         if(content.isPortal){
           content.MakeModelPortalChild(this.box.material.stencilRef);
           content.MakeBoxMaterialInvisible();
           content.box.material.depthWrite = false;
+          // if(content.hasOwnProperty('hvymPanels') && content.hvymPanels.length>0){
+          //   content.hvymPanels[0].MakePortalChild(this.box.material.stencilRef)
+          // }
         }
         
       }
