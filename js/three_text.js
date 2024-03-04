@@ -1233,7 +1233,7 @@ export function meshRefProperties(isGroup=false, ref=undefined, valueProps=strin
   }
 };
 
-export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties(), meshProps=textMeshProperties(), align='CENTER', editText=false) {
+export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties(), meshProps=textMeshProperties(), align='CENTER', editText=false, wrap=true) {
   return {
     'font': font,
     'letterSpacing': letterSpacing,
@@ -1246,7 +1246,8 @@ export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, pa
     'matProps': matProps,
     'meshProps': meshProps,
     'align': align,
-    'editText': editText
+    'editText': editText,
+    'wrap': wrap
   }
 };
 
@@ -1304,6 +1305,7 @@ export class BaseText {
     this.material = getMaterial(textProps.matProps);
     this.meshes = {};
     this.editText = textProps.editText;
+    this.wrap = textProps.wrap;
   }
   DarkenTextMaterial(amount=10){
     darkenMaterial(this.material, amount);
@@ -1321,8 +1323,9 @@ export class BaseText {
     this.material = material;
   }
   SetParent(parent){
-    this.parent = parent;
+    this.parent = parent.box;
     this.parentSize = getGeometrySize(this.parent.geometry);
+    this.parentCtrl = parent;
     this.initialPositionY = (this.parentSize.height / 2) - (this.textProps.height) - (this.textProps.padding);
 
     if(this.parent.userData.isPortal){
@@ -1347,6 +1350,7 @@ export class BaseText {
     this.meshes[key].userData.key = key;
     this.meshes[key].userData.currentText = text;
     this.meshes[key].userData.controller = this;
+    this.meshes[key].userData.wrap = this.wrap;
     this.ParentText(key);
     this.AlignTextPos(key);
 
@@ -1376,12 +1380,15 @@ export class BaseText {
     return this.meshes[key]
   }
   AlignEditTextToTop(key){
-    let yPosition = this.meshes[key].position.y;
-    let textSize = getGeometrySize(this.meshes[key].geometry);
 
     yPosition=-this.parentSize.height;
-    console.log(this.initialPositionY)
     let pos = new THREE.Vector3(this.meshes[key].position.x, this.initialPositionY, this.meshes[key].position.z);
+    this.meshes[key].position.copy(pos);
+
+  }
+  AlignEditTextToCenter(key){
+    let yPosition = -this.parentSize.height/2;
+    let pos = new THREE.Vector3(this.meshes[key].position.x, yPosition, this.meshes[key].position.z);
     this.meshes[key].position.copy(pos);
 
   }
@@ -1434,10 +1441,17 @@ export class BaseText {
   UpdateTextMesh(key, text){
     if(this.meshes[key]==undefined)
       return;
+
+    let ctrl = this.parent.userData.boxCtrl.is;
+    
     this.meshes[key].geometry.dispose();
     this.meshes[key].geometry = this.GeometryText(text);
     this.meshes[key].userData.size = getGeometrySize(this.meshes[key].geometry);
-    this.AlignTextPos(key);
+    if(!this.wrap && ctrl == 'INPUT_TEXT_WIDGET'){
+      this.AlignEditTextToCenter(key);
+    }else{
+      this.AlignTextPos(key);
+    }
   }
   MergedMultiTextMesh(text){
     const geometry = this.MergedMultiGeometry(text);
@@ -1473,7 +1487,7 @@ export class BaseText {
       letterGeometries = geoHandler.letterGeometries;
 
       // Check if lineWidth exceeds cBox width - padding
-      if (lineWidth > this.parentSize.width / 2 - this.textProps.padding) {
+      if (lineWidth > this.parentSize.width / 2 - this.textProps.padding && this.wrap) {
         lineWidth = -(this.parentSize.width / 2) + this.textProps.padding; // Reset x position to the upper-left corner
         yPosition -= this.textProps.lineSpacing; // Move to the next line
       }
@@ -2177,7 +2191,7 @@ class BaseTextBox extends BaseBox {
     this.portal = buttonProps.portal;
 
     this.BaseText = new BaseText(this.textProps);
-    this.BaseText.SetParent(this.box);
+    this.BaseText.SetParent(this);
 
     this.textMaterial = getMaterial(this.textProps.matProps, this.box.material.stencilRef);
     this.BaseText.SetMaterial(this.textMaterial);
@@ -2330,6 +2344,7 @@ export class PanelEditText extends PanelBox {
     const section = panelProps.sections.data[panelProps.name];
     const editTextProps = defaultPanelEditTextProps(panelProps.name, this.box, panelProps.textProps.font);
     editTextProps.name = section.name;
+    editTextProps.textProps.wrap = false;
     this.ctrlWidget = new InputTextWidget(editTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -2343,6 +2358,7 @@ export class PanelInputText extends PanelBox {
     this.SetParentPanel();
     const inputTextProps = defaultPanelInputTextProps(panelProps.name, this.box, panelProps.textProps.font);
     inputTextProps.name = section.name;
+    inputTextProps.textProps.wrap = false;
     this.ctrlWidget = new InputTextWidget(inputTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -3001,7 +3017,7 @@ export class BaseWidget extends BaseBox {
     this.complexMesh = widgetProps.boxProps.complexMesh;
 
     this.BaseText = new BaseText(widgetProps.textProps);
-    this.BaseText.SetParent(this.box);
+    this.BaseText.SetParent(this);
 
     darkenMaterial(this.box.material, 20);
 
@@ -4333,13 +4349,13 @@ export class InputTextWidget extends BaseWidget {
     const textProps = textInputProps.textProps;
     let widgetProps = widgetProperties(inputBoxProps, textInputProps.name, true, true, textProps, false, undefined, textInputProps.listConfig, 0)
     super(widgetProps);
+    this.is = 'INPUT_TEXT_WIDGET';
     this.defaultText = 'Enter Text';
     if(textInputProps.name.length>0){
       this.defaultText = textInputProps.name;
     }
     
-    this.is = 'INPUT_TEXT_WIDGET';
-    this.BaseText.SetParent(this.box);
+    this.BaseText.SetParent(this);
     this.inputText = this.BaseText.NewTextMesh('inputText', this.defaultText);
     setupStencilChildMaterial(this.inputText.material, this.box.material.stencilRef);
     this.BaseText.SetMergedTextUserData('inputText');
@@ -5722,7 +5738,7 @@ export class ListItemBox extends BaseBox {
     this.spacing = listConfig.spacing;
     this.index = listConfig.index;
     this.BaseText = new BaseText(this.textProps);
-    this.BaseText.SetParent(this.box);
+    this.BaseText.SetParent(this);
     this.BaseText.SetMaterial(this.listTextMaterial);
 
     let textMeshOffset = 1;
