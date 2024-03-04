@@ -2327,7 +2327,9 @@ export class PanelEditText extends PanelBox {
     super(panelProps);
     this.SetParentPanel();
     this.is = 'PANEL_EDIT_TEXT';
+    const section = panelProps.sections.data[panelProps.name];
     const editTextProps = defaultPanelEditTextProps(panelProps.name, this.box, panelProps.textProps.font);
+    editTextProps.name = section.name;
     this.ctrlWidget = new InputTextWidget(editTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -2337,8 +2339,10 @@ export class PanelInputText extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_INPUT_TEXT';
+    const section = panelProps.sections.data[panelProps.name];
     this.SetParentPanel();
     const inputTextProps = defaultPanelInputTextProps(panelProps.name, this.box, panelProps.textProps.font);
+    inputTextProps.name = section.name;
     this.ctrlWidget = new InputTextWidget(inputTextProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -4321,17 +4325,22 @@ export class InputTextWidget extends BaseWidget {
     const props = InputTextWidget.CalculateBoxProps(textInputProps);
     let inputBoxProps = props.inputBoxProps;
     let btnBoxProps = undefined;
+
     if(textInputProps.buttonProps != undefined){
       btnBoxProps = props.btnBoxProps;
       textInputProps.buttonProps.boxProps = btnBoxProps;
     }
-    
     const textProps = textInputProps.textProps;
     let widgetProps = widgetProperties(inputBoxProps, textInputProps.name, true, true, textProps, false, undefined, textInputProps.listConfig, 0)
     super(widgetProps);
+    this.defaultText = 'Enter Text';
+    if(textInputProps.name.length>0){
+      this.defaultText = textInputProps.name;
+    }
+    
     this.is = 'INPUT_TEXT_WIDGET';
     this.BaseText.SetParent(this.box);
-    this.inputText = this.BaseText.NewTextMesh('inputText', 'Enter Text');
+    this.inputText = this.BaseText.NewTextMesh('inputText', this.defaultText);
     setupStencilChildMaterial(this.inputText.material, this.box.material.stencilRef);
     this.BaseText.SetMergedTextUserData('inputText');
     this.inputTextSize = this.inputText.userData.size;
@@ -4446,6 +4455,7 @@ export function textInputProperties(boxProps=undefined, name='', textProps=undef
 export function defaultPanelEditTextProps(name, parent, font){
   const boxProps = defaultPanelEditTextBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
+  textProps.editText = true;
   return textInputProperties(boxProps, name, textProps);
 }
 
@@ -5287,9 +5297,7 @@ export class HVYM_Data {
       colPanels.push(colPanel);
     }
 
-
     return colPanels
-
   }
   hvymCollection(id, collectionName){
     return {
@@ -5568,8 +5576,8 @@ export class GLTFModelWidget extends BaseWidget {
         loader.load(panelTextProps.font, (font) => {
           panelTextProps.font = font;
           const panelPropList = this.hvymData.panelHVYMCollectionPropertyList(this.box, panelTextProps, this.isPortal);
-
           this.CreateHVYMPanel(panelPropList);
+          this.isHVYM = true;
         });
       }
     }
