@@ -1377,11 +1377,8 @@ export class BaseText {
     return this.meshes[key]
   }
   AlignEditTextToTop(key){
-
-    yPosition=-this.parentSize.height;
     let pos = new THREE.Vector3(this.meshes[key].position.x, this.initialPositionY, this.meshes[key].position.z);
     this.meshes[key].position.copy(pos);
-
   }
   AlignEditTextToCenter(key){
     let yPosition = -this.parentSize.height/2;
@@ -6208,19 +6205,12 @@ function inputTextYPosition(event, textMesh, boxSize, padding){
 }
 
 function onEnterKey(event, textMesh, currentText, boxSize, padding){
-
-  let yPosition = textMesh.position.y;
   textMesh.dispatchEvent({type:'onEnter'});
 
   if(textMesh.widget == undefined){
-    yPosition=inputTextYPosition(event, textMesh, boxSize, padding);
-    //textMesh.position.set(textMesh.position.x, yPosition, textMesh.position.z);
     if(textMesh.userData.textProps.draggable){
       draggable.push(textMesh);
     }
-  }else{
-    //textMesh.widget.base.userData.value = currentText;
-    //textMesh.dispatchEvent({type:'update'});
   }
 }
 
@@ -6236,13 +6226,7 @@ function onHandleTextGeometry(textMesh, currentText, boxSize){
 }
 
 function onHandleTypingText(event, textMesh, currentText, boxSize, padding){
-
-  let yPosition = textMesh.position.y;
-
   if(textMesh.widget == undefined){
-    yPosition=inputTextYPosition(event, textMesh, boxSize, padding);
-    //textMesh.position.set(textMesh.position.x, yPosition, textMesh.position.z);
-
     textMesh.userData.textProps.cBox.box.userData.currentText = currentText;
   }else{
 
