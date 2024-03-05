@@ -421,15 +421,6 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
     let scales = [];
     let selected = undefined;
 
-    function selectorOnUpdate(elem, props){
-      if(elem.userData.open){
-
-      }else{
-
-      }
-      //gsap.to(elem.scale, props);
-    }
-
     elem.userData.selectors.forEach((c, idx) => {
       let size = getGeometrySize(c.geometry);
       let parentSize = getGeometrySize(c.parent.geometry);
@@ -541,9 +532,7 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
   function panelExpandComplete(elem){
     if(elem.userData.properties.expanded)
       return;
-    elem.userData.widgetElements.forEach((widget, index) =>{
-        widget.userData.boxCtrl.ToggleVisible(elem.userData.properties.expanded);
-    });
+    elem.dispatchEvent({type:'hideWidgets'});
   }
 
   function handleRotate(handle, props){
@@ -2753,10 +2742,21 @@ export class BasePanel extends BaseTextBox {
       if(!this.userData.targetElem.userData.properties.expanded)
       return;
 
-      this.userData.targetElem.userData.widgetElements.forEach((widget, index) =>{
-        widget.userData.boxCtrl.ToggleVisible(this.userData.targetElem.userData.properties.expanded);
-      });
+      this.userData.targetElem.dispatchEvent({type:'showWidgets'});
 
+    });
+
+
+    this.box.addEventListener('hideWidgets', function(event) {
+      this.userData.handleExpand.userData.targetElem.userData.widgetElements.forEach((widget, index) =>{
+        widget.userData.boxCtrl.ToggleVisible(false);
+      });
+    });
+
+    this.box.addEventListener('showWidgets', function(event) {
+      this.userData.handleExpand.userData.targetElem.userData.widgetElements.forEach((widget, index) =>{
+        widget.userData.boxCtrl.ToggleVisible(true);
+      });
     });
 
   }
