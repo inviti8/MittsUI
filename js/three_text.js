@@ -538,6 +538,14 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
     gsap.to(elem.scale, props);
   }
 
+  function panelExpandComplete(elem){
+    if(elem.userData.properties.expanded)
+      return;
+    elem.userData.widgetElements.forEach((widget, index) =>{
+        widget.userData.boxCtrl.ToggleVisible(elem.userData.properties.expanded);
+    });
+  }
+
   function handleRotate(handle, props){
     gsap.to(handle.rotation, props);
   }
@@ -711,7 +719,7 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
       }
 
       //Adjust the bottom for parent container again
-      props = { duration: duration, x: parentBottom.position.x, y: YPos, z: parentBottom.position.z, ease: easeOut };
+      props = { duration: duration, x: parentBottom.position.x, y: YPos, z: parentBottom.position.z, ease: easeOut, onComplete: panelExpandComplete, onCompleteParams:[elem]};
       gsap.to(parentBottom.position, props);
 
     }
@@ -1893,6 +1901,13 @@ export class BaseBox {
         }
     });
   }
+  ToggleVisible(visible){
+    this.box.traverse( function( object ) {
+        if(object.isMesh){
+          object.visible = visible;
+        }
+    });
+  }
   CreateBoxGeometry(boxProps) {
     let result = undefined;
     if(this.complexMesh){
@@ -2720,19 +2735,30 @@ export class BasePanel extends BaseTextBox {
     this.handleExpand.addEventListener('close', function(event) {
       this.userData.targetElem.userData.properties.expanded = false;
       panelAnimation(this.userData.targetElem, 'EXPAND');
+      this.userData.targetElem.userData.widgetElements.forEach((widget, index) =>{
+        widget.userData.boxCtrl.ToggleVisible(false);
+      });
     });
 
     this.handleExpand.addEventListener('action', function(event) {
       this.userData.targetElem.userData.properties.expanded = !this.userData.targetElem.userData.properties.expanded;
       if(!this.userData.targetElem.userData.properties.expanded){
         this.userData.targetElem.userData.panelList.forEach((panel, idx) => {
+
             panel.handleExpand.dispatchEvent({type:'close'});
         });
       }
       panelAnimation(this.userData.targetElem, 'EXPAND');
+
+      if(!this.userData.targetElem.userData.properties.expanded)
+      return;
+
+      this.userData.targetElem.userData.widgetElements.forEach((widget, index) =>{
+        widget.userData.boxCtrl.ToggleVisible(this.userData.targetElem.userData.properties.expanded);
+      });
+
     });
 
-    //panelAnimation(this.box, 'EXPAND');
   }
   CreateTopHandle() {
     const handle = this.CreateHandle();
