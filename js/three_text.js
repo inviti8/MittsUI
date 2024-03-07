@@ -3,6 +3,7 @@ import { gsap } from "gsap";
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -57,11 +58,6 @@ let meshViews = [];
 let portals = [];
 let panels = [];
 let gltfModels = [];
-
-//Need pools for scenes to manage meshView content
-const SCENE_MAX = 32;
-let scenePool = [];
-let cameraPool = [];
 
 //Interaction variables
 let mouseDown = false;
@@ -1137,10 +1133,6 @@ export function addToPortals(obj){
   portals.push(obj);
 };
 
-export function getScenePool(){
-  return scenePool;
-};
-
 export function centerPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, parentSize.height-parentSize.height, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
@@ -1384,7 +1376,6 @@ export class BaseText {
     let yPosition = -this.parentSize.height/2;
     let pos = new THREE.Vector3(this.meshes[key].position.x, yPosition, this.meshes[key].position.z);
     this.meshes[key].position.copy(pos);
-
   }
   AlignTextPos(key){
     if(this.textProps.align == 'CENTER'){
@@ -3026,7 +3017,7 @@ export class BaseWidget extends BaseBox {
     this.is = 'BASE_WIDGET';
     this.isHVYM = false;
     this.objectControlProps = widgetProps.objectControlProps;
-    let zOffset = 1;
+    this.zOffset = 1;
     this.value = widgetProps.valueProps.defaultValue;
     this.box.userData.horizontal = widgetProps.horizontal;
     this.box.userData.hasSubObject = widgetProps.useValueText;
@@ -3045,7 +3036,7 @@ export class BaseWidget extends BaseBox {
     darkenMaterial(this.box.material, 20);
 
     if(this.isPortal){
-      zOffset = -1;
+      this.zOffset = -1;
     }
 
     if(this.handleSize > 0){
@@ -3362,7 +3353,7 @@ export function materialNumberValueProperties(material, prop){
   return result
 }
 
-class ValueTextWidget extends BaseTextBox{
+export class ValueTextWidget extends BaseTextBox{
   constructor(widgetProps) {
     let valBoxProps = {...widgetProps.boxProps};
     valBoxProps.isPortal = true;
@@ -5735,6 +5726,54 @@ export function createGLTFModelPortal(gltfProps){
   }
 }
 
+export function GLTFDragAndDrop(parent) {
+  document.addEventListener('dragover', (e) => {
+      e.preventDefault()
+  });
+  document.addEventListener('drop', (e) => {
+      e.preventDefault()
+
+      const file = e.dataTransfer.files[0];
+      const filename = file.name;
+      const extension = filename.split( '.' ).pop().toLowerCase();
+
+      const reader = new FileReader();
+      reader.addEventListener( 'progress', function ( event ) {
+
+        const progress = Math.floor( ( event.loaded / event.total ) * 100 ) + '%';
+
+        console.log( 'Loading', filename, progress );
+
+      } );
+
+      reader.addEventListener( 'load', async function ( event ) {
+
+        const contents = event.target.result;
+
+        console.log(contents)
+
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath( '../examples/js/libs/draco/gltf/' );
+        const loader = new GLTFLoader();
+        loader.setDRACOLoader( dracoLoader );
+
+        loader.parse( contents, '', function ( gltf ) {
+          const size = getGeometrySize(parent.geometry);
+          const boxProps = boxProperties(gltf.scene.name, parent, size.width, size.height, size.depth, 3, 0.02);
+          const gltfProps = gltfProperties(boxProps, gltf.scene.name, gltf);
+          gltfProps.hvymData = new HVYM_Data(gltf);
+          GLTFModelWidgetLoader(gltfProps);
+
+          console.log(gltf)
+
+        } );
+
+      }, false );
+      reader.readAsArrayBuffer( file );
+
+  });
+};
+
 export function listItemConfig(boxProps, textProps=undefined,  animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, childInset=0.9, index=0){
   return {
     'type': 'LIST_CONFIG',
@@ -6055,12 +6094,9 @@ export function createGLTFContentPortalList(gltfProps, contentArr) {
 };
 
 export function addTranslationControl(elem, camera, renderer){
-
   control = new TransformControls( camera, renderer.domElement );
   control.addEventListener( 'change', render );
   control.attach( elem );
-
-
 };
 
 //INTERACTION HANDLERS
