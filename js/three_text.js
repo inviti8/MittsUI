@@ -3716,31 +3716,24 @@ export class MeterWidget extends SliderWidget {
 
 };
 
+export function createMeterPortal(meterProps) {
+  meterProps.boxProps.isPortal = true;
+  createMeter(meterProps);
+};
 
+export function createMeter(meterProps) {
+  if(typeof meterProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(meterProps.textProps.font, (font) => {
+      meterProps.textProps.font = font;
+      new MeterWidget(meterProps);
 
-export class ColorHandler {
-  constructor(colorProps) {
-    this.colorProps = colorProps;
-    this.defaultColor = this.ColorObject(colorProps.defaultColor);
-    this.color = this.ColorObject(colorProps.defaultColor);
-  }
-  ColorObject(color){
-    let result = undefined;
-    if(typeof color === 'string'){
-      result = colorsea(color, 100);
-    }else if(color.constructor === Array){
-      if(color.length == 3){
-        const colorStr = 'rgb('+color[0]+', '+color[1]+', '+color[2]+')';
-        result = colorsea(colorStr, 100);
-      }else if(color.length == 4){
-        const colorStr = 'rgba('+color[0]+', '+color[1]+', '+color[2]+','+color[3]+'%)';
-        result = colorsea(colorStr, 100);
-      }
-    }
-
-    return result
+    });
+  }else if(meterProps.textProps.font.isFont){
+    new MeterWidget(meterProps);
   }
 };
+
 
 export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex', objectControlProps=undefined ){
   return {
@@ -3783,8 +3776,6 @@ export class ColorWidget extends BaseWidget {
     if(!this.isMeter){
       this.colorManipulator = SliderWidget;
     }
-
-    this.ColorHandler = new ColorHandler(widgetProps);
 
     colorWidgetProps = this.InitColorWidgetProps(colorWidgetProps)
     this.useAlpha = colorWidgetProps.base.useAlpha;
@@ -4195,6 +4186,84 @@ export function textBoxProperties( boxProps, text, textProps, animProps=undefine
   }
 };
 
+
+/**
+ * This function creates a slider portal(inset inside of parent, 
+ * rendered using stencil ref)widget based on passed property set.
+ * @param {object} sliderProps (sliderProperties) Properties used for toggle widget.
+ * 
+ * @returns {null} no return value.
+ */
+export function createSliderPortal(sliderProps) {
+  sliderProps.boxProps.isPortal = true;
+  createSliderBox(sliderProps);
+};
+
+/**
+ * This function creates a toggle widget based on passed property set.
+ * @param {object} toggleProps (toggleProperties) Properties used for toggle widget.
+ * 
+ * @returns {null} no return value.
+ */
+export function createToggleBox(toggleProps) {
+  if(typeof toggleProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(toggleProps.textProps.font, (font) => {
+      toggleProps.textProps.font = font;
+      let toggle = new ToggleWidget(toggleProps);
+
+    });
+  }else if(toggleProps.textProps.font.isFont){
+    let toggle = new ToggleWidget(toggleProps);
+  }
+};
+
+/**
+ * This function creates a toggle portal(inset inside of parent, 
+ * rendered using stencil ref)widget based on passed property set.
+ * @param {object} toggleProps (toggleProperties) Properties used for toggle widget.
+ * 
+ * @returns {null} no return value.
+ */
+function TogglePortal(toggleProps) {
+  const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
+  let stencilRef = getStencilRef();
+  let toggle = new ToggleWidget(toggleProps);
+  setupStencilMaterial(toggle.box.material, stencilRef);
+  setupStencilChildMaterial(toggle.handle.material, stencilRef);
+  toggle.box.material.depthWrite = false;
+  toggle.handle.material.depthWrite = false;
+  toggleProps.boxProps.parent.add(toggle.box);
+  toggle.box.position.set(toggle.box.position.x, toggle.box.position.y, toggle.box.position.z+parentSize.depth/2);
+  toggles.push(toggle.handle);
+
+}
+
+/**
+ * This function creates a toggle portal(inset inside of parent, 
+ * rendered using stencil ref)widget based on passed property set.
+ * @param {object} toggleProps (toggleProperties) Properties used for toggle widget.
+ * 
+ * @returns {null} no return value.
+ */
+export function createTogglePortal(toggleProps) {
+  if(typeof toggleProps.textProps.font === 'string'){
+    // Load the font
+    loader.load(toggleProps.textProps.font, (font) => {
+      toggleProps.textProps.font = font;
+      TogglePortal(toggleProps);
+    });
+  }else if(toggleProps.textProps.font.isFont){
+    TogglePortal(toggleProps);
+  }
+};
+
+/**
+ * This function creates a input text box widget based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) property set.
+ * 
+ * @returns {object} TextBoxWidget class object.
+ */
 export class TextBoxWidget extends BaseWidget {
   constructor(textBoxProps) {
     const textProps = textBoxProps.textProps;
@@ -4268,6 +4337,12 @@ export class TextBoxWidget extends BaseWidget {
 
 };
 
+/**
+ * This function creates a multi-line text widget based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) property set.
+ * 
+ * @returns {null} no return.
+ */
 export function createStaticTextBox(textBoxProps) {
   textBoxProps.MultiLetterMeshes = false;
   if(typeof textBoxProps.textProps.font === 'string'){
@@ -4283,21 +4358,45 @@ export function createStaticTextBox(textBoxProps) {
   }  
 };
 
+/**
+ * This function creates a multi-line text widget portal based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) property set.
+ * 
+ * @returns {null} no return.
+ */
 export function createStaticTextPortal(textBoxProps) {
   textBoxProps = TextBoxWidget.SetupPortalProps(textBoxProps);
   createStaticTextBox(textBoxProps);
 }
 
+/**
+ * This function creates a scrollable multi-line text widget portal based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) property set.
+ * 
+ * @returns {null} no return.
+ */
 export function createStaticScrollableTextBox(textBoxProps) {
   textBoxProps.textProps.draggable = true;
   createStaticTextBox(textBoxProps); 
 }
 
+/**
+ * This function creates a multi-line text widget portal based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) property set.
+ * 
+ * @returns {null} no return.
+ */
 export function createStaticScrollableTextPortal(textBoxProps) {
   textBoxProps.textProps.draggable = true;
   createStaticTextPortal(textBoxProps);
 }
 
+/**
+ * This function creates a multi-line text widget based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) property set.
+ * 
+ * @returns {null} no return.
+ */
 export function createMultiTextBox(textBoxProps) {
   textBoxProps.MultiLetterMeshes = true;
   textBoxProps.textProps.MultiLetterMeshes = true;
@@ -4314,21 +4413,59 @@ export function createMultiTextBox(textBoxProps) {
   }
 };
 
+/**
+ * This function creates a multi-line text widget portal based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) property set.
+ * 
+ * @returns {null} no return.
+ */
 export function createMultiTextPortal(textBoxProps) {
   textBoxProps = TextBoxWidget.SetupPortalProps(textBoxProps);
   createMultiTextBox(textBoxProps);
 };
 
+/**
+ * This function creates a scrollable text widget based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) property set.
+ * 
+ * @returns {null} no return.
+ */
 export function createMultiScrollableTextBox(textBoxProps) {
   textBoxProps.textProps.draggable = true;
   createMultiTextBox(textBoxProps);
 };
 
+/**
+ * This function creates a scrollable text widget portal based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) property set.
+ * 
+ * @returns {null} no return.
+ */
 export function createMultiScrollableTextPortal(textBoxProps) {
   textBoxProps = TextBoxWidget.SetupPortalProps(textBoxProps);
   createMultiScrollableTextBox(textBoxProps);
 };
 
+/**
+ * This function creates a catch all property set for text based elements.
+ * @param {object} cBox object for an widget that has a box mesh.
+ * @param {string} text string of text to be rendered.
+ * @param {object} textMesh Object3D mesh for text.
+ * @param {object} font the loaded font asset object.
+ * @param {number} size text size.
+ * @param {number} height text height.
+ * @param {number} zOffset position of text in z.
+ * @param {number} letterSpacing space between letters.
+ * @param {number} lineSpacing space between text lines.
+ * @param {number} wordSpacing space between words.
+ * @param {number} text padding.
+ * @param {number} draggable draggability of text.
+ * @param {number} meshProps text mesh properties.
+ * @param {bool} [wrap=true] if true, text wraps.
+ * @param {bool} [hasButton=false] if true, text element has button.
+ * 
+ * @returns {object} Data object text elements.
+ */
 export function editTextProperties(cBox, text, textMesh, font, size, height, zOffset, letterSpacing, lineSpacing, wordSpacing, padding, draggable, meshProps, wrap=true, hasButton=false){
   return {
     'type': 'EDIT_TEXT_PROPS',
@@ -4350,6 +4487,12 @@ export function editTextProperties(cBox, text, textMesh, font, size, height, zOf
   }
 };
 
+/**
+ * This function creates a input text widget based on passed property set.
+ * @param {object} inputTextProps (editTextProperties) property set.
+ * 
+ * @returns {object} InputTextWidget class object.
+ */
 export class InputTextWidget extends BaseWidget {
   constructor(textInputProps) {
     const props = InputTextWidget.CalculateBoxProps(textInputProps);
@@ -4455,6 +4598,12 @@ export class InputTextWidget extends BaseWidget {
   }
 };
 
+/**
+ * This function creates a default property set for input text box properties.
+ * @param {object} parent Object3D that the widget should be parented to.
+ * 
+ * @returns {object} boxProperties for input text elements.
+ */
 function TextInputBoxProperties(parent, portal=false){
   let matProps = phongMatProperties('black');
   if(portal){
@@ -4463,15 +4612,37 @@ function TextInputBoxProperties(parent, portal=false){
   return boxProperties('input-box-properties', parent, 'black', 4, 2, 0.2, 10, 0.4, 0.25, true, matProps);
 }
 
+/**
+ * This function creates a default property set for input text box properties.
+ * @param {object} parent Object3D that the widget should be parented to.
+ * 
+ * @returns {object} boxProperties for input text elements.
+ */
 export function defaultTextInputBoxProps(parent=undefined){
   return TextInputBoxProperties(parent);
 };
 
-export function defaultTextInputPortalBoxProps(parent=undefined){
+/**
+ * This function creates a default property set for input text box portal properties.
+ * @param {object} parent Object3D that the widget should be parented to.
+ * 
+ * @returns {object} boxProperties for input text elements.
+ */
+export function defaultTextInputPortalBoxProps(parent){
   return TextInputBoxProperties(parent, true);
 };
 
-export function textInputProperties(boxProps=undefined, name='', textProps=undefined, buttonProps=undefined, draggable=false){
+/**
+ * This function creates a property set for input text widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} name for the element.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {object} [buttonProps=undefined] (buttonProperties) if input needs a button, pass button properties.
+ * @param {bool} [draggables=false] if true, text will be draggable.
+ * 
+ * @returns {object} Data object for list selector elements.
+ */
+export function textInputProperties(boxProps, name='', textProps=undefined, buttonProps=undefined, draggable=false){
   return {
     'type': 'INPUT_TEXT',
     'boxProps': boxProps,
@@ -4482,6 +4653,15 @@ export function textInputProperties(boxProps=undefined, name='', textProps=undef
   }
 };
 
+/**
+ * This function creates a default property set for edit text widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data object for edit text elements.
+ */
 export function defaultPanelEditTextProps(name, parent, font){
   const boxProps = defaultPanelEditTextBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
@@ -4489,6 +4669,15 @@ export function defaultPanelEditTextProps(name, parent, font){
   return textInputProperties(boxProps, name, textProps);
 }
 
+/**
+ * This function creates a default property set for edit text widgets in panels.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data object for edit text elements in panels.
+ */
 export function defaultPanelInputTextProps(name, parent, font){
   const boxProps = defaultPanelEditTextBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
@@ -4497,6 +4686,12 @@ export function defaultPanelInputTextProps(name, parent, font){
   return textInputProperties(boxProps, name, textProps, btnProps);
 }
 
+/**
+ * This function creates a text input widget.
+ * @param {object} textInputProps (textInputProperties) Properties used for text input widget.
+ * 
+ * @returns {null} no return value.
+ */
 export function createTextInput(textInputProps) {
   textInputProps.textProps.editText = true;
   if(typeof textInputProps.textProps.font === 'string'){
@@ -4510,23 +4705,47 @@ export function createTextInput(textInputProps) {
   }
 };
 
+/**
+ * This function creates a text input widget.
+ * @param {object} textInputProps (textInputProperties) Properties used for text input widget.
+ * 
+ * @returns {null} no return value.
+ */
 export function createScrollableTextInput(textInputProps) {
   textInputProps.draggable = true;
   createTextInput(textInputProps);
 };
 
+/**
+ * This function creates a text input widget portal(inset inside of parent, 
+ * rendered using stencil ref) widget based on passed property set.
+ * @param {object} textInputProps (textInputProperties) Properties used for text input widget.
+ * 
+ * @returns {null} no return value.
+ */
 export function createTextInputPortal(textInputProps) {
   textInputProps = InputTextWidget.SetupPortalProps(textInputProps);
   createTextInput(textInputProps);
 };
 
-//TODO: Scrolling is broken, needs to be fixed
+/**
+ * This function creates a text input widget.
+ * @param {object} textInputProps (textInputProperties) Properties used for text input portal(inset inside of parent, rendered using stencil ref) widget based on passed property set.
+ * 
+ * @returns {null} no return value.
+ */
 export function createScrollableTextInputPortal(textInputProps) {
   textInputProps = InputTextWidget.SetupPortalProps(textInputProps);
   textInputProps.draggable = true;
   createTextInput(textInputProps);
 };
 
+/**
+ * This function creates a selector set property set.
+ * @param {object} set dictionary of objects for selector.
+ * 
+ * @returns {object} Selector set property.
+ */
 export function selectorSet(set){
   return {
     'type': 'SELECTOR_SET',
@@ -4534,18 +4753,36 @@ export function selectorSet(set){
   }
 };
 
-export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', textProps=undefined, animProps=undefined, listConfig=undefined, objectControlProps=undefined){
+/**
+ * This function creates a property set for list selector widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} name for the element.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {object} [listConfig=undefined] (listItemConfig) if a list config is used, model will be attached to a list element.
+ * @param {number} [objectControlProps=undefined] slot for object that will be updated by widget.
+ * 
+ * @returns {object} Data object for list selector elements.
+ */
+export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', textProps=undefined, listConfig=undefined, objectControlProps=undefined){
   return {
     'type': 'LIST_SELECTOR',
     'boxProps': boxProps,
     'name': name,
     'textProps': textProps,
-    'animProps': animProps,
     'listConfig': listConfig,
     'objectControlProps': objectControlProps
   }
 };
 
+/**
+ * This function creates a default property set for list selector widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data object for list selector elements.
+ */
 export function defaultPanelListSelectorProps(name, parent, font){
   const boxProps = defaultPanelListSelectorBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
@@ -4554,6 +4791,15 @@ export function defaultPanelListSelectorProps(name, parent, font){
   return listSelectorProps
 };
 
+/**
+ * This function creates a default property set for material list selector widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data object for list selector elements.
+ */
 export function defaultPanelMaterialSetSelectorProps(name, parent, font){
   const boxProps = defaultPanelListSelectorBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
@@ -4562,6 +4808,12 @@ export function defaultPanelMaterialSetSelectorProps(name, parent, font){
   return listSelectorProps
 };
 
+/**
+ * This function creates a selector widget based on passed property set.
+ * @param {object} listSelectorProps (listSelectorProperties) property set.
+ * 
+ * @returns {object} SelectorWidget class object.
+ */
 export class SelectorWidget extends BaseWidget {
   constructor(listSelectorProps) {
     const isPortal = listSelectorProps.isPortal;
@@ -4728,6 +4980,13 @@ export class SelectorWidget extends BaseWidget {
   }
 };
 
+/**
+ * This function creates a list selector widget.
+ * @param {object} listSelectorProps (listSelectorProperties) Properties used for list selector widget.
+ * @param {object} selectors (selectorSetProperties) Properties used for list selector set dictionary.
+ * 
+ * @returns {null} no return value.
+ */
 export function createListSelector(listSelectorProps, selectors) {
 
   if(typeof listSelectorProps.textProps.font === 'string'){
@@ -4744,11 +5003,25 @@ export function createListSelector(listSelectorProps, selectors) {
 
 };
 
+/**
+ * This function creates a list selector portal(inset inside of parent, 
+ * rendered using stencil ref) widget based on passed property set.
+ * @param {object} listSelectorProps (listSelectorProperties) Properties used for list selector widget.
+ * @param {object} selectors (selectorSetProperties) Properties used for list selector set dictionary.
+ * 
+ * @returns {null} no return value.
+ */
 export function createListSelectorPortal(listSelectorProps, selectors) {
   listSelectorProps.isPortal = true;
   createListSelector(listSelectorProps, selectors);
 };
 
+/**
+ * This function creates a button element based on passed property set.
+ * @param {object} buttonProps (buttonProperties) Properties used for button element.
+ * 
+ * @returns {object} BaseTextBox class object.
+ */
 function ButtonElement(buttonProps){
   let btn = new BaseTextBox(buttonProps);
   let textProps = buttonProps.textProps;
@@ -4768,6 +5041,13 @@ function ButtonElement(buttonProps){
   return btn
 }
 
+/**
+ * This function creates a button portal(inset inside of parent, 
+ * rendered using stencil ref) widget based on passed property set.
+ * @param {object} buttonProps (buttonProperties) Properties used for button element.
+ * 
+ * @returns {object} BaseTextBox class object.
+ */
 function PortalButtonElement(buttonProps){
   const portal = new BaseBox(buttonProps.boxProps);
   const stencilRef = portal.box.material.stencilRef;
@@ -4788,6 +5068,12 @@ function PortalButtonElement(buttonProps){
   return portal
 }
 
+/**
+ * This function creates a button element based on passed property set.
+ * @param {object} buttonProps (buttonProperties) Properties used for button element.
+ * 
+ * @returns {object} BaseTextBox class object.
+ */
 function Button(buttonProps) {
   if(typeof buttonProps.textProps.font === 'string'){
     // Load the font
@@ -4800,6 +5086,13 @@ function Button(buttonProps) {
   }
 }
 
+/**
+ * This function creates a button portal(inset inside of parent, 
+ * rendered using stencil ref) widget based on passed property set.
+ * @param {object} buttonProps (buttonProperties) Properties used for button element.
+ * 
+ * @returns {object} BaseTextBox class object.
+ */
 function portalButton(buttonProps) {
   if(typeof buttonProps.textProps.font === 'string'){
     // Load the font
@@ -4812,44 +5105,58 @@ function portalButton(buttonProps) {
   }
 }
 
+/**
+ * This function creates a button element based on passed property set.
+ * @param {object} buttonProps (buttonProperties) Properties used for button element.
+ * 
+ * @returns {object} BaseTextBox class object.
+ */
 export function createButton(buttonProps){
   Button(buttonProps);
 };
 
+/**
+ * This function creates a button portal(inset inside of parent, 
+ * rendered using stencil ref) widget based on passed property set.
+ * @param {object} buttonProps (buttonProperties) Properties used for button element.
+ * 
+ * @returns {object} BaseTextBox class object.
+ */
 export function createPortalButton(buttonProps){
   buttonProps.isPortal = true;
   buttonProps.boxProps.isPortal = true;
   portalButton(buttonProps);
 };
 
+/**
+ * This function creates a mouseoverable button element based on passed property set.
+ * @param {object} buttonProps (buttonProperties) Properties used for button element.
+ * 
+ * @returns {object} BaseTextBox class object.
+ */
 export function createMouseOverButton(buttonProps){
   buttonProps.mouseOver = true;
   Button(buttonProps);
 };
 
+/**
+ * This function creates a  mouseoverable button portal(inset inside of parent, 
+ * rendered using stencil ref) widget based on passed property set.
+ * @param {object} buttonProps (buttonProperties) Properties used for button element.
+ * 
+ * @returns {object} BaseTextBox class object.
+ */
 export function createMouseOverPortalButton(buttonProps){
   buttonProps.mouseOver = true;
   createPortalButton(buttonProps);
 };
 
-export function createMeter(meterProps) {
-  if(typeof meterProps.textProps.font === 'string'){
-    // Load the font
-    loader.load(meterProps.textProps.font, (font) => {
-      meterProps.textProps.font = font;
-      new MeterWidget(meterProps);
-
-    });
-  }else if(meterProps.textProps.font.isFont){
-    new MeterWidget(meterProps);
-  }
-};
-
-export function createMeterPortal(meterProps) {
-  meterProps.boxProps.isPortal = true;
-  createMeter(meterProps);
-};
-
+/**
+ * This function creates a slider widget based on passed property set.
+ * @param {object} sliderProps (sliderProperties) Properties used for toggle widget.
+ * 
+ * @returns {null} no return value.
+ */
 export function createSliderBox(sliderProps) {
   if(typeof sliderProps.textProps.font === 'string'){
     // Load the font
@@ -4863,70 +5170,35 @@ export function createSliderBox(sliderProps) {
   }
 };
 
-export function createSliderPortal(sliderProps) {
-  sliderProps.boxProps.isPortal = true;
-  createSliderBox(sliderProps);
-};
-
-function ToggleBox(toggleProps){
-  const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
-  let toggle = new ToggleWidget(toggleProps);
-}
-
-export function createToggleBox(toggleProps) {
-  if(typeof toggleProps.textProps.font === 'string'){
-    // Load the font
-    loader.load(toggleProps.textProps.font, (font) => {
-      toggleProps.textProps.font = font;
-      ToggleBox(toggleProps);
-
-    });
-  }else if(toggleProps.textProps.font.isFont){
-    ToggleBox(toggleProps);
-  }
-};
-
-function TogglePortal(toggleProps) {
-  const parentSize = getGeometrySize(toggleProps.boxProps.parent.geometry);
-  let stencilRef = getStencilRef();
-  let toggle = new ToggleWidget(toggleProps);
-  setupStencilMaterial(toggle.box.material, stencilRef);
-  setupStencilChildMaterial(toggle.handle.material, stencilRef);
-  toggle.box.material.depthWrite = false;
-  toggle.handle.material.depthWrite = false;
-  toggleProps.boxProps.parent.add(toggle.box);
-  toggle.box.position.set(toggle.box.position.x, toggle.box.position.y, toggle.box.position.z+parentSize.depth/2);
-  toggles.push(toggle.handle);
-
-}
-
-export function createTogglePortal(toggleProps) {
-  if(typeof toggleProps.textProps.font === 'string'){
-    // Load the font
-    loader.load(toggleProps.textProps.font, (font) => {
-      toggleProps.textProps.font = font;
-      TogglePortal(toggleProps);
-    });
-  }else if(toggleProps.textProps.font.isFont){
-    TogglePortal(toggleProps);
-  }
-};
-
-export function imageProperties(boxProps, name='', imgUrl=undefined, padding=0.01, matProps=undefined, animProps=undefined, listConfig=undefined, onCreated=undefined, zOffset=0){
+/**
+ * This function creates a property set for loading image widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} name for the element.
+ * @param {object} imgUrl a url to the image
+ * @param {number} [padding=0.01] paddnig for image element.
+ * @param {object} [listConfig=undefined] (listItemConfig) if a list config is used, model will be attached to a list element.
+ * @param {number} [zoffset=0] Amount to offset model in z.
+ * 
+ * @returns {object} Data object for gltf model elements.
+ */
+export function imageProperties(boxProps, name='', imgUrl, padding=0.01, listConfig=undefined, zOffset=0){
   return {
     'type': 'IMAGE',
     'boxProps': boxProps,
     'name': name,
     'imgUrl': imgUrl,
     'padding': padding,
-    'matProps': matProps,
-    'animProps': animProps,
     'listConfig': listConfig,
-    'onCreated': onCreated,
     'zOffset': zOffset
   }
 };
 
+/**
+ * This function creates an image widget based on passed property set.
+ * @param {object} imageProps (imageProperties) property set.
+ * 
+ * @returns {object} ImageWidget class object.
+ */
 export class ImageWidget extends BaseWidget {
   constructor(imageProps) {
     let textProps = {...DEFAULT_TEXT_PROPS};
@@ -4961,6 +5233,12 @@ export class ImageWidget extends BaseWidget {
 
 };
 
+/**
+ * This function creates an image widget based on passed property set.
+ * @param {object} imageProps (imageProperties) Properties used for image widget.
+ * 
+ * @returns {null} no return value.
+ */
 export function createImageBox(imageProps){
 
   if(typeof DEFAULT_TEXT_PROPS.font === 'string'){
@@ -4976,6 +5254,12 @@ export function createImageBox(imageProps){
   }
 };
 
+/**
+ * Checks whether or not heavymeta data is used for widget creation.
+ * @param {object} data heavymeta data object.
+ * 
+ * @returns {bool}
+ */
 export function dataIsHVYMWidget(data){
   let result = false;
 
@@ -4986,7 +5270,12 @@ export function dataIsHVYMWidget(data){
   return result
 }
 
-
+/**
+ * This function creates heavymeta data object based on loaded gltf file.
+ * @param {object} gltf loaded gltf object.
+ * 
+ * @returns {object} Heavymeta data class object.
+ */
 export class HVYM_Data {
   constructor(gltf) {
     this.is = 'EMPTY';
@@ -5521,18 +5810,36 @@ export class HVYM_Data {
   }
 };
 
-export function modelValueProperties(path=0, rotX=false, rotY=false, useLabel=true, widgetValueProp=undefined){
+/**
+ * This function creates a value property set used for panel section creation.
+ * @param {string} path string url for loading the model file.
+ * @param {bool} useLabel if true, label is shown based on model name.
+ * @param {object} widgetValueProp value property used for widget creation.
+ * 
+ * @returns {object} Data object for model value properties.
+ */
+export function modelValueProperties(path=0, useLabel=true, widgetValueProp=undefined){
   return {
     'type': 'MODEL_VALUE_PROPS',
     'path': path,
-    'rotX': rotX,
-    'rotY': rotY,
     'useLabel': useLabel,
     'widgetValueProp': widgetValueProp
   }
 };
 
-export function gltfProperties(boxProps, name='', gltf=undefined, listConfig=undefined, zOffset=0, dataPanel=false){
+/**
+ * This function creates a property set for loading gltf model widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} name for the element.
+ * @param {object} gltf a url to the model, or the loaded model Object3D
+ * @param {object} [listConfig=undefined] (listItemConfig) if a list config is used, model will be attached to a list element.
+ * @param {number} [zoffset=0] Amount to offset model in z.
+ * @param {number} [childInset=0.9] Amount content is inset.
+ * @param {number} [index=0] Index of the list element.
+ * 
+ * @returns {object} Data object for gltf model elements.
+ */
+export function gltfProperties(boxProps, name='', gltf, listConfig=undefined, zOffset=0){
   return {
     'type': 'GLTF',
     'boxProps': boxProps,
@@ -5540,11 +5847,20 @@ export function gltfProperties(boxProps, name='', gltf=undefined, listConfig=und
     'gltf': gltf,
     'listConfig': listConfig,
     'zOffset': zOffset,
-    'dataPanel': dataPanel,
     'hvymData': undefined
   }
 };
 
+/**
+ * This function creates a default property set for loading gltf model widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * @param {string} modelPath path to the model file.
+ * 
+ * @returns {object} Data object for gltf model elements.
+ */
 export function defaultPanelGltfModelProps(name, parent, font, modelPath){
   const boxProps = defaultPanelGltfModelBoxProps(name, parent);
   boxProps.isPortal = true;
@@ -5553,6 +5869,12 @@ export function defaultPanelGltfModelProps(name, parent, font, modelPath){
   return gltfProperties(boxProps, name, modelPath)
 }
 
+/**
+ * This function creates a gltf model widget based on passed property set.
+ * @param {object} gltfProps (gltfProperties) Properties used for model widget.
+ * 
+ * @returns {null} no return value.
+ */
 export class GLTFModelWidget extends BaseWidget {
   constructor(gltfProps) {
     let textProps = {...DEFAULT_TEXT_PROPS};
@@ -5656,6 +5978,13 @@ export class GLTFModelWidget extends BaseWidget {
 
 };
 
+/**
+ * This function creates a gltf model widget based on passed property set. Handles font loading
+ * in the case that font isnt loaded.
+ * @param {object} gltfProps (gltfProperties) Properties used for model widget.
+ * 
+ * @returns {null} no return value.
+ */
 function GLTFModelWidgetLoader(gltfProps){
   if(typeof DEFAULT_TEXT_PROPS.font === 'string'){
     // Load the font
@@ -5672,6 +6001,12 @@ function GLTFModelWidgetLoader(gltfProps){
   }
 }
 
+/**
+ * This function creates a gltf model widget based on passed property set.
+ * @param {object} gltfProps (gltfProperties) Properties used for model widget.
+ * 
+ * @returns {null} no return value.
+ */
 export function createGLTFModel(gltfProps){
     gltfProps.boxProps.isPortal = false;
     console.log(gltfProps)
@@ -5702,6 +6037,13 @@ export function createGLTFModel(gltfProps){
 
 };
 
+/**
+ * This function creates a gltf model widget portal(inset inside of parent, 
+ * rendered using stencil ref) based on passed property set.
+ * @param {object} gltfProps (gltfProperties) Properties used for model widget.
+ * 
+ * @returns {null} no return value.
+ */
 export function createGLTFModelPortal(gltfProps){
   gltfProps = GLTFModelWidget.SetupPortalProps(gltfProps);
   if(typeof gltfProps.gltf === 'string'){
@@ -5726,6 +6068,11 @@ export function createGLTFModelPortal(gltfProps){
   }
 }
 
+/**
+ * Enable model drag and drop upload for page.
+ *
+ * @param {object} parent Object3D.
+ */
 export function GLTFDragAndDrop(parent) {
   document.addEventListener('dragover', (e) => {
       e.preventDefault()
@@ -5773,7 +6120,20 @@ export function GLTFDragAndDrop(parent) {
   });
 };
 
-export function listItemConfig(boxProps, textProps=undefined,  animProps=undefined, infoProps=undefined, useTimeStamp=true, spacing=0, childInset=0.9, index=0){
+/**
+ * This function creates a list item config.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {object} textProps (textProperties) Properties of text.
+ * @param {object} animProps (animationProperties) 
+ * @param {object} infoProps (infoProperties) Information displayed
+ * @param {bool} [useTimeStamp=true]
+ * @param {number} [spacing=0] Spacing between list elements.
+ * @param {number} [childInset=0.9] Amount content is inset.
+ * @param {number} [index=0] Index of the list element.
+ * 
+ * @returns {object} Data object for configuring List Items.
+ */
+export function listItemConfig(boxProps, textProps,  animProps, infoProps, useTimeStamp=true, spacing=0, childInset=0.9, index=0){
   return {
     'type': 'LIST_CONFIG',
     'boxProps': boxProps,
@@ -5787,6 +6147,11 @@ export function listItemConfig(boxProps, textProps=undefined,  animProps=undefin
   }
 }
 
+/**
+ * Creates a list item box container for the object that has a list item config.
+ *
+ * @param {object} ListItemConfig.
+ */
 export class ListItemBox extends BaseBox {
   constructor(listConfig) {
 
