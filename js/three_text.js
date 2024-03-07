@@ -5737,39 +5737,38 @@ export function GLTFDragAndDrop(parent) {
       const filename = file.name;
       const extension = filename.split( '.' ).pop().toLowerCase();
 
-      const reader = new FileReader();
-      reader.addEventListener( 'progress', function ( event ) {
 
-        const progress = Math.floor( ( event.loaded / event.total ) * 100 ) + '%';
+      if(extension == 'glb'){
+        const reader = new FileReader();
+        reader.addEventListener( 'progress', function ( event ) {
 
-        console.log( 'Loading', filename, progress );
+          const progress = Math.floor( ( event.loaded / event.total ) * 100 ) + '%';
 
-      } );
-
-      reader.addEventListener( 'load', async function ( event ) {
-
-        const contents = event.target.result;
-
-        console.log(contents)
-
-        const dracoLoader = new DRACOLoader();
-        dracoLoader.setDecoderPath( '../examples/js/libs/draco/gltf/' );
-        const loader = new GLTFLoader();
-        loader.setDRACOLoader( dracoLoader );
-
-        loader.parse( contents, '', function ( gltf ) {
-          const size = getGeometrySize(parent.geometry);
-          const boxProps = boxProperties(gltf.scene.name, parent, size.width, size.height, size.depth, 3, 0.02);
-          const gltfProps = gltfProperties(boxProps, gltf.scene.name, gltf);
-          gltfProps.hvymData = new HVYM_Data(gltf);
-          GLTFModelWidgetLoader(gltfProps);
-
-          console.log(gltf)
+          console.log( 'Loading', filename, progress );
 
         } );
 
-      }, false );
-      reader.readAsArrayBuffer( file );
+        reader.addEventListener( 'load', async function ( event ) {
+
+          const contents = event.target.result;
+          const dracoLoader = new DRACOLoader();
+          dracoLoader.setDecoderPath( '../examples/js/libs/draco/gltf/' );
+          const loader = new GLTFLoader();
+          loader.setDRACOLoader( dracoLoader );
+
+          loader.parse( contents, '', function ( gltf ) {
+            const size = getGeometrySize(parent.geometry);
+            const boxProps = boxProperties(gltf.scene.name, parent, size.width, size.height, size.depth, 3, 0.02);
+            const gltfProps = gltfProperties(boxProps, gltf.scene.name, gltf);
+            gltfProps.hvymData = new HVYM_Data(gltf);
+            GLTFModelWidgetLoader(gltfProps);
+          } );
+
+        }, false );
+        reader.readAsArrayBuffer( file );
+      }else{
+        alert('Only .glb model supported currently.')
+      }
 
   });
 };
