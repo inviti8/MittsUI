@@ -1812,6 +1812,12 @@ function setGeometryPivot(mesh, boxProps){
   }
 }
 
+/**
+ * This function creates base class for all elements with boxes.
+ * @param {object} boxProps (boxProperties) property set.
+ * 
+ * @returns {object} BaseBox class object.
+ */
 export class BaseBox {
   constructor(boxProps) {
     this.is = 'BASE_BOX';
@@ -2134,6 +2140,18 @@ export class BaseBox {
 
 }
 
+/**
+ * This function creates a property set for button widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} [name='Button'] name for the element.
+ * @param {string} [value=''] button value.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {bool} [mouseOver=false] if true, button expands on ouse-over.
+ * @param {string} [attach='RIGHT'] alignment of where button is attached.
+ * @param {object} [objectControlProps=undefined] slot for object that will be updated by widget.
+ * 
+ * @returns {object} Data object for button elements.
+ */
 export function buttonProperties(boxProps, name='Button', value='', textProps=undefined, mouseOver=false, attach='RIGHT', objectControlProps=undefined){
   return {
     'type': 'BUTTON',
@@ -2147,6 +2165,14 @@ export function buttonProperties(boxProps, name='Button', value='', textProps=un
   }
 };
 
+/**
+ * This function creates a default property set for button widgets, used in panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data object for button elements, used in panels.
+ */
 export function defaultPanelButtonProps(name, parent, font){
   const boxProps = defaultPanelButtonBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
@@ -2154,6 +2180,14 @@ export function defaultPanelButtonProps(name, parent, font){
   return buttonProperties(boxProps, name, '', textProps, false, 'CENTER')
 };
 
+/**
+ * This function creates a default property set for edit text button widgets, used in panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data object for edit text button elements, used in panels.
+ */
 export function defaultPanelEditTextButtonProps(name, parent, font){
   const boxProps = defaultEditTextButtonBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
@@ -2161,6 +2195,12 @@ export function defaultPanelEditTextButtonProps(name, parent, font){
   return buttonProperties(boxProps, name, '', textProps)
 };
 
+/**
+ * This function creates base class for elements that are boxes containing text such as buttons.
+ * @param {object} buttonProps (buttonProperties) property set.
+ * 
+ * @returns {object} BaseTextBox class object.
+ */
 class BaseTextBox extends BaseBox {
   constructor(buttonProps) {
     let indicatorBoxProps = undefined;
@@ -2227,6 +2267,12 @@ class BaseTextBox extends BaseBox {
   }
 }
 
+/**
+ * This function creates panel box for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelBox class object.
+ */
 export class PanelBox extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
@@ -2237,6 +2283,12 @@ export class PanelBox extends BaseTextBox {
   }
 };
 
+/**
+ * This function creates panel gltf label widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelLabel class object.
+ */
 export class PanelLabel extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
@@ -2246,6 +2298,12 @@ export class PanelLabel extends BaseTextBox {
   }
 };
 
+/**
+ * This function creates panel gltf model widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelGltfModel class object.
+ */
 export class PanelGltfModel extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
@@ -2290,6 +2348,12 @@ export class PanelGltfModel extends BaseTextBox {
   }
 };
 
+/**
+ * This function creates panel gltf model meter widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelGltfModelMeter class object.
+ */
 export class PanelGltfModelMeter extends PanelGltfModel{
   constructor(panelProps) {
     super(panelProps);
@@ -2309,6 +2373,12 @@ export class PanelGltfModelMeter extends PanelGltfModel{
   }
 };
 
+/**
+ * This function creates panel gltf model value meter widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelGltfModelValueMeter class object.
+ */
 export class PanelGltfModelValueMeter extends PanelGltfModelMeter{
   constructor(panelProps) {
     super(panelProps);
@@ -2327,6 +2397,12 @@ export class PanelGltfModelValueMeter extends PanelGltfModelMeter{
   }
 };
 
+/**
+ * This function creates panel edit text widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelEditText class object.
+ */
 export class PanelEditText extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2341,6 +2417,12 @@ export class PanelEditText extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel input text widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelInputText class object.
+ */
 export class PanelInputText extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2355,6 +2437,12 @@ export class PanelInputText extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel toggle widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelBooleanToggle class object.
+ */
 export class PanelBooleanToggle extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2367,6 +2455,12 @@ export class PanelBooleanToggle extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel slider widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelSlider class object.
+ */
 export class PanelSlider extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2393,6 +2487,12 @@ export class PanelSlider extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel material slider widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelMaterialSlider class object.
+ */
 export class PanelMaterialSlider extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2408,6 +2508,12 @@ export class PanelMaterialSlider extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel meter widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelMeter class object.
+ */
 export class PanelMeter extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2424,6 +2530,12 @@ export class PanelMeter extends PanelBox {
   } 
 };
 
+/**
+ * This function creates panel value meter widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelValueMeter class object.
+ */
 export class PanelValueMeter extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2440,6 +2552,12 @@ export class PanelValueMeter extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel color widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelColorWidget class object.
+ */
 export class PanelColorWidget extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2451,6 +2569,12 @@ export class PanelColorWidget extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel material color widget for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelMaterialColorWidget class object.
+ */
 export class PanelMaterialColorWidget extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2472,6 +2596,12 @@ export class PanelMaterialColorWidget extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel selector for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelListSelector class object.
+ */
 export class PanelListSelector extends PanelBox {
   constructor(panelProps) {
     panelProps.boxProps.matProps.useCase = 'STENCIL';
@@ -2492,6 +2622,12 @@ export class PanelListSelector extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel toggle for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelToggle class object.
+ */
 export class PanelToggle extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2513,6 +2649,12 @@ export class PanelToggle extends PanelBox {
   }
 };
 
+/**
+ * This function creates panel button for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} PanelButton class object.
+ */
 export class PanelButton extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
@@ -2524,7 +2666,16 @@ export class PanelButton extends PanelBox {
   }
 };
 
-//value types: container, controls, label, edit_text, input_text, toggle, int_slider, float_slider
+
+/**
+ * This function creates a property set for panels.
+ * value types: container, controls, label, edit_text, input_text, toggle, int_slider, float_slider
+ * @param {string} [name='Section'] name of the panel section.
+ * @param {string} [value_type='container'] use for this panel.
+ * @param {object} [data={}] value data attached to the panel.
+ * 
+ * @returns {object} Data (panelSectionProperties)
+ */
 export function panelSectionProperties(name='Section', value_type='container', data={}){
   return {
     'type': 'PANEL_SECTION',
@@ -2534,6 +2685,16 @@ export function panelSectionProperties(name='Section', value_type='container', d
   }
 };
 
+/**
+ * This function creates a default property set for material panels.
+ * @param {object} material target material.
+ * @param {bool} [emissive=false] if true, emissive property is exposed.
+ * @param {bool} [reflective=false] if true, reflective property is exposed.
+ * @param {bool} [iridescent=false] if true, iridescent property is exposed.
+ * @param {bool} [sheen=false] if true, sheen property is exposed.
+ * 
+ * @returns {object} Data (panelSectionProperties)
+ */
 export function panelMaterialSectionPropertySet(material, emissive=false, reflective=false, iridescent=false, sheen=false){
   let sectionData = {};
   let matType = materialTypeConstant(material);
@@ -2604,6 +2765,12 @@ export function panelMaterialSectionPropertySet(material, emissive=false, reflec
   return panelSectionProperties(material.name, 'controls', sectionData)
 };
 
+/**
+ * This function creates a default property set for panels.
+ * @param {object} materialSet Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (panelSectionProperties)
+ */
 export function panelMaterialSetSectionPropertySet(materialSet){
   let sectionData = {};
   let matType = undefined;
