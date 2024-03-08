@@ -1598,7 +1598,6 @@ export class BaseText {
     this.meshes[key].userData.maxScroll = geomSize.height/2 - this.parentSize.height/2 - (this.padding+extraSpace);
     this.meshes[key].userData.minScroll = this.meshes[key].userData.initialPositionY+this.meshes[key].userData.maxScroll+(this.padding-extraSpace);
     this.meshes[key].userData.padding = this.padding;
-    this.meshes[key].userData.settleThreshold = geomSize.height/50;
   }
 }
 
@@ -2613,6 +2612,23 @@ export function panelMaterialSetSectionPropertySet(materialSet){
   return panelSectionProperties(materialSet.name, 'controls', sectionData)
 };
 
+/**
+ * This function creates a property set for panel widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} [name=''] name for the element.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {string} [attach='LEFT'] how the panel is attached.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {object} [sections={}] (panelSectionProperties) used to create panels.
+ * @param {bool} [open=true] if true panel is open, else closed.
+ * @param {bool} [expanded=true] if true panel is expanded, else collapsed.
+ * @param {bool} [isSubPanel=true] identifier indicating whether panel is child of another panel.
+ * @param {object} [topPanel=undefined] (Object3D) this is always set to the topmost panel element.
+ * @param {object} [topCtrl=undefined] (BasePanel) if subPane, this is the hook to the parent BasePanel class.
+ * @param {number} [index=0] index of the panel.
+ * 
+ * @returns {object} Data object for panel elements.
+ */
 export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
   return {
     'type': 'PANEL',
@@ -2630,11 +2646,24 @@ export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT
   }
 };
 
+/**
+ * This function creates a default property set for panels.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data object for panels.
+ */
 export function hvymPanelProperties(parent, font){
   let panelBoxProps = three_text.defaultPanelWidgetBoxProps('gltf-panel-box', parent);
   let panelTextProps = three_text.defaultWidgetTextProperties(font);
 };
 
+/**
+ * This function creates panel elements for expandable ui elements.
+ * @param {object} panelProps (panelProperties) property set.
+ * 
+ * @returns {object} BasePanel class object.
+ */
 export class BasePanel extends BaseTextBox {
   constructor(panelProps) {
     super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
@@ -2989,6 +3018,21 @@ export function CreateBasePanel(panelProps) {
   
 };
 
+/**
+ * This function creates a property set for various widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} [name=''] name for the element.
+ * @param {bool} [horizontal=true] if true toggle is horizontal, else vertical.
+ * @param {bool} [on=false] if true initial state of widget is on, else off.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {bool} [useValueText=true] if true toggle has a text portal for value.
+ * @param {bool} [numeric=true] the meter value is numeric.
+ * @param {object} [valueProps=stringValueProperties] property set for value type of widget.
+ * @param {number} [handleSize=2] size of handle on toggle.
+ * @param {object} [objectControlProps=undefined] slot for object that will be updated by widget.
+ * 
+ * @returns {object} Data object for widget elements.
+ */
 export function widgetProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), listConfig=undefined, handleSize=2, objectControlProps=undefined ){
   return {
     'type': 'WIDGET',
@@ -3005,7 +3049,12 @@ export function widgetProperties(boxProps, name='', horizontal=true, on=false, t
   }
 };
 
-
+/**
+ * This function creates base class used by several widgets with handles.
+ * @param {object} widgetProps (widgetProperties) property set.
+ * 
+ * @returns {object} BaseWidget class object.
+ */
 export class BaseWidget extends BaseBox {
   constructor(widgetProps) {
     let size = BaseWidget.CalculateWidgetSize(widgetProps.boxProps, widgetProps.horizontal, widgetProps.useValueText, widgetProps.handleSize);
@@ -3307,6 +3356,17 @@ export class BaseWidget extends BaseBox {
   }
 };
 
+/**
+ * This function creates a number value property set.
+ * @param {number} [defaultvalue=0] default numeric value.
+ * @param {number} [min=0] minimum value.
+ * @param {number} [max=1] maximum value.
+ * @param {number} [places=3] number of place values used in number.
+ * @param {number} [step=0.001] decimal places that numbers use.
+ * @param {bool} [editable=true] if true, number text is editable.
+ * 
+ * @returns {object} Data object for number values.
+ */
 export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, step=0.001, editable=true){
   return {
     'type': 'NUMBER_VALUE_PROPS',
@@ -3319,22 +3379,61 @@ export function numberValueProperties( defaultValue=0, min=0, max=1, places=3, s
   }
 };
 
+/**
+ * This function creates a number value property set for static integers.
+ * @param {number} [defaultvalue=0] default numeric value.
+ * @param {number} [min=0] minimum value.
+ * @param {number} [max=1] maximum value.
+ * 
+ * @returns {object} Data object for integer values.
+ */
 export function intValueProperties( defaultValue=0, min=0, max=1){
   return numberValueProperties( defaultValue, min, max, 0, 0.001, false)
 };
 
+/**
+ * This function creates a number value property set for editable integers.
+ * @param {number} [defaultvalue=0] default numeric value.
+ * @param {number} [min=0] minimum value.
+ * @param {number} [max=1] maximum value.
+ * 
+ * @returns {object} Data object for integer values.
+ */
 export function intValuePropertiesEditable( defaultValue=0, min=0, max=1){
   return numberValueProperties( defaultValue, min, max, 0, 0.001, true)
 };
 
+/**
+ * This function creates a number value property set for floats.
+ * @param {number} [defaultvalue=0] default numeric value.
+ * @param {number} [min=0] minimum value.
+ * @param {number} [max=1] maximum value.
+ * 
+ * @returns {object} Data object for float values.
+ */
 export function floatValueProperties( defaultValue=0, min=0, max=1){
   return numberValueProperties( defaultValue, min, max, 3, 0.001, false)
 };
 
+/**
+ * This function creates a number value property set for editable floats.
+ * @param {number} [defaultvalue=0] default numeric value.
+ * @param {number} [min=0] minimum value.
+ * @param {number} [max=1] maximum value.
+ * 
+ * @returns {object} Data object for float values.
+ */
 export function floatValuePropertiesEditable( defaultValue=0, min=0, max=1){
   return numberValueProperties( defaultValue, min, max, 3, 0.001, true)
 };
 
+/**
+ * This function creates a number value property set for materials.
+ * @param {object} material object.
+ * @param {string} prop target property in the material.
+ * 
+ * @returns {object} Data object for float values.
+ */
 export function materialNumberValueProperties(material, prop){
   let result = undefined;
 
@@ -3353,6 +3452,12 @@ export function materialNumberValueProperties(material, prop){
   return result
 }
 
+/**
+ * This function creates a value text widget based on passed property set.
+ * @param {object} widgetProps (widgetProperties) property set.
+ * 
+ * @returns {object} ValueTextWidget class object.
+ */
 export class ValueTextWidget extends BaseTextBox{
   constructor(widgetProps) {
     let valBoxProps = {...widgetProps.boxProps};
@@ -3445,6 +3550,21 @@ export class ValueTextWidget extends BaseTextBox{
 
 }
 
+/**
+ * This function creates a property set slider widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} [name=''] name for the element.
+ * @param {bool} [horizontal=true] if true toggle is horizontal, else vertical.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {bool} [useValueText=true] if true toggle has a text portal for value.
+ * @param {bool} [numeric=true] the meter value is numeric.
+ * @param {object} [valueProps=numberValueProperties] property set for value type of meter widget.
+ * @param {number} [handleSize=8] size of handle on toggle.
+ * @param {bool} [draggable=true] if true, widgets hadles are draggable.
+ * @param {object} [objectControlProps=undefined] slot for object that will be updated by widget.
+ * 
+ * @returns {object} Data object for slider elements.
+ */
 export function sliderProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, objectControlProps=undefined){
   return {
     'type': 'SLIDER',
@@ -3461,12 +3581,27 @@ export function sliderProperties(boxProps, name='', horizontal=true, textProps=u
   }
 };
 
+/**
+ * This function creates a default property set for slider widgets, used in panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * @param {object} valueProps value property object used by widget.
+ * 
+ * @returns {object} Data object for slider elements, used in panels.
+ */
 export function defaultPanelSliderProps(name, parent, font, valueProps){
   const boxProps = defaultPanelSliderBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
   return sliderProperties(boxProps, name, true, textProps, true, true, valueProps)
 };
 
+/**
+ * This function creates a slider widget based on passed property set.
+ * @param {object} widgetProps (widgetProperties) property set.
+ * 
+ * @returns {object} SliderWidget class object.
+ */
 export class SliderWidget extends BaseWidget {
   constructor(widgetProps) {
     widgetProps.textProps.align = 'LEFT';
@@ -3635,6 +3770,21 @@ export class SliderWidget extends BaseWidget {
   }
 };
 
+/**
+ * This function creates a property set toggle widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} [name=''] name for the element.
+ * @param {bool} [horizontal=true] if true toggle is horizontal, else vertical.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {bool} [useValueText=true] if true toggle has a text portal for value.
+ * @param {bool} [numeric=true] the meter value is numeric.
+ * @param {object} [valueProps=numberValueProperties] property set for value type of meter widget.
+ * @param {number} [handleSize=8] size of handle on toggle.
+ * @param {bool} [draggable=true] if true, widgets hadles are draggable.
+ * @param {string} [meterColor=SECONDARY_COLOR_A] color of meter.
+ * 
+ * @returns {object} Data object for toggle elements.
+ */
 export function meterProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, draggable=true, meterColor=SECONDARY_COLOR_A){
   return {
     'type': 'METER',
@@ -3651,18 +3801,42 @@ export function meterProperties(boxProps, name='', horizontal=true, textProps=un
   }
 };
 
+/**
+ * This function creates a default property set for color widgets, used in panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * @param {object} valueProps value property object used by widget.
+ * 
+ * @returns {object} Data object for color elements, used in panels.
+ */
 export function defaultPanelMeterProps(name, parent, font, valueProps){
   const boxProps = defaultPanelSliderBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
   return meterProperties(boxProps, name, true, textProps, false, true, valueProps)
 };
 
+/**
+ * This function creates a default property set for color widgets with value text, used in panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * @param {object} valueProps value property object used by widget.
+ * 
+ * @returns {object} Data object for color elements, used in panels.
+ */
 export function defaultPanelValueMeterProps(name, parent, font, valueProps){
   const boxProps = defaultPanelSliderBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
   return meterProperties(boxProps, name, true, textProps, true, true, valueProps)
 };
 
+/**
+ * This function creates a meter widget based on passed property set.
+ * @param {object} widgetProps (widgetProperties) property set.
+ * 
+ * @returns {object} MeterWidget class object.
+ */
 export class MeterWidget extends SliderWidget {
   constructor(widgetProps) {
     super(widgetProps);
@@ -3734,7 +3908,23 @@ export function createMeter(meterProps) {
   }
 };
 
-
+/**
+ * This function creates a property set toggle widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} [name=''] name for the element.
+ * @param {bool} [horizontal=true] if true toggle is horizontal, else vertical.
+ * @param {bool} [defaultColor='#ffffff'] if true initial state of widget is toggled(on), else off.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {bool} [useValueText=true] if true toggle has a text portal for value.
+ * @param {bool} [useAlpha=true] alpha property of color is set by widget.
+ * @param {bool} [draggable=true] if true, widgets hadles are draggable.
+ * @param {number} [alpha=100] Alpha value.
+ * @param {bool} [meter=false] if true, slider elements use meter bars, instead of handles.
+ * @param {string} [colorValueType='hex'] value type generated by widget.
+ * @param {object} [objectControlProps=undefined] slot for object that will be updated by widget.
+ * 
+ * @returns {object} Data object for toggle elements.
+ */
 export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex', objectControlProps=undefined ){
   return {
     'type': 'COLOR_WIDGET',
@@ -3755,12 +3945,26 @@ export function colorWidgetProperties(boxProps, name='', horizontal=true, defaul
   }
 };
 
+/**
+ * This function creates a default property set for color widgets.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data object for color elements.
+ */
 export function defaultPanelColorWidgetProps(name, parent, font){
   const boxProps = defaultPanelColorWidgetBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
   return colorWidgetProperties(boxProps, name, true, '#ffffff', textProps)
 };
 
+/**
+ * This function creates a color widget based on passed property set.
+ * @param {object} widgetProps (widgetProperties) property set.
+ * 
+ * @returns {object} ColorWidget class object.
+ */
 export class ColorWidget extends BaseWidget {
   constructor(widgetProps) {
     let colorWidgetProps = ColorWidget.ColorWidgetProps(widgetProps);
@@ -3984,6 +4188,13 @@ export class ColorWidget extends BaseWidget {
 
 };
 
+/**
+ * This function creates a color (inset inside of parent, 
+ * rendered using stencil ref)widget based on passed property set.
+ * @param {object} colorWidgetProps (colorWidgetProperties) Properties used for toggle widget.
+ * 
+ * @returns {null} no return value.
+ */
 export function createColorWidget(colorWidgetProps) {
   colorWidgetProps.useValueText = true;
   if(typeof colorWidgetProps.textProps.font === 'string'){
@@ -3997,12 +4208,28 @@ export function createColorWidget(colorWidgetProps) {
   }
 };
 
+/**
+ * This function creates a color portal(inset inside of parent, 
+ * rendered using stencil ref)widget based on passed property set.
+ * @param {object} colorWidgetProps (colorWidgetProperties) Properties used for toggle widget.
+ * 
+ * @returns {null} no return value.
+ */
 export function createColorWidgetPortal(colorWidgetProps) {
   colorWidgetProps.useValueText = true;
   colorWidgetProps.boxProps.isPortal = true;
   createColorWidget(colorWidgetProps);
 };
 
+/**
+ * This function creates string value property set for toggle widgets.
+ * @param {string} [defaultValue='Off'] default value of widget.
+ * @param {string} [onValue='On'] on value of widget.
+ * @param {string} [offValue='On'] off value of widget.
+ * @param {bool} [editable=false] if true attached text element is editable.
+ * 
+ * @returns {object} Data value property object for toggle elements.
+ */
 export function stringValueProperties(defaultValue='Off', onValue='On', offValue='Off', editable=false){
   return {
     'type': 'STRING_VALUE_PROPS',
@@ -4013,6 +4240,20 @@ export function stringValueProperties(defaultValue='Off', onValue='On', offValue
   }
 };
 
+/**
+ * This function creates a property set toggle widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} [name=''] for the element.
+ * @param {bool} [horizontal=true] if true toggle is horizontal, else vertical.
+ * @param {bool} [on=false] if true initial state of widget is toggled(on), else off.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {bool} useValueText if true toggle has a text portal for value.
+ * @param {object} [valueProps=stringValueProperties] property set for value type of toggle widget.
+ * @param {number} [handleSize=2] size of handle on toggle.
+ * @param {object} [objectControlProps=undefined] slot for object that will be updated by widget.
+ * 
+ * @returns {object} Data object for toggle elements.
+ */
 export function toggleProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), handleSize=2, objectControlProps=undefined ){
   return {
     'type': 'TOGGLE',
@@ -4028,12 +4269,27 @@ export function toggleProperties(boxProps, name='', horizontal=true, on=false, t
   }
 };
 
+/**
+ * This function creates a default property set for toggle widgets.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {string} font path to the font json file.
+ * @param {bool} [on=false] initial toggled state of widget.
+ * 
+ * @returns {object} Data object for toggle elements.
+ */
 export function defaultPanelBooleanToggleProps(name, parent, font, on=false){
   const boxProps = defaultPanelToggleBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
   return toggleProperties(boxProps, name, true, on, textProps);
 }
 
+/**
+ * This function creates a toggle widget based on passed property set.
+ * @param {object} widgetProps (widgetProperties) property set.
+ * 
+ * @returns {object} ToggleWidget class object.
+ */
 export class ToggleWidget extends BaseWidget {
   constructor(widgetProps) {
 
@@ -4141,15 +4397,20 @@ export class ToggleWidget extends BaseWidget {
   }
 };
 
+/**
+ * This function sets required scrolling userdata vars on passed mergedMesh
+ */
 function setMergedMeshUserData(boxSize, geomSize, padding, mergedMesh){
   let extraSpace = padding*0.5;
   mergedMesh.userData.initialPositionY = boxSize.height/2 - geomSize.height/2;
   mergedMesh.userData.maxScroll = geomSize.height/2 - boxSize.height/2 - (padding+extraSpace);
   mergedMesh.userData.minScroll = mergedMesh.userData.initialPositionY+mergedMesh.userData.maxScroll+(padding-extraSpace);
   mergedMesh.userData.padding = padding;
-  mergedMesh.userData.settleThreshold = geomSize.height/50;
 }
 
+/**
+ * This function sets required mouse-over userdata vars on passed element
+ */
 function mouseOverUserData(elem){
   elem.userData.defaultScale =  new THREE.Vector3().copy(elem.scale);
   elem.userData.mouseOver =  false;
@@ -4157,6 +4418,13 @@ function mouseOverUserData(elem){
   elem.userData.hoverAnim = undefined;
 }
 
+/**
+ * This function creates a slider portal(inset inside of parent, 
+ * rendered using stencil ref)widget based on passed property set.
+ * @param {object} sliderProps (sliderProperties) Properties used for toggle widget.
+ * 
+ * @returns {null} no return value.
+ */
 function adjustBoxScaleRatio(box, parent){
   let ratio = parent.userData.ratio;
   let scaleX = parent.scale.x;
@@ -4173,6 +4441,18 @@ function adjustBoxScaleRatio(box, parent){
   box.userData.defaultScale = new THREE.Vector3().copy(box.scale);
 }
 
+/**
+ * This function creates a property set for list selector widgets.
+ * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
+ * @param {string} text the text that will be rendered.
+ * @param {object} [textProps=undefined] (textProperties) Properties of text.
+ * @param {object} [animProps=undefined] (animationProperties) animation properties for text.
+ * @param {object} [listConfig=undefined] (listItemConfig) if a list config is used, model will be attached to a list element.
+ * @param {bool} [scrollable=false] if true, text is scrollable.
+ * @param {bool} [MultiLetterMeshes=false] if true, text created with an individual mesh for each letter.
+ * 
+ * @returns {object} Data object for list selector elements.
+ */
 export function textBoxProperties( boxProps, text, textProps, animProps=undefined, listConfig=undefined, scrollable=false, MultiLetterMeshes=false){
   return {
     'type': 'TEXT_BOX',
@@ -4759,7 +5039,7 @@ export function selectorSet(set){
  * @param {string} name for the element.
  * @param {object} [textProps=undefined] (textProperties) Properties of text.
  * @param {object} [listConfig=undefined] (listItemConfig) if a list config is used, model will be attached to a list element.
- * @param {number} [objectControlProps=undefined] slot for object that will be updated by widget.
+ * @param {object} [objectControlProps=undefined] slot for object that will be updated by widget.
  * 
  * @returns {object} Data object for list selector elements.
  */
@@ -5853,7 +6133,6 @@ export function gltfProperties(boxProps, name='', gltf, listConfig=undefined, zO
 
 /**
  * This function creates a default property set for loading gltf model widgets.
- * @param {object} boxProps (boxProperties) Dimensions of element box mesh.
  * @param {string} name for the element.
  * @param {object} parent Object3D that the model widget should be parented to.
  * @param {string} font path to the font json file.
@@ -6282,6 +6561,13 @@ export class ListItemBox extends BaseBox {
 
 };
 
+/**
+ * This function creates a list of text elements.
+ * @param {object} textBoxProps (textBoxProperties) Properties used for text list.
+ * @param {object} contentArr array of text blocks to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createStaticTextList( textBoxProps, contentArr ) {
   let listConfig = textBoxProps.listConfig;
   if(listConfig.boxProps.parent.isScene)
@@ -6298,6 +6584,14 @@ export function createStaticTextList( textBoxProps, contentArr ) {
 
 };
 
+/**
+ *  This function creates a list of text element portals(inset inside of parent, 
+ * rendered using stencil ref) based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) Properties used for text list.
+ * @param {object} contentArr array of text blocks to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createStaticTextPortalList( textBoxProps, contentArr ) {
   let listConfig = textBoxProps.listConfig;
   if(listConfig.boxProps.parent.isScene)
@@ -6314,6 +6608,13 @@ export function createStaticTextPortalList( textBoxProps, contentArr ) {
 
 };
 
+/**
+ * This function creates a scrollable list of text elements.
+ * @param {object} textBoxProps (textBoxProperties) Properties used for text list.
+ * @param {object} contentArr array of text blocks to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createStaticScrollableTextList( textBoxProps, contentArr ) {
   if(listConfig.boxProps.parent.isScene)
     return;
@@ -6330,6 +6631,14 @@ export function createStaticScrollableTextList( textBoxProps, contentArr ) {
 
 };
 
+/**
+ *  This function creates a scrollable list of text element portals(inset inside of parent, 
+ * rendered using stencil ref) based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) Properties used for text list.
+ * @param {object} contentArr array of text blocks to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createStaticScrollableTextPortalList( textBoxProps, contentArr ) {
   let listConfig = textBoxProps.listConfig;
   if(listConfig.boxProps.parent.isScene)
@@ -6346,6 +6655,13 @@ export function createStaticScrollableTextPortalList( textBoxProps, contentArr )
 
 };
 
+/**
+ * This function creates a list of multi-mesh text elements.
+ * @param {object} textBoxProps (textBoxProperties) Properties used for text list.
+ * @param {object} contentArr array of text blocks to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createMultiTextList( textBoxProps, contentArr  ) {
   if(listConfig.boxProps.parent.isScene)
     return;
@@ -6362,6 +6678,15 @@ export function createMultiTextList( textBoxProps, contentArr  ) {
 
 };
 
+
+/**
+ *  This function creates a list of multi-mesh text element portals(inset inside of parent, 
+ * rendered using stencil ref) based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) Properties used for text list.
+ * @param {object} contentArr array of text blocks to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createMultiTextPortalList( textBoxProps, contentArr  ) {
   let listConfig = textBoxProps.listConfig;
   if(listConfig.boxProps.parent.isScene)
@@ -6378,6 +6703,13 @@ export function createMultiTextPortalList( textBoxProps, contentArr  ) {
 
 };
 
+/**
+ * This function creates a scrollable list of multi-mesh text elements.
+ * @param {object} textBoxProps (textBoxProperties) Properties used for text list.
+ * @param {object} contentArr array of text blocks to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createMultiScrollableTextList( textBoxProps, contentArr ) {
   if(listConfig.boxProps.parent.isScene)
     return;
@@ -6394,6 +6726,14 @@ export function createMultiScrollableTextList( textBoxProps, contentArr ) {
 
 };
 
+/**
+ *  This function creates a scrollable list of multi-mesh text element portals(inset inside of parent, 
+ * rendered using stencil ref) based on passed property set.
+ * @param {object} textBoxProps (textBoxProperties) Properties used for text list.
+ * @param {object} contentArr array of text blocks to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createMultiScrollableTextPortalList(textBoxProps, contentArr) {
   let listConfig = textBoxProps.listConfig;
   if(listConfig.boxProps.parent.isScene)
@@ -6410,6 +6750,13 @@ export function createMultiScrollableTextPortalList(textBoxProps, contentArr) {
 
 };
 
+/**
+ * This function creates a list of image elements.
+ * @param {object} imageProps (imageProperties) Properties used for image list.
+ * @param {object} contentArr array of images to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createImageContentList( imageProps, contentArr ) {
   if(listConfig.boxProps.parent.isScene)
     return;
@@ -6425,6 +6772,13 @@ export function createImageContentList( imageProps, contentArr ) {
 
 };
 
+/**
+ * This function creates a list of gltf model elements.
+ * @param {object} gltfProps (gltfProperties) Properties used for model list.
+ * @param {object} contentArr array of models to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createGLTFContentList(gltfProps, contentArr) {
   let listConfig = gltfProps.listConfig;
   if(listConfig.boxProps.parent.isScene)
@@ -6442,6 +6796,13 @@ export function createGLTFContentList(gltfProps, contentArr) {
 
 };
 
+/**
+ * This function creates a list of gltf model portal elements.
+ * @param {object} gltfProps (gltfProperties) Properties used for model list.
+ * @param {object} contentArr array of models to be rendered.
+ * 
+ * @returns {null} no return value.
+ */
 export function createGLTFContentPortalList(gltfProps, contentArr) {
   let listConfig = gltfProps.listConfig;
   if(listConfig.boxProps.parent.isScene)
@@ -6457,6 +6818,14 @@ export function createGLTFContentPortalList(gltfProps, contentArr) {
 
 };
 
+/**
+ * This function creates a translation controller to passed element.
+ * @param {object} elem target Object3D, that gizmo will be attached to.
+ * @param {object} camera camera currently used in scene.
+ * @param {object} renderer used in scene.
+ * 
+ * @returns {null} no return value.
+ */
 export function addTranslationControl(elem, camera, renderer){
   control = new TransformControls( camera, renderer.domElement );
   control.addEventListener( 'change', render );
@@ -6464,6 +6833,13 @@ export function addTranslationControl(elem, camera, renderer){
 };
 
 //INTERACTION HANDLERS
+
+/**
+ * This should be called on mouse down events, for interactions to work.
+ * @param {object} raycaster current raycaster in scene.
+ * 
+ * @returns {null} no return value.
+ */
 export function mouseDownHandler(raycaster){
   mouseDown = true;
   isDragging = true;
@@ -6497,6 +6873,12 @@ export function mouseDownHandler(raycaster){
   }
 }
 
+/**
+ * This should be called on mouse up events, for interactions to work.
+ * @param {object} raycaster current raycaster in scene.
+ * 
+ * @returns {null} no return value.
+ */
 export function mouseUpHandler(){
   mouseDown = false;
   isDragging = false;
@@ -6504,6 +6886,12 @@ export function mouseUpHandler(){
   toggleSceneCtrls(true);
 }
 
+/**
+ * This should be called on mouse move events, for interactions to work.
+ * @param {object} raycaster current raycaster in scene.
+ * 
+ * @returns {null} no return value.
+ */
 export function mouseMoveHandler(raycaster, event){
   const intersectsMouseOverable = raycaster.intersectObjects(mouseOverable);
   const intersectsselectorElems = raycaster.intersectObjects(selectorElems);
@@ -6586,7 +6974,7 @@ export function mouseMoveHandler(raycaster, event){
 
 }
 
-function inputTextYPosition(event, textMesh, boxSize, padding){
+function _inputTextYPosition(event, textMesh, boxSize, padding){
 
   let yPosition = textMesh.position.y;
   let textSize = getGeometrySize(textMesh.geometry);
@@ -6604,7 +6992,7 @@ function inputTextYPosition(event, textMesh, boxSize, padding){
 
 }
 
-function onEnterKey(event, textMesh, currentText, boxSize, padding){
+function _onEnterKey(event, textMesh, currentText, boxSize, padding){
   textMesh.dispatchEvent({type:'onEnter'});
 
   if(textMesh.widget == undefined){
@@ -6614,7 +7002,7 @@ function onEnterKey(event, textMesh, currentText, boxSize, padding){
   }
 }
 
-function onHandleTextGeometry(textMesh, currentText, boxSize){
+function _onHandleTextGeometry(textMesh, currentText, boxSize){
   if(textMesh.widget != undefined)//widgets update their own text geometry
     return;
 
@@ -6625,7 +7013,7 @@ function onHandleTextGeometry(textMesh, currentText, boxSize){
   }
 }
 
-function onHandleTypingText(event, textMesh, currentText, boxSize, padding){
+function _onHandleTypingText(event, textMesh, currentText, boxSize, padding){
   if(textMesh.widget == undefined){
     textMesh.userData.textProps.cBox.box.userData.currentText = currentText;
   }else{
@@ -6637,6 +7025,12 @@ function onHandleTypingText(event, textMesh, currentText, boxSize, padding){
   } 
 }
 
+/**
+ * This should be called on double click events, for interactions to work.
+ * @param {object} raycaster current raycaster in scene.
+ * 
+ * @returns {null} no return value.
+ */
 export function doubleClickHandler(raycaster){
   raycaster.layers.set(0);
   const intersectsInputPrompt = raycaster.intersectObjects(inputPrompts);
@@ -6659,17 +7053,17 @@ export function doubleClickHandler(raycaster){
       clickable.push(textMesh);
     }
 
-    let yPosition = inputTextYPosition(event, textMesh, boxSize, padding);
+    let yPosition = _inputTextYPosition(event, textMesh, boxSize, padding);
 
     // Listen for keyboard input
     window.addEventListener('keydown', (event) => {
 
         if (event.key === 'Enter') {;
-          onEnterKey(event, textMesh, currentText, boxSize, padding);
+          _onEnterKey(event, textMesh, currentText, boxSize, padding);
         } else if (event.key === 'Backspace') {
             // Handle backspace
             currentText = currentText.slice(0, -1);
-            onHandleTypingText(event, textMesh, currentText, boxSize, padding);
+            _onHandleTypingText(event, textMesh, currentText, boxSize, padding);
         } else if (event.key === 'Shift' || event.key === 'Control' || event.key === 'Capslock') {
 
         } else if (event.key === 'ArrowDown' ) {
@@ -6682,14 +7076,20 @@ export function doubleClickHandler(raycaster){
           }else{
             currentText += event.key;
           }
-          onHandleTypingText(event, textMesh, currentText, boxSize, padding);
+          _onHandleTypingText(event, textMesh, currentText, boxSize, padding);
 
         }
-        onHandleTextGeometry(textMesh, currentText, boxSize);
+        _onHandleTextGeometry(textMesh, currentText, boxSize);
       });
     }
 }
 
+/**
+ * This should be placed in the main update.
+ * @param {number} time delta from  update loop.
+ * 
+ * @returns {null} no return value.
+ */
 export function hvymUpdate(delta){
   gltfModels.forEach((model, idx) => {
     model.UpdateAnimation(delta);
