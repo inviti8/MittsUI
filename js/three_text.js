@@ -52,11 +52,7 @@ let inputPrompts = [];
 let inputText = [];
 let selectorElems = [];
 let toggles = [];
-let clippedMeshes = [];//Everything that is clipped locally needs to have the tranform matrixes updated in render
 let stencilRefs = [];//For assigning a unique stencil ref to each clipped material
-let meshViews = [];
-let portals = [];
-let panels = [];
 let gltfModels = [];
 
 //Interaction variables
@@ -114,18 +110,49 @@ export function MainSceneProperties(scene=undefined, mouse=undefined, camera=und
  */
 export class HVYM_Scene {
   constructor(sceneProps) {
+
+    this.posVar = new THREE.Vector3();
+    this.scaleVar = new THREE.Vector3();
+    this.draggable = [];
+    this.mouseOverable = [];
+    this.clickable = [];
+    this.inputPrompts = [];
+    this.inputText = [];
+    this.selectorElems = [];
+    this.toggles = [];
+    this.stencilRefs = [];//For assigning a unique stencil ref to each clipped material
+    this.gltfModels = [];
+
+    //Interaction variables
+    this.mouseDown = false;
+    this.isDragging = false;
+    this.lastDragged = undefined;
+    this.previousMouseX = 0;
+    this.previousMouseY = 0;
+    this.moveDir = 1;
+    this.dragDistX = 0;
+    this.dragDistY = 0;
+    this.lastClick = 0;
+    this.mouseOver = [];
+
     this.ambientLight = new THREE.AmbientLight(0x404040);
     this.ambientLight.name = 'MAIN_AMBIENT_LIGHT'
-    sceneProps.scene.add(ambientLight);
+    sceneProps.scene.add(this.ambientLight);
 
     this.directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     this.directionalLight.name = 'MAIN_DIRECTIONAL_LIGHT'
     this.directionalLight.position.set(1, 1, 1);
-    sceneProps.scene.add(directionalLight);
+    sceneProps.scene.add(this.directionalLight);
   }
   createMainSceneControls(mainSceneProps){
     this.camCtrls = new OrbitControls(mainSceneProps.camera, mainSceneProps.renderer.domElement);
     this.camCtrls.update(); // This is important to initialize the controls
+  }
+  getStencilRef(){
+    let ref = this.stencilRefs.length+1;
+    this.stencilRefs.push(ref);
+
+    return this.stencilRefs[stencilRefs.length-1]
   }
   toggleSceneCtrls(state){
     if(!this.camCtrls)
@@ -133,30 +160,214 @@ export class HVYM_Scene {
 
     this.camCtrls.enabled = state;
   }
+  mouseDownHandler(raycaster){
+    this.mouseDown = true;
+    this.isDragging = true;
+    this.previousMouseX = event.clientX;
+    this.previousMouseY = event.clientY;
+
+    const intersectsDraggable = raycaster.intersectObjects(this.draggable);
+    const intersectsClickable = raycaster.intersectObjects(this.clickable);
+    const intersectsToggle = raycaster.intersectObjects(this.toggles);
+
+    if ( intersectsDraggable.length > 0 ) {
+      console.log('intersects draggable')
+      this.lastDragged = intersectsDraggable[0].object;
+    }
+
+    if ( intersectsClickable.length > 0 ) {
+      console.log("Clickable")
+      let obj = intersectsClickable[0].object;
+      obj.dispatchEvent({type:'action'});
+
+      if(!this.clickable.includes(obj))
+        return;
+
+      clickAnimation(obj);
+
+    }
+
+    if ( intersectsToggle.length > 0 ) {
+      let obj = intersectsToggle[0].object;
+      obj.dispatchEvent({type:'action'});
+    }
+  }
+  mouseUpHandler(){
+    this.mouseDown = false;
+    this.isDragging = false;
+    this.lastDragged = undefined;
+    this.toggleSceneCtrls(true);
+  }
+  mouseMoveHandler(raycaster, event){
+    const intersectsMouseOverable = raycaster.intersectObjects(this.mouseOverable);
+    const intersectsselectorElems = raycaster.intersectObjects(this.selectorElems);
+    let canMouseOver = true;
+
+    if(intersectsMouseOverable.length > 0){
+
+      let elem = intersectsMouseOverable[0].object;
+
+      if(elem.userData.mouseOverParent != undefined){
+        canMouseOver = false;
+      }
+
+      if(!this.mouseOver.includes(elem) && canMouseOver){
+        elem.userData.mouseOver = true;
+        this.mouseOver.push(elem);
+        mouseOverAnimation(elem);
+      }
+
+    }else if(intersectsselectorElems.length > 0){
+
+      let e = intersectsselectorElems[0].object;
+      // console.log("elem")
+      if(e.parent.userData.selectors != undefined && !e.parent.userData.open){
+        selectorAnimation(e.parent);
+      }
+
+    }else{
+
+      this.mouseOver.forEach((elem, idx) => {
+        if(elem.userData.mouseOver && canMouseOver){
+          elem.userData.mouseOver = false;
+          mouseOverAnimation(elem);
+          mouseOver.splice(mouseOver.indexOf(elem));
+        }
+      });
+
+      this.selectorElems.forEach((elem, idx) => {
+        if(elem.parent.userData.selectors != undefined && elem.parent.userData.open){
+          selectorAnimation(elem.parent, 'CLOSE');
+        }
+      });
+    }
+
+    if (this.lastDragged != undefined && this.lastDragged.userData.draggable && this.mouseDown && this.isDragging) {
+      const deltaX = event.clientX - this.previousMouseX;
+      const deltaY = event.clientY - this.previousMouseY;
+      const dragPosition = this.lastDragged.position.clone();
+      this.toggleSceneCtrls(false);
+      if(!this.lastDragged.userData.horizontal){
+        dragDistY = deltaY;
+
+        if(deltaY<0){
+          moveDir=1
+        }else{
+          moveDir=-1;
+        }
+        // Limit scrolling
+        dragPosition.y = Math.max(this.lastDragged.userData.minScroll, Math.min(this.lastDragged.userData.maxScroll, dragPosition.y - deltaY * 0.01));
+        this.lastDragged.position.copy(dragPosition);
+        this.previousMouseY = event.clientY;
+        this.lastDragged.dispatchEvent({type:'action'});
+      }else{
+        dragDistX = deltaX;
+
+        if(deltaX<0){
+          moveDir=1
+        }else{
+          moveDir=-1;
+        }
+
+        // Limit scrolling
+        dragPosition.x = Math.max(this.lastDragged.userData.minScroll, Math.min(this.lastDragged.userData.maxScroll, dragPosition.x + deltaX * 0.01));
+        this.lastDragged.position.copy(dragPosition);
+        this.previousMouseX = event.clientX;
+        this.lastDragged.dispatchEvent({type:'action'});
+      }
+      
+    }
+
+  }
+  doubleClickHandler(raycaster){
+    raycaster.layers.set(0);
+    const intersectsInputPrompt = raycaster.intersectObjects(this.inputPrompts);
+
+    if(intersectsInputPrompt.length > 0){
+
+      let textMesh = intersectsInputPrompt[0].object;
+      let userData = textMesh.userData;
+      const textProps = textMesh.userData.textProps;
+
+      // Initialize variables for typing
+      let currentText = textProps.cBox.box.userData.currentText;
+      let boxSize = getGeometrySize(textProps.cBox.box.geometry);
+      let pos = new THREE.Vector3().copy(textMesh.position);
+      let padding = textProps.padding;
+
+      if(!textProps.draggable){
+        this.inputPrompts.push(textMesh);
+        this.mouseOverable.push(textMesh);
+        this.clickable.push(textMesh);
+      }
+
+      let yPosition = this._inputTextYPosition(event, textMesh, boxSize, padding);
+
+      // Listen for keyboard input
+      window.addEventListener('keydown', (event) => {
+
+          if (event.key === 'Enter') {;
+            this._onEnterKey(event, textMesh, currentText, boxSize, padding);
+          } else if (event.key === 'Backspace') {
+              // Handle backspace
+              currentText = currentText.slice(0, -1);
+              this._onHandleTypingText(event, textMesh, currentText, boxSize, padding);
+          } else if (event.key === 'Shift' || event.key === 'Control' || event.key === 'Capslock') {
+
+          } else if (event.key === 'ArrowDown' ) {
+
+          } else if (event.key === 'ArrowUp' ) {
+
+          } else {
+            if(event.shiftKey || event.capslock){
+              currentText += event.key.toUpperCase();
+            }else{
+              currentText += event.key;
+            }
+            this._onHandleTypingText(event, textMesh, currentText, boxSize, padding);
+
+          }
+          this._onHandleTextGeometry(textMesh, currentText, boxSize);
+        });
+      }
+  }
+  Update(delta){
+    this.gltfModels.forEach((model, idx) => {
+      model.UpdateAnimation(delta);
+    });
+  }
+  _onEnterKey(event, textMesh, currentText, boxSize, padding){
+    textMesh.dispatchEvent({type:'onEnter'});
+
+    if(textMesh.widget == undefined){
+      if(textMesh.userData.textProps.draggable){
+        this.draggable.push(textMesh);
+      }
+    }
+  }
+  _onHandleTextGeometry(textMesh, currentText, boxSize){
+    if(textMesh.widget != undefined)//widgets update their own text geometry
+      return;
+
+    let textProps = textMesh.userData.textProps;
+    if(currentText.length > 0){
+      textMesh.userData.currentText = currentText;
+      textMesh.dispatchEvent({type:'update'});
+    }
+  }
+  _onHandleTypingText(event, textMesh, currentText, boxSize, padding){
+    if(textMesh.widget == undefined){
+      textMesh.userData.textProps.cBox.box.userData.currentText = currentText;
+    }else{
+
+      if(!isNaN(currentText)){
+        textMesh.widget.box.userData.currentText = currentText;
+        textMesh.widget.SetValueText(currentText);
+      }
+    } 
+  }
 }
 
-export function createMainSceneControls(mainSceneProps){
-  SCENE_CTRLS = new OrbitControls(mainSceneProps.camera, mainSceneProps.renderer.domElement);
-  SCENE_CTRLS.update(); // This is important to initialize the controls
-}
-
-export function toggleSceneCtrls(state){
-  if(!SCENE_CTRLS)
-    return;
-
-  SCENE_CTRLS.enabled = state;
-}
-
-export function createMainSceneLighting(scene){
-  const ambientLight = new THREE.AmbientLight(0x404040);
-  ambientLight.name = 'MAIN_AMBIENT_LIGHT'
-  scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-  directionalLight.name = 'MAIN_DIRECTIONAL_LIGHT'
-  directionalLight.position.set(1, 1, 1);
-  scene.add(directionalLight);
-};
 
 function _randomNumber(min, max) {
   return Math.random() * (max - min) + min;
@@ -1385,146 +1596,6 @@ export function lightenMaterial(material, value, alpha=100){
   let c = colorsea('#'+material.color.getHexString(), alpha).lighten(value);
   material.color.set(c.hex());
 }
-
-/**
- * This function get constant draggable array.
- * @returns {array} draggable.
- * 
- */
-export function getDraggable(obj){
-  return draggable;
-};
-
-/**
- * This function adds draggable to array constant.
- * @param {object} add created draggable element to array.
- * 
- * @returns {null} no return.
- * 
- */
-export function addToDraggable(obj){
-  draggable.push(obj);
-};
-
-/**
- * This function get constant mouseoverable array.
- * @returns {array} mouseoverable.
- * 
- */
-export function getMouseOverable(){
-  return mouseOverable;
-};
-
-/**
- * This function adds mouseoverable to array constant.
- * @param {object} add created mouseoverable element to array.
- * 
- * @returns {null} no return.
- * 
- */
-export function addToMouseOverable(obj){
-  mouseOverable.push(obj);
-};
-
-/**
- * This function get constant clickable array.
- * @returns {array} clickable.
- * 
- */
-export function getClickable(){
-  return clickable;
-};
-
-/**
- * This function adds clickable to array constant.
- * @param {object} add created clickable element to array.
- * 
- * @returns {null} no return.
- * 
- */
-export function addClickable(obj){
-  clickable.push(obj);
-};
-
-/**
- * This function get constant input prompt array.
- * @returns {array} inputPrompts.
- * 
- */
-export function getInputPrompts(){
-  return inputPrompts;
-};
-
-/**
- * This function adds input prompt element to array constant.
- * @param {object} add created input prompt to array.
- * 
- * @returns {null} no return.
- * 
- */
-export function addToInputPrompts(obj){
-  inputPrompts.push(obj);
-};
-
-/**
- * This function get constant input text array.
- * @returns {array} inputText.
- * 
- */
-export function getInputText(){
-  return inputText;
-};
-
-/**
- * This function adds input text element to array constant.
- * @param {object} add created input text to array.
- * 
- * @returns {null} no return.
- * 
- */
-export function addToInputText(obj){
-  inputText.push(obj);
-};
-
-/**
- * This function get constant selector array.
- * @returns {array} selectorElems.
- * 
- */
-export function getSelectorElems(){
-  return selectorElems;
-};
-
-/**
- * This function adds selector element to array constant.
- * @param {object} add created selector to array.
- * 
- * @returns {null} no return.
- * 
- */
-export function addToSelectorElems(obj){
-  selectorElems.push(obj);
-};
-
-/**
- * This function get constant toggle array.
- * @returns {array} toggles.
- * 
- */
-export function getToggles(){
-  return toggles;
-};
-
-/**
- * This function adds toggle element to array constant.
- * @param {object} add created toggle to array.
- * 
- * @returns {null} no return.
- * 
- */
-export function addToToggles(obj){
-  toggles.push(obj);
-};
 
 /**
  * This function creates vector 3 position for the center of the parent.
@@ -2897,9 +2968,10 @@ export class BaseBox {
  * 
  * @returns {object} Data object for button elements.
  */
-export function buttonProperties(boxProps, name='Button', value='', textProps=undefined, mouseOver=false, attach='RIGHT', objectControlProps=undefined){
+export function buttonProperties( scene, boxProps, name='Button', value='', textProps=undefined, mouseOver=false, attach='RIGHT', objectControlProps=undefined){
   return {
     'type': 'BUTTON',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'value': value,
@@ -2918,11 +2990,11 @@ export function buttonProperties(boxProps, name='Button', value='', textProps=un
  * 
  * @returns {object} Data object for button elements, used in panels.
  */
-export function defaultPanelButtonProps(name, parent, font){
+export function defaultPanelButtonProps(scene, name, parent, font){
   const boxProps = defaultPanelButtonBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
 
-  return buttonProperties(boxProps, name, '', textProps, false, 'CENTER')
+  return buttonProperties(scene, boxProps, name, '', textProps, false, 'CENTER')
 };
 
 /**
@@ -2956,6 +3028,7 @@ class BaseTextBox extends BaseBox {
     }
     super(buttonProps.boxProps);
     this.is = 'BASE_TEXT_BOX';
+    this.scene = buttonProps.scene;
     this.objectControlProps = buttonProps.objectControlProps;
     this.text = buttonProps.name;
     this.textProps = buttonProps.textProps;
@@ -3020,7 +3093,7 @@ class BaseTextBox extends BaseBox {
  */
 export class PanelBox extends BaseTextBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(buttonProperties(panelProps.scene, panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.is = 'PANEL_BOX';
     this.SetParentPanel();
     this.DeleteText();
@@ -3036,7 +3109,7 @@ export class PanelBox extends BaseTextBox {
  */
 export class PanelLabel extends BaseTextBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(buttonProperties(panelProps.scene, panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.is = 'PANEL_LABEL';
     this.SetParentPanel();
     this.AlignOutsideBehindParent();
@@ -3051,8 +3124,9 @@ export class PanelLabel extends BaseTextBox {
  */
 export class PanelGltfModel extends BaseTextBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(buttonProperties(panelProps.scene, panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.is = 'PANEL_GLTF_MODEL';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
     this.AlignOutsideBehindParent();
     this.panelProps = panelProps;
@@ -3064,7 +3138,8 @@ export class PanelGltfModel extends BaseTextBox {
     if(!this.useLabel){
       this.DeleteText();
     }
-    let gltfProps = defaultPanelGltfModelProps(this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.path);
+
+    let gltfProps = defaultPanelGltfModelProps(this.scene, this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.path);
     gltfProps.ctrl = this;
 
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
@@ -3103,8 +3178,9 @@ export class PanelGltfModelMeter extends PanelGltfModel{
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_GLTF_MODEL_METER';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
-    this.meterProps = defaultPanelMeterProps(this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
+    this.meterProps = defaultPanelMeterProps(this.scene, this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
     this.DeleteText();
     this.loadedCallback = this.SetupMeter;
   }
@@ -3128,8 +3204,9 @@ export class PanelGltfModelValueMeter extends PanelGltfModelMeter{
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_GLTF_MODEL_VALUE_METER';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
-    this.meterProps = defaultPanelValueMeterProps(this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
+    this.meterProps = defaultPanelValueMeterProps(this.scene, this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
     this.loadedCallback = this.SetupValueMeter;
   }
   SetupValueMeter(){
@@ -3153,8 +3230,9 @@ export class PanelEditText extends PanelBox {
     super(panelProps);
     this.SetParentPanel();
     this.is = 'PANEL_EDIT_TEXT';
+    this.scene = panelProps.scene;
     const section = panelProps.sections.data[panelProps.name];
-    const editTextProps = defaultPanelEditTextProps(panelProps.name, this.box, panelProps.textProps.font);
+    const editTextProps = defaultPanelEditTextProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
     editTextProps.name = section.name;
     editTextProps.textProps.wrap = false;
     this.ctrlWidget = new InputTextWidget(editTextProps);
@@ -3172,9 +3250,10 @@ export class PanelInputText extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_INPUT_TEXT';
+    this.scene = panelProps.scene;
     const section = panelProps.sections.data[panelProps.name];
     this.SetParentPanel();
-    const inputTextProps = defaultPanelInputTextProps(panelProps.name, this.box, panelProps.textProps.font);
+    const inputTextProps = defaultPanelInputTextProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
     inputTextProps.name = section.name;
     inputTextProps.textProps.wrap = false;
     this.ctrlWidget = new InputTextWidget(inputTextProps);
@@ -3192,9 +3271,10 @@ export class PanelBooleanToggle extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_BOOLEAN_TOGGLE';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
     this.DeleteText();
-    const toggleProps = defaultPanelBooleanToggleProps(panelProps.name, this.box, panelProps.textProps.font);
+    const toggleProps = defaultPanelBooleanToggleProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new ToggleWidget(toggleProps);
 
   }
@@ -3210,6 +3290,7 @@ export class PanelSlider extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_SLIDER';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     let valProps = section.data;
@@ -3223,7 +3304,7 @@ export class PanelSlider extends PanelBox {
         valProps = section.data.val_props.valueProps
       }
     }
-    const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    const sliderProps = defaultPanelSliderProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, valProps);
     if(objectControlProps!=undefined){
       sliderProps.objectControlProps = objectControlProps;
     }
@@ -3242,11 +3323,12 @@ export class PanelMaterialSlider extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_MATERIAL_SLIDER';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     const matRefProps = section.data;
     matRefProps.valueProps.editable = true;
-    const sliderProps = defaultPanelSliderProps(panelProps.name, this.box, panelProps.textProps.font, matRefProps.valueProps);
+    const sliderProps = defaultPanelSliderProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, matRefProps.valueProps);
     sliderProps.objectControlProps = matRefProps;
     this.ctrlWidget = new SliderWidget(sliderProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -3263,13 +3345,14 @@ export class PanelMeter extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_METER';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     let valProps = section.data;
     if(valProps.type == 'HVYM_VAL_PROP_REF'){
       valProps = valProps.val_props;
     }
-    const meterProps = defaultPanelMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    const meterProps = defaultPanelMeterProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, valProps);
     this.ctrlWidget = new MeterWidget(meterProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   } 
@@ -3285,13 +3368,14 @@ export class PanelValueMeter extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_VALUE_METER';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     let valProps = section.data;
     if(valProps.type == 'HVYM_VAL_PROP_REF'){
       valProps = valProps.val_props;
     }
-    const meterProps = defaultPanelValueMeterProps(panelProps.name, this.box, panelProps.textProps.font, valProps);
+    const meterProps = defaultPanelValueMeterProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, valProps);
     this.ctrlWidget = new MeterWidget(meterProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -3307,8 +3391,9 @@ export class PanelColorWidget extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_COLOR_WIDGET';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
-    const colorWidgetProps = defaultPanelColorWidgetProps(panelProps.name, this.box, panelProps.textProps.font);
+    const colorWidgetProps = defaultPanelColorWidgetProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new ColorWidget(colorWidgetProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -3324,10 +3409,11 @@ export class PanelMaterialColorWidget extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_MATERIAL_COLOR_WIDGET';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     const matRefProps = section.data;
-    this.colorWidgetProps = defaultPanelColorWidgetProps(panelProps.name, this.box, panelProps.textProps.font);
+    this.colorWidgetProps = defaultPanelColorWidgetProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
     if(matRefProps.targetProp=='color'){
       matRefProps.useMaterialView = true;
       this.colorWidgetProps.useAlpha = true;
@@ -3352,6 +3438,7 @@ export class PanelListSelector extends PanelBox {
     panelProps.boxProps.matProps.useCase = 'STENCIL';
     super(panelProps);
     this.is = 'PANEL_LIST_SELECTOR';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     this.selectors = section.data;
@@ -3359,7 +3446,7 @@ export class PanelListSelector extends PanelBox {
     if(!dataIsHVYMWidget(this.selectors))
       return;
 
-    const listSelectorProps = defaultPanelListSelectorProps(panelProps.name, this.box, panelProps.textProps.font);
+    const listSelectorProps = defaultPanelListSelectorProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
     this.ctrlWidget = new SelectorWidget(listSelectorProps);
     this.ctrlWidget.box.userData.hoverZPos = this.size.depth*2;
     this.ctrlWidget.AssignSelectionSet(this.selectors);
@@ -3377,11 +3464,12 @@ export class PanelToggle extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_TOGGLE';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
     const section = panelProps.sections.data[panelProps.name];
     const sectionProps = section.data;
     let on = false;
-    let toggleProps = defaultPanelBooleanToggleProps(sectionProps.name, this.box, panelProps.textProps.font, false);
+    let toggleProps = defaultPanelBooleanToggleProps(this.scene, sectionProps.name, this.box, panelProps.textProps.font, false);
     if(sectionProps.type == 'HVYM_MESH_PROP_REF'){
       toggleProps.on = sectionProps.visible;
       toggleProps.objectControlProps = sectionProps.val_props;
@@ -3404,8 +3492,9 @@ export class PanelButton extends PanelBox {
   constructor(panelProps) {
     super(panelProps);
     this.is = 'PANEL_BUTTON';
+    this.scene = panelProps.scene;
     this.SetParentPanel();
-    const buttonProps = defaultPanelButtonProps(panelProps.name, this.box, panelProps.textProps.font)
+    const buttonProps = defaultPanelButtonProps(this.scene, panelProps.name, this.box, panelProps.textProps.font)
     this.ctrlWidget = ButtonElement(buttonProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -3541,9 +3630,10 @@ export function panelMaterialSetSectionPropertySet(materialSet){
  * 
  * @returns {object} Data object for panel elements.
  */
-export function panelProperties( boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
+export function panelProperties( scene, boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
   return {
     'type': 'PANEL',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'textProps': textProps,
@@ -3578,8 +3668,9 @@ export function hvymPanelProperties(parent, font){
  */
 export class BasePanel extends BaseTextBox {
   constructor(panelProps) {
-    super(buttonProperties(panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
+    super(buttonProperties(panelProps.scene, panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.is = 'BASE_PANEL';
+    this.scene = panelProps.scene;
     this.boxProps = panelProps.boxProps;
     this.name = panelProps.name;
     this.textProps = panelProps.textProps;
@@ -3725,7 +3816,7 @@ export class BasePanel extends BaseTextBox {
     result.userData.onRotation = new THREE.Vector3(result.rotation.x, result.rotation.y, result.rotation.z+0.8)
     result.userData.size = size;
     mouseOverUserData(result);
-    clickable.push(result);
+    this.scene.clickable.push(result);
 
     return result
   }
@@ -3921,11 +4012,9 @@ export function CreateBasePanel(panelProps) {
     loader.load(panelProps.textProps.font, (font) => {
       panelProps.textProps.font = font;
       let panel = new BasePanel(panelProps);
-      panels.push(panel);
     });
   }else if(panelProps.textProps.font.isFont){
     let panel = new BasePanel(panelProps);
-    panels.push(panel);
   } 
   
 };
@@ -3945,9 +4034,10 @@ export function CreateBasePanel(panelProps) {
  * 
  * @returns {object} Data object for widget elements.
  */
-export function widgetProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), listConfig=undefined, handleSize=2, objectControlProps=undefined ){
+export function widgetProperties(scene, boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), listConfig=undefined, handleSize=2, objectControlProps=undefined ){
   return {
     'type': 'WIDGET',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
@@ -4014,8 +4104,10 @@ export class BaseWidget extends BaseBox {
     }
 
     this.widgetText = this.WidgetText();
-    this.widgetTextSize = getGeometrySize(this.widgetText.geometry);
-
+    if(this.widgetText!=undefined){
+      this.widgetTextSize = getGeometrySize(this.widgetText.geometry);
+    }
+    
     BaseWidget.SetUpObjectControlProps(this);
 
   }
@@ -4389,8 +4481,9 @@ export class ValueTextWidget extends BaseTextBox{
       valBoxProps.height=size.subHeight;
       valBoxProps.width=widgetProps.boxProps.width;
     }
-    super(buttonProperties(valBoxProps, defaultVal, widgetProps.value, textProps, false));
+    super(buttonProperties(widgetProps.scene, valBoxProps, defaultVal, widgetProps.value, textProps, false));
     this.is = 'VALUE_TEXT_WIDGET';
+    this.scene = widgetProps.scene;
     this.widgetSize = size;
     this.numeric = widgetProps.numeric;
     this.places = widgetProps.valueProps.places;
@@ -4437,7 +4530,7 @@ export class ValueTextWidget extends BaseTextBox{
     this.box.dispatchEvent({type:'onValueUpdated'});
   }
   EditableSetup(){
-    inputPrompts.push(this.textMesh);
+    this.scene.inputPrompts.push(this.textMesh);
     const textProps = this.box.userData.properties.textProps;
     const tProps = editTextProperties(this, '', this.textMesh, textProps.font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, false, textProps.meshProps);
     this.textMesh.userData.textProps = tProps;
@@ -4445,7 +4538,7 @@ export class ValueTextWidget extends BaseTextBox{
     this.box.userData.currentText = '';
     this.textMesh.userData.numeric = this.box.userData.properties.numeric;
     this.textMesh.widget = this;
-    mouseOverable.push(this.box);
+    this.scene.mouseOverable.push(this.box);
     mouseOverUserData(this.textMesh);
   }
   NumericValueValid(val){
@@ -4477,9 +4570,10 @@ export class ValueTextWidget extends BaseTextBox{
  * 
  * @returns {object} Data object for slider elements.
  */
-export function sliderProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, objectControlProps=undefined){
+export function sliderProperties(scene, boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, objectControlProps=undefined){
   return {
     'type': 'SLIDER',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
@@ -4502,10 +4596,10 @@ export function sliderProperties(boxProps, name='', horizontal=true, textProps=u
  * 
  * @returns {object} Data object for slider elements, used in panels.
  */
-export function defaultPanelSliderProps(name, parent, font, valueProps){
+export function defaultPanelSliderProps(scene, name, parent, font, valueProps){
   const boxProps = defaultPanelSliderBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
-  return sliderProperties(boxProps, name, true, textProps, true, true, valueProps)
+  return sliderProperties(scene, boxProps, name, true, textProps, true, true, valueProps)
 };
 
 /**
@@ -4519,8 +4613,9 @@ export class SliderWidget extends BaseWidget {
     widgetProps.textProps.align = 'LEFT';
     super(widgetProps);
     this.is = 'SLIDER_WIDGET';
+    this.scene = widgetProps.scene;
     if(widgetProps.valueProps.editable){
-      draggable.push(this.handle);
+      this.scene.draggable.push(this.handle);
     }
     
     if(this.box.userData.hasSubObject){
@@ -4697,9 +4792,10 @@ export class SliderWidget extends BaseWidget {
  * 
  * @returns {object} Data object for toggle elements.
  */
-export function meterProperties(boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, draggable=true, meterColor=SECONDARY_COLOR_A){
+export function meterProperties(scene, boxProps, name='', horizontal=true, textProps=undefined, useValueText=true, numeric=true, valueProps=numberValueProperties(), handleSize=8, draggable=true, meterColor=SECONDARY_COLOR_A){
   return {
     'type': 'METER',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
@@ -4722,10 +4818,10 @@ export function meterProperties(boxProps, name='', horizontal=true, textProps=un
  * 
  * @returns {object} Data object for color elements, used in panels.
  */
-export function defaultPanelMeterProps(name, parent, font, valueProps){
+export function defaultPanelMeterProps(scene, name, parent, font, valueProps){
   const boxProps = defaultPanelSliderBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
-  return meterProperties(boxProps, name, true, textProps, false, true, valueProps)
+  return meterProperties(scene, boxProps, name, true, textProps, false, true, valueProps)
 };
 
 /**
@@ -4737,10 +4833,10 @@ export function defaultPanelMeterProps(name, parent, font, valueProps){
  * 
  * @returns {object} Data object for color elements, used in panels.
  */
-export function defaultPanelValueMeterProps(name, parent, font, valueProps){
+export function defaultPanelValueMeterProps(scene, name, parent, font, valueProps){
   const boxProps = defaultPanelSliderBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
-  return meterProperties(boxProps, name, true, textProps, true, true, valueProps)
+  return meterProperties(scene, boxProps, name, true, textProps, true, true, valueProps)
 };
 
 /**
@@ -4837,9 +4933,10 @@ export function createMeter(meterProps) {
  * 
  * @returns {object} Data object for toggle elements.
  */
-export function colorWidgetProperties(boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex', objectControlProps=undefined ){
+export function colorWidgetProperties(scene, boxProps, name='', horizontal=true, defaultColor='#ffffff', textProps=undefined, useValueText=true, useAlpha=true, draggable=true, alpha=100, meter=true, colorValueType='hex', objectControlProps=undefined ){
   return {
     'type': 'COLOR_WIDGET',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
@@ -4865,10 +4962,10 @@ export function colorWidgetProperties(boxProps, name='', horizontal=true, defaul
  * 
  * @returns {object} Data object for color elements.
  */
-export function defaultPanelColorWidgetProps(name, parent, font){
+export function defaultPanelColorWidgetProps(scene, name, parent, font){
   const boxProps = defaultPanelColorWidgetBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
-  return colorWidgetProperties(boxProps, name, true, '#ffffff', textProps)
+  return colorWidgetProperties(scene, boxProps, name, true, '#ffffff', textProps)
 };
 
 /**
@@ -4885,6 +4982,7 @@ export class ColorWidget extends BaseWidget {
     }
     super(colorWidgetProps.base);
     this.is = 'COLOR_WIDGET';
+    this.scene = widgetProps.scene;
     this.value = widgetProps.defaultColor;
     this.isMeter = widgetProps.meter;
 
@@ -5166,9 +5264,10 @@ export function stringValueProperties(defaultValue='Off', onValue='On', offValue
  * 
  * @returns {object} Data object for toggle elements.
  */
-export function toggleProperties(boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), handleSize=2, objectControlProps=undefined ){
+export function toggleProperties(scene, boxProps, name='', horizontal=true, on=false, textProps=undefined, useValueText=true, valueProps=stringValueProperties(), handleSize=2, objectControlProps=undefined ){
   return {
     'type': 'TOGGLE',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'horizontal': horizontal,
@@ -5190,10 +5289,10 @@ export function toggleProperties(boxProps, name='', horizontal=true, on=false, t
  * 
  * @returns {object} Data object for toggle elements.
  */
-export function defaultPanelBooleanToggleProps(name, parent, font, on=false){
+export function defaultPanelBooleanToggleProps(scene, name, parent, font, on=false){
   const boxProps = defaultPanelToggleBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
-  return toggleProperties(boxProps, name, true, on, textProps);
+  return toggleProperties(scene, boxProps, name, true, on, textProps);
 }
 
 /**
@@ -5207,6 +5306,7 @@ export class ToggleWidget extends BaseWidget {
 
     super(widgetProps);
     this.is = 'TOGGLE_WIDGET';
+    this.scene = widgetProps.scene;
     this.on = widgetProps.on;
     
     if(this.box.userData.hasSubObject){
@@ -5220,7 +5320,7 @@ export class ToggleWidget extends BaseWidget {
       this.handle.userData.onPos = this.handleCtrl.TopCenterBoxPos();
     }
 
-    toggles.push(this.handle);
+    this.scene.toggles.push(this.handle);
 
     if(widgetProps.valueProps.defaultValue == widgetProps.valueProps.onValue){
       this.handle.position.copy(this.handle.userData.onPos);
@@ -5365,9 +5465,10 @@ function adjustBoxScaleRatio(box, parent){
  * 
  * @returns {object} Data object for list selector elements.
  */
-export function textBoxProperties( boxProps, text, textProps, animProps=undefined, listConfig=undefined, scrollable=false, MultiLetterMeshes=false){
+export function textBoxProperties( scene, boxProps, text, textProps, animProps=undefined, listConfig=undefined, scrollable=false, MultiLetterMeshes=false){
   return {
     'type': 'TEXT_BOX',
+    'scene': scene,
     'boxProps': boxProps,
     'text': text,
     'textProps': textProps,
@@ -5403,10 +5504,12 @@ export function createToggleBox(toggleProps) {
     loader.load(toggleProps.textProps.font, (font) => {
       toggleProps.textProps.font = font;
       let toggle = new ToggleWidget(toggleProps);
+      toggle.scene.toggles.push(toggle.handle);
 
     });
   }else if(toggleProps.textProps.font.isFont){
     let toggle = new ToggleWidget(toggleProps);
+    toggle.scene.toggles.push(toggle.handle);
   }
 };
 
@@ -5427,7 +5530,7 @@ function TogglePortal(toggleProps) {
   toggle.handle.material.depthWrite = false;
   toggleProps.boxProps.parent.add(toggle.box);
   toggle.box.position.set(toggle.box.position.x, toggle.box.position.y, toggle.box.position.z+parentSize.depth/2);
-  toggles.push(toggle.handle);
+  toggle.scene.toggles.push(toggle.handle);
 
 }
 
@@ -5459,9 +5562,10 @@ export function createTogglePortal(toggleProps) {
 export class TextBoxWidget extends BaseWidget {
   constructor(textBoxProps) {
     const textProps = textBoxProps.textProps;
-    let widgetProps = widgetProperties(textBoxProps.boxProps, "", true, true, textProps, false, undefined, textBoxProps.listConfig, 0);
+    let widgetProps = widgetProperties(textBoxProps.scene, textBoxProps.boxProps, "", true, true, textProps, false, undefined, textBoxProps.listConfig, 0);
     super(widgetProps);
     this.is = 'TEXT_BOX_WIDGET';
+    this.scene = textBoxProps.scene;
     this.textMeshMaterial = getMaterial(textProps.matProps);
     this.textProps = textProps;
     this.textMesh = this.BaseText.NewTextMesh('textMesh', textBoxProps.text);
@@ -5485,7 +5589,7 @@ export class TextBoxWidget extends BaseWidget {
     this.HandleListConfig(textBoxProps.listConfig);
 
     if(textProps.draggable){
-      draggable.push(this.textMesh);
+      this.scene.draggable.push(this.textMesh);
     }
     if(textBoxProps.animProps!=undefined){
       //anim, action, duration, ease, delay, onComplete
@@ -5696,9 +5800,10 @@ export class InputTextWidget extends BaseWidget {
       textInputProps.buttonProps.boxProps = btnBoxProps;
     }
     const textProps = textInputProps.textProps;
-    let widgetProps = widgetProperties(inputBoxProps, textInputProps.name, true, true, textProps, false, undefined, textInputProps.listConfig, 0)
+    let widgetProps = widgetProperties(textInputProps.scene, inputBoxProps, textInputProps.name, true, true, textProps, false, undefined, textInputProps.listConfig, 0)
     super(widgetProps);
     this.is = 'INPUT_TEXT_WIDGET';
+    this.scene = textInputProps.scene;
     this.defaultText = 'Enter Text';
     if(textInputProps.name.length>0){
       this.defaultText = textInputProps.name;
@@ -5717,7 +5822,7 @@ export class InputTextWidget extends BaseWidget {
       this.buttonProps = textInputProps.buttonProps;
     }
     
-    mouseOverable.push(this.inputText);
+    this.scene.mouseOverable.push(this.inputText);
 
     if(this.buttonProps != undefined){
       this.button = this.AttachButton();
@@ -5726,14 +5831,14 @@ export class InputTextWidget extends BaseWidget {
     this.HandleTextInputSetup();
   }
   HandleTextInputSetup(){
-    inputPrompts.push(this.inputText);
+    this.scene.inputPrompts.push(this.inputText);
     let textProps = this.box.userData.properties.textProps;
     let draggable = this.box.userData.properties.draggable;
     const editProps = editTextProperties(this, '', this.inputText, textProps.font, textProps.size, textProps.height, textProps.zOffset, textProps.letterSpacing, textProps.lineSpacing, textProps.wordSpacing, textProps.padding, draggable, textProps.meshProps);
     this.inputText.userData.textProps = editProps;
     this.box.userData.mouseOverParent = true;
     this.box.userData.currentText = '';
-    mouseOverable.push(this.box);
+    this.scene.mouseOverable.push(this.box);
     mouseOverUserData(this.inputText);
     if(this.box.userData.properties.isPortal){
       setupStencilMaterial(this.box.material, this.box.material.stencilRef);
@@ -5834,9 +5939,10 @@ export function defaultTextInputPortalBoxProps(parent){
  * 
  * @returns {object} Data object for list selector elements.
  */
-export function textInputProperties(boxProps, name='', textProps=undefined, buttonProps=undefined, draggable=false){
+export function textInputProperties( scene, boxProps, name='', textProps=undefined, buttonProps=undefined, draggable=false){
   return {
     'type': 'INPUT_TEXT',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'textProps': textProps,
@@ -5854,11 +5960,11 @@ export function textInputProperties(boxProps, name='', textProps=undefined, butt
  * 
  * @returns {object} Data object for edit text elements.
  */
-export function defaultPanelEditTextProps(name, parent, font){
+export function defaultPanelEditTextProps(scene, name, parent, font){
   const boxProps = defaultPanelEditTextBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
   textProps.editText = true;
-  return textInputProperties(boxProps, name, textProps);
+  return textInputProperties(scene, boxProps, name, textProps);
 }
 
 /**
@@ -5870,12 +5976,12 @@ export function defaultPanelEditTextProps(name, parent, font){
  * 
  * @returns {object} Data object for edit text elements in panels.
  */
-export function defaultPanelInputTextProps(name, parent, font){
+export function defaultPanelInputTextProps(scene, name, parent, font){
   const boxProps = defaultPanelEditTextBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
   const btnBoxProps = defaultEditTextButtonBoxProps(name, parent);
   const btnProps = buttonProperties(btnBoxProps, name, '', textProps)
-  return textInputProperties(boxProps, name, textProps, btnProps);
+  return textInputProperties(scene, boxProps, name, textProps, btnProps);
 }
 
 /**
@@ -5955,9 +6061,10 @@ export function selectorSet(set){
  * 
  * @returns {object} Data object for list selector elements.
  */
-export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name='', textProps=undefined, listConfig=undefined, objectControlProps=undefined){
+export function listSelectorProperties( scene, boxProps=defaultTextInputBoxProps(), name='', textProps=undefined, listConfig=undefined, objectControlProps=undefined){
   return {
     'type': 'LIST_SELECTOR',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'textProps': textProps,
@@ -5975,10 +6082,10 @@ export function listSelectorProperties(boxProps=defaultTextInputBoxProps(), name
  * 
  * @returns {object} Data object for list selector elements.
  */
-export function defaultPanelListSelectorProps(name, parent, font){
+export function defaultPanelListSelectorProps(scene, name, parent, font){
   const boxProps = defaultPanelListSelectorBoxProps(name, parent);
   const textProps = defaultWidgetTextProperties(font);
-  const listSelectorProps = listSelectorProperties(boxProps, name, textProps)
+  const listSelectorProps = listSelectorProperties(scene, boxProps, name, textProps)
 
   return listSelectorProps
 };
@@ -6022,9 +6129,10 @@ export class SelectorWidget extends BaseWidget {
       listSelectorProps.boxProps.matProps.useCase = 'STENCIL_CHILD';
       listSelectorProps.textProps.matProps.useCase = 'STENCIL_CHILD';
     }
-    let widgetProps = widgetProperties(btnBoxProps, listSelectorProps.name, true, true, btnTextProps, false, undefined, listSelectorProps.listConfig, 0)
+    let widgetProps = widgetProperties(listSelectorProps.scene, btnBoxProps, listSelectorProps.name, true, true, btnTextProps, false, undefined, listSelectorProps.listConfig, 0)
     super(widgetProps);
     this.is = 'SELCTOR_WIDGET';
+    this.scene = listSelectorProps.scene;
     this.isHVYM = false;
     this.isPortal = isPortal;
     this.box.userData.properties = listSelectorProps;
@@ -6060,7 +6168,7 @@ export class SelectorWidget extends BaseWidget {
 
     for (const [key, val] of Object.entries(this.selectors)) {
       let props = this.box.userData.properties;
-      let btnProps = buttonProperties({...this.btnBoxProps}, key, val, props.textProps);
+      let btnProps = buttonProperties(this.scene, {...this.btnBoxProps}, key, val, props.textProps);
       if(val.type == 'HVYM_MAT_SET_REF'){
         val.mat_ref.userData.mat_ref_props = materialRefPropertiesFromMaterial(val.mat_ref, 'color', true);
         val.mat_ref.userData.mat_ref_props.isHVYM = this.isHVYM;
@@ -6072,16 +6180,16 @@ export class SelectorWidget extends BaseWidget {
 
       const editProps = editTextProperties(btn, '', this.btnTextProps.textMesh, this.btnTextProps.font, this.btnTextProps.size, this.btnTextProps.height, this.btnTextProps.zOffset, this.btnTextProps.letterSpacing, this.btnTextProps.lineSpacing, this.btnTextProps.wordSpacing, this.btnTextProps.padding, true, this.btnTextProps.meshProps);
       btn.textMesh.userData.textProps = editProps;
-      inputPrompts.push(btn.textMesh);
-      mouseOverable.push(btn.textMesh);
-      clickable.push(btn.textMesh);
+      this.scene.inputPrompts.push(btn.textMesh);
+      this.scene.mouseOverable.push(btn.textMesh);
+      this.scene.clickable.push(btn.textMesh);
       btn.box.name = key;
       
       this.SetUserData(btn, key, val, idx);
       mouseOverUserData(btn.textMesh);
 
       this.box.userData.selectors.push(btn.box);
-      selectorElems.push(btn.box);
+      this.scene.selectorElems.push(btn.box);
       this.box.add(btn.box);
         
       btn.textMesh.addEventListener('action', function(event) {
@@ -6223,9 +6331,9 @@ function ButtonElement(buttonProps){
   btn.textMesh.userData.mouseOverParent = true;
 
   mouseOverUserData(btn.box);
-  clickable.push(btn.box);
+  btn.scene.clickable.push(btn.box);
   if(mouseOver){
-    mouseOverable.push(btn.box);
+    btn.scene.mouseOverable.push(btn.box);
   }
 
   btn.box.userData.properties = buttonProps;
@@ -6373,9 +6481,10 @@ export function createSliderBox(sliderProps) {
  * 
  * @returns {object} Data object for gltf model elements.
  */
-export function imageProperties(boxProps, name='', imgUrl, padding=0.01, listConfig=undefined, zOffset=0){
+export function imageProperties( scene, boxProps, name='', imgUrl, padding=0.01, listConfig=undefined, zOffset=0){
   return {
     'type': 'IMAGE',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'imgUrl': imgUrl,
@@ -6395,7 +6504,7 @@ export class ImageWidget extends BaseWidget {
   constructor(imageProps) {
     let textProps = {...DEFAULT_TEXT_PROPS};
     imageProps.boxProps.isPortal = true;
-    let widgetProps = widgetProperties(imageProps.boxProps, imageProps.name, true, true, textProps, false, undefined, imageProps.listConfig, 0);
+    let widgetProps = widgetProperties(imageProps.scene, imageProps.boxProps, imageProps.name, true, true, textProps, false, undefined, imageProps.listConfig, 0);
     super(widgetProps);
     this.is = 'IMAGE_WIDGET';
     this.map = new THREE.TextureLoader().load( imageProps.imgUrl );
@@ -6798,13 +6907,13 @@ export class HVYM_Data {
 
     return panelSectionProperties('sections', 'container', mainData);
   }
-  panelHVYMCollectionPropertyList(parent, textProps){
+  panelHVYMCollectionPropertyList(scene, parent, textProps){
     let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', parent);
     let colPanels = [];
 
     for (const [colId, collection] of Object.entries(this.collections)) {
       let topSectionData = this.createHVYMCollectionWidgetData(collection);
-      let colPanel = panelProperties( panelBoxProps, collection.collectionName, textProps, 'LEFT', topSectionData);
+      let colPanel = panelProperties( scene, panelBoxProps, collection.collectionName, textProps, 'LEFT', topSectionData);
       colPanels.push(colPanel);
     }
 
@@ -7031,9 +7140,10 @@ export function modelValueProperties(path=0, useLabel=true, widgetValueProp=unde
  * 
  * @returns {object} Data object for gltf model elements.
  */
-export function gltfProperties(boxProps, name='', gltf, listConfig=undefined, zOffset=0){
+export function gltfProperties( scene, boxProps, name='', gltf, listConfig=undefined, zOffset=0){
   return {
     'type': 'GLTF',
+    'scene': scene,
     'boxProps': boxProps,
     'name': name,
     'gltf': gltf,
@@ -7052,12 +7162,12 @@ export function gltfProperties(boxProps, name='', gltf, listConfig=undefined, zO
  * 
  * @returns {object} Data object for gltf model elements.
  */
-export function defaultPanelGltfModelProps(name, parent, font, modelPath){
+export function defaultPanelGltfModelProps(scene, name, parent, font, modelPath){
   const boxProps = defaultPanelGltfModelBoxProps(name, parent);
   boxProps.isPortal = true;
   boxProps.matProps.useCase = 'STENCIL';
   const textProps = defaultWidgetTextProperties(font);
-  return gltfProperties(boxProps, name, modelPath)
+  return gltfProperties(scene, boxProps, name, modelPath)
 }
 
 /**
@@ -7069,9 +7179,10 @@ export function defaultPanelGltfModelProps(name, parent, font, modelPath){
 export class GLTFModelWidget extends BaseWidget {
   constructor(gltfProps) {
     let textProps = {...DEFAULT_TEXT_PROPS};
-    let widgetProps = widgetProperties(gltfProps.boxProps, gltfProps.name, true, true, textProps, false, undefined, gltfProps.listConfig, 0);
+    let widgetProps = widgetProperties(gltfProps.scene, gltfProps.boxProps, gltfProps.name, true, true, textProps, false, undefined, gltfProps.listConfig, 0);
     super(widgetProps);
     this.is = 'GLTF_MODEL_WIDGET';
+    this.scene = gltfProps.scene;
     this.hvymData = gltfProps.hvymData;
     this.box.properties = gltfProps;
     const boxSize = getGeometrySize(this.box.geometry);
@@ -7118,7 +7229,7 @@ export class GLTFModelWidget extends BaseWidget {
         // Load the font
         loader.load(panelTextProps.font, (font) => {
           panelTextProps.font = font;
-          const panelPropList = this.hvymData.panelHVYMCollectionPropertyList(this.box, panelTextProps, this.isPortal);
+          const panelPropList = this.hvymData.panelHVYMCollectionPropertyList(this.scene, this.box, panelTextProps, this.isPortal);
           this.CreateHVYMPanel(panelPropList);
           this.isHVYM = true;
         });
@@ -7183,12 +7294,12 @@ function GLTFModelWidgetLoader(gltfProps){
       DEFAULT_TEXT_PROPS.font = font;
       ListItemBox.SetListConfigFont(gltfProps.listConfig, font);
       let model = new GLTFModelWidget(gltfProps);
-      gltfModels.push(model);
+      model.scene.gltfModels.push(model);
     });
   }else if(DEFAULT_TEXT_PROPS.font.isFont){
     ListItemBox.SetListConfigFont(gltfProps.listConfig, DEFAULT_TEXT_PROPS.font);
     let model = new GLTFModelWidget(gltfProps);
-    gltfModels.push(model);
+    model.scene.gltfModels.push(model);
   }
 }
 
@@ -7324,9 +7435,10 @@ export function GLTFDragAndDrop(parent) {
  * 
  * @returns {object} Data object for configuring List Items.
  */
-export function listItemConfig(boxProps, textProps,  animProps, infoProps, useTimeStamp=true, spacing=0, childInset=0.9, index=0){
+export function listItemConfig( scene, boxProps, textProps,  animProps, infoProps, useTimeStamp=true, spacing=0, childInset=0.9, index=0){
   return {
     'type': 'LIST_CONFIG',
+    'scene': scene,
     'boxProps': boxProps,
     'textProps': textProps,
     'animProps': animProps,
@@ -7748,268 +7860,3 @@ export function addTranslationControl(elem, camera, renderer){
   control.addEventListener( 'change', render );
   control.attach( elem );
 };
-
-//INTERACTION HANDLERS
-
-/**
- * This should be called on mouse down events, for interactions to work.
- * @param {object} raycaster current raycaster in scene.
- * 
- * @returns {null} no return value.
- */
-export function mouseDownHandler(raycaster){
-  mouseDown = true;
-  isDragging = true;
-  previousMouseX = event.clientX;
-  previousMouseY = event.clientY;
-
-  const intersectsDraggable = raycaster.intersectObjects(draggable);
-  const intersectsClickable = raycaster.intersectObjects(clickable);
-  const intersectsToggle = raycaster.intersectObjects(toggles);
-
-  if ( intersectsDraggable.length > 0 ) {
-    console.log('intersects draggable')
-    lastDragged = intersectsDraggable[0].object;
-  }
-
-  if ( intersectsClickable.length > 0 ) {
-    console.log("Clickable")
-    let obj = intersectsClickable[0].object;
-    obj.dispatchEvent({type:'action'});
-
-    if(!clickable.includes(obj))
-      return;
-
-    clickAnimation(obj);
-
-  }
-
-  if ( intersectsToggle.length > 0 ) {
-    let obj = intersectsToggle[0].object;
-    obj.dispatchEvent({type:'action'});
-  }
-}
-
-/**
- * This should be called on mouse up events, for interactions to work.
- * @param {object} raycaster current raycaster in scene.
- * 
- * @returns {null} no return value.
- */
-export function mouseUpHandler(){
-  mouseDown = false;
-  isDragging = false;
-  lastDragged = undefined;
-  toggleSceneCtrls(true);
-}
-
-/**
- * This should be called on mouse move events, for interactions to work.
- * @param {object} raycaster current raycaster in scene.
- * 
- * @returns {null} no return value.
- */
-export function mouseMoveHandler(raycaster, event){
-  const intersectsMouseOverable = raycaster.intersectObjects(mouseOverable);
-  const intersectsselectorElems = raycaster.intersectObjects(selectorElems);
-  let canMouseOver = true;
-
-  if(intersectsMouseOverable.length > 0){
-
-    let elem = intersectsMouseOverable[0].object;
-
-    if(elem.userData.mouseOverParent != undefined){
-      canMouseOver = false;
-    }
-
-    if(!mouseOver.includes(elem) && canMouseOver){
-      elem.userData.mouseOver = true;
-      mouseOver.push(elem);
-      mouseOverAnimation(elem);
-    }
-
-  }else if(intersectsselectorElems.length > 0){
-
-    let e = intersectsselectorElems[0].object;
-    // console.log("elem")
-    if(e.parent.userData.selectors != undefined && !e.parent.userData.open){
-      selectorAnimation(e.parent);
-    }
-
-  }else{
-
-    mouseOver.forEach((elem, idx) => {
-      if(elem.userData.mouseOver && canMouseOver){
-        elem.userData.mouseOver = false;
-        mouseOverAnimation(elem);
-        mouseOver.splice(mouseOver.indexOf(elem));
-      }
-    });
-
-    selectorElems.forEach((elem, idx) => {
-      if(elem.parent.userData.selectors != undefined && elem.parent.userData.open){
-        selectorAnimation(elem.parent, 'CLOSE');
-      }
-    });
-  }
-
-  if (lastDragged != undefined && lastDragged.userData.draggable && mouseDown && isDragging) {
-    const deltaX = event.clientX - previousMouseX;
-    const deltaY = event.clientY - previousMouseY;
-    const dragPosition = lastDragged.position.clone();
-    toggleSceneCtrls(false);
-    if(!lastDragged.userData.horizontal){
-      dragDistY = deltaY;
-
-      if(deltaY<0){
-        moveDir=1
-      }else{
-        moveDir=-1;
-      }
-      // Limit scrolling
-      dragPosition.y = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll, dragPosition.y - deltaY * 0.01));
-      lastDragged.position.copy(dragPosition);
-      previousMouseY = event.clientY;
-      lastDragged.dispatchEvent({type:'action'});
-    }else{
-      dragDistX = deltaX;
-
-      if(deltaX<0){
-        moveDir=1
-      }else{
-        moveDir=-1;
-      }
-
-      // Limit scrolling
-      dragPosition.x = Math.max(lastDragged.userData.minScroll, Math.min(lastDragged.userData.maxScroll, dragPosition.x + deltaX * 0.01));
-      lastDragged.position.copy(dragPosition);
-      previousMouseX = event.clientX;
-      lastDragged.dispatchEvent({type:'action'});
-    }
-    
-  }
-
-}
-
-function _inputTextYPosition(event, textMesh, boxSize, padding){
-
-  let yPosition = textMesh.position.y;
-  let textSize = getGeometrySize(textMesh.geometry);
-
-  if(textMesh.widget == undefined){
-    if (event.key === 'Enter') {
-      yPosition=boxSize.height-boxSize.height;
-      textMesh.dispatchEvent({type:'onEnter'});
-    }else{
-      yPosition=textSize.height-padding;
-    }
-  }
-
-  return yPosition
-
-}
-
-function _onEnterKey(event, textMesh, currentText, boxSize, padding){
-  textMesh.dispatchEvent({type:'onEnter'});
-
-  if(textMesh.widget == undefined){
-    if(textMesh.userData.textProps.draggable){
-      draggable.push(textMesh);
-    }
-  }
-}
-
-function _onHandleTextGeometry(textMesh, currentText, boxSize){
-  if(textMesh.widget != undefined)//widgets update their own text geometry
-    return;
-
-  let textProps = textMesh.userData.textProps;
-  if(currentText.length > 0){
-    textMesh.userData.currentText = currentText;
-    textMesh.dispatchEvent({type:'update'});
-  }
-}
-
-function _onHandleTypingText(event, textMesh, currentText, boxSize, padding){
-  if(textMesh.widget == undefined){
-    textMesh.userData.textProps.cBox.box.userData.currentText = currentText;
-  }else{
-
-    if(!isNaN(currentText)){
-      textMesh.widget.box.userData.currentText = currentText;
-      textMesh.widget.SetValueText(currentText);
-    }
-  } 
-}
-
-/**
- * This should be called on double click events, for interactions to work.
- * @param {object} raycaster current raycaster in scene.
- * 
- * @returns {null} no return value.
- */
-export function doubleClickHandler(raycaster){
-  raycaster.layers.set(0);
-  const intersectsInputPrompt = raycaster.intersectObjects(inputPrompts);
-
-  if(intersectsInputPrompt.length > 0){
-
-    let textMesh = intersectsInputPrompt[0].object;
-    let userData = textMesh.userData;
-    const textProps = textMesh.userData.textProps;
-
-    // Initialize variables for typing
-    let currentText = textProps.cBox.box.userData.currentText;
-    let boxSize = getGeometrySize(textProps.cBox.box.geometry);
-    let pos = new THREE.Vector3().copy(textMesh.position);
-    let padding = textProps.padding;
-
-    if(!textProps.draggable){
-      inputPrompts.push(textMesh);
-      mouseOverable.push(textMesh);
-      clickable.push(textMesh);
-    }
-
-    let yPosition = _inputTextYPosition(event, textMesh, boxSize, padding);
-
-    // Listen for keyboard input
-    window.addEventListener('keydown', (event) => {
-
-        if (event.key === 'Enter') {;
-          _onEnterKey(event, textMesh, currentText, boxSize, padding);
-        } else if (event.key === 'Backspace') {
-            // Handle backspace
-            currentText = currentText.slice(0, -1);
-            _onHandleTypingText(event, textMesh, currentText, boxSize, padding);
-        } else if (event.key === 'Shift' || event.key === 'Control' || event.key === 'Capslock') {
-
-        } else if (event.key === 'ArrowDown' ) {
-
-        } else if (event.key === 'ArrowUp' ) {
-
-        } else {
-          if(event.shiftKey || event.capslock){
-            currentText += event.key.toUpperCase();
-          }else{
-            currentText += event.key;
-          }
-          _onHandleTypingText(event, textMesh, currentText, boxSize, padding);
-
-        }
-        _onHandleTextGeometry(textMesh, currentText, boxSize);
-      });
-    }
-}
-
-/**
- * This should be placed in the main update.
- * @param {number} time delta from  update loop.
- * 
- * @returns {null} no return value.
- */
-export function hvymUpdate(delta){
-  gltfModels.forEach((model, idx) => {
-    model.UpdateAnimation(delta);
-  });
-};
-
