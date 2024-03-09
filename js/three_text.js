@@ -45,29 +45,7 @@ const loader = new FontLoader();
 const gltfLoader = new GLTFLoader();
 let posVar = new THREE.Vector3();
 let scaleVar = new THREE.Vector3();
-let draggable = [];
-let mouseOverable = [];
-let clickable = [];
-let inputPrompts = [];
-let inputText = [];
-let selectorElems = [];
-let toggles = [];
 let stencilRefs = [];//For assigning a unique stencil ref to each clipped material
-let gltfModels = [];
-
-//Interaction variables
-let mouseDown = false;
-let isDragging = false;
-let lastDragged = undefined;
-let previousMouseX = 0;
-let previousMouseY = 0;
-let moveDir = 1;
-let dragDistX = 0;
-let dragDistY = 0;
-let lastClick = 0;
-let mouseOver = [];
-
-let SCENE_CTRLS = undefined;
 
 const DEFAULT_FONT = 'fonts/Generic_Techno_Regular.json';
 let DEFAULT_TEXT_PROPS = textProperties( DEFAULT_FONT, 0.02, 0.1, 0.1, 0.1, 0.05, 0.05, 1);
@@ -103,16 +81,17 @@ export function MainSceneProperties(scene=undefined, mouse=undefined, camera=und
 };
 
 /**
- * This function creates a new scene, sets up lighting.
+ * This function creates a new scene, sets up lighting,
+ * handles scene interactions and updates.
  * @param {object} gltf loaded gltf object.
  * 
  * @returns {object} Heavymeta scene class object.
  */
 export class HVYM_Scene {
   constructor(sceneProps) {
-
-    this.posVar = new THREE.Vector3();
-    this.scaleVar = new THREE.Vector3();
+    this.scene = sceneProps.scene;
+    this.anims = new HVYM_Animation();
+    this.raycaster = sceneProps.raycaster;
     this.draggable = [];
     this.mouseOverable = [];
     this.clickable = [];
@@ -160,15 +139,15 @@ export class HVYM_Scene {
 
     this.camCtrls.enabled = state;
   }
-  mouseDownHandler(raycaster){
+  mouseDownHandler(){
     this.mouseDown = true;
     this.isDragging = true;
     this.previousMouseX = event.clientX;
     this.previousMouseY = event.clientY;
 
-    const intersectsDraggable = raycaster.intersectObjects(this.draggable);
-    const intersectsClickable = raycaster.intersectObjects(this.clickable);
-    const intersectsToggle = raycaster.intersectObjects(this.toggles);
+    const intersectsDraggable = this.raycaster.intersectObjects(this.draggable);
+    const intersectsClickable = this.raycaster.intersectObjects(this.clickable);
+    const intersectsToggle = this.raycaster.intersectObjects(this.toggles);
 
     if ( intersectsDraggable.length > 0 ) {
       console.log('intersects draggable')
@@ -183,7 +162,7 @@ export class HVYM_Scene {
       if(!this.clickable.includes(obj))
         return;
 
-      clickAnimation(obj);
+      this.anims.clickAnimation(obj);
 
     }
 
@@ -198,9 +177,9 @@ export class HVYM_Scene {
     this.lastDragged = undefined;
     this.toggleSceneCtrls(true);
   }
-  mouseMoveHandler(raycaster, event){
-    const intersectsMouseOverable = raycaster.intersectObjects(this.mouseOverable);
-    const intersectsselectorElems = raycaster.intersectObjects(this.selectorElems);
+  mouseMoveHandler(event){
+    const intersectsMouseOverable = this.raycaster.intersectObjects(this.mouseOverable);
+    const intersectsselectorElems = this.raycaster.intersectObjects(this.selectorElems);
     let canMouseOver = true;
 
     if(intersectsMouseOverable.length > 0){
@@ -214,7 +193,7 @@ export class HVYM_Scene {
       if(!this.mouseOver.includes(elem) && canMouseOver){
         elem.userData.mouseOver = true;
         this.mouseOver.push(elem);
-        mouseOverAnimation(elem);
+        this.anims.mouseOverAnimation(elem);
       }
 
     }else if(intersectsselectorElems.length > 0){
@@ -222,7 +201,7 @@ export class HVYM_Scene {
       let e = intersectsselectorElems[0].object;
       // console.log("elem")
       if(e.parent.userData.selectors != undefined && !e.parent.userData.open){
-        selectorAnimation(e.parent);
+        this.anims.selectorAnimation(e.parent);
       }
 
     }else{
@@ -230,14 +209,14 @@ export class HVYM_Scene {
       this.mouseOver.forEach((elem, idx) => {
         if(elem.userData.mouseOver && canMouseOver){
           elem.userData.mouseOver = false;
-          mouseOverAnimation(elem);
-          mouseOver.splice(mouseOver.indexOf(elem));
+          this.anims.mouseOverAnimation(elem);
+          this.mouseOver.splice(this.mouseOver.indexOf(elem));
         }
       });
 
       this.selectorElems.forEach((elem, idx) => {
         if(elem.parent.userData.selectors != undefined && elem.parent.userData.open){
-          selectorAnimation(elem.parent, 'CLOSE');
+          this.anims.selectorAnimation(elem.parent, 'CLOSE');
         }
       });
     }
@@ -279,9 +258,9 @@ export class HVYM_Scene {
     }
 
   }
-  doubleClickHandler(raycaster){
-    raycaster.layers.set(0);
-    const intersectsInputPrompt = raycaster.intersectObjects(this.inputPrompts);
+  doubleClickHandler(){
+    this.raycaster.layers.set(0);
+    const intersectsInputPrompt = this.raycaster.intersectObjects(this.inputPrompts);
 
     if(intersectsInputPrompt.length > 0){
 
@@ -421,602 +400,600 @@ export function infoProperties(title, author){
   }
 };
 
-/**
- * This function animates text elements.
- * @param {object} elem the Object3D to be animated.
- * @param {string} [anim='FADE'] this is a localized constant to the function.
- * @param {string} [anim='IN'] this is a localized constant for fading animation in or out.
- * @param {number} [duration=0.07] the duration of the animation.
- * @param {string} [easeIn='power1.inOut'] easing in constant for animation.
- * @param {number} [delay=0.007] the delay before animation plays.
- * @param {number} [delayIdx=0] this is a delay multiplier, which acts to stagger animations played consecutively.
- * 
- * @returns {null} No return.
- * 
- */
-function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, delayIdx=0, onComplete=undefined){
-  const top = box.userData.height/2+10;
-  const bottom = top-box.userData.height-10;
-  const right = box.userData.width;
-  const left = -box.userData.width;
-  let props = {};
+export class HVYM_Animation {
+  constructor() {
+    this.posVar = new THREE.Vector3();
+    this.scaleVar = new THREE.Vector3();
+  }
+  /**
+   * This function animates text elements.
+   * @param {object} elem the Object3D to be animated.
+   * @param {string} [anim='FADE'] this is a localized constant to the function.
+   * @param {string} [anim='IN'] this is a localized constant for fading animation in or out.
+   * @param {number} [duration=0.07] the duration of the animation.
+   * @param {string} [easeIn='power1.inOut'] easing in constant for animation.
+   * @param {number} [delay=0.007] the delay before animation plays.
+   * @param {number} [delayIdx=0] this is a delay multiplier, which acts to stagger animations played consecutively.
+   * 
+   * @returns {null} No return.
+   * 
+   */
+  txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, delayIdx=0, onComplete=undefined){
+    const top = box.userData.height/2+10;
+    const bottom = top-box.userData.height-10;
+    const right = box.userData.width;
+    const left = -box.userData.width;
+    let props = {};
 
-  switch (anim) {
-      case 'FADE':
-        let opacityTarget = 1;
-        if(action == 'OUT'){
-          opacityTarget = 0;
-        }else{
-          txt.material.opacity=0;
-        }
-        props = {duration: duration, opacity: opacityTarget, ease: ease };
-        if(onComplete != undefined){
-          props.onComplete = onComplete;
-        }
-        gsap.to(txt.material, props).delay(delay*delayIdx);
-        break;
-      case 'SCALE':
-        if(action == 'OUT'){
-          scaleVar.set(0,0,0);
-        }else{
-          scaleVar.copy(txt.scale);
-          txt.scale.set(0,0,0);
-          txt.material.opacity=1;
-        }
-        props = {duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: ease };
-        if(onComplete != undefined){
-          props.onComplete = onComplete;
-        }
-        gsap.to(txt.scale, props).delay(delay*delayIdx);
-        break;
-      case 'SLIDE_DOWN':
-        if(txt.position.y>bottom){
+    switch (anim) {
+        case 'FADE':
+          let opacityTarget = 1;
           if(action == 'OUT'){
-            posVar.set(txt.position.x, top, txt.position.z);
-            txt.material.opacity=1;
+            opacityTarget = 0;
           }else{
-            posVar.copy(txt.position);
-            txt.position.set(txt.position.x, top, txt.position.z);
+            txt.material.opacity=0;
+          }
+          props = {duration: duration, opacity: opacityTarget, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+          gsap.to(txt.material, props).delay(delay*delayIdx);
+          break;
+        case 'SCALE':
+          if(action == 'OUT'){
+            this.scaleVar.set(0,0,0);
+          }else{
+            this.scaleVar.copy(txt.scale);
+            txt.scale.set(0,0,0);
             txt.material.opacity=1;
           }
-          props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
+          props = {duration: duration, x: this.scaleVar.x, y: this.scaleVar.y, z: this.scaleVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+          gsap.to(txt.scale, props).delay(delay*delayIdx);
+          break;
+        case 'SLIDE_DOWN':
+          if(txt.position.y>bottom){
+            if(action == 'OUT'){
+              this.posVar.set(txt.position.x, top, txt.position.z);
+              txt.material.opacity=1;
+            }else{
+              this.posVar.copy(txt.position);
+              txt.position.set(txt.position.x, top, txt.position.z);
+              txt.material.opacity=1;
+            }
+            props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
+            if(onComplete != undefined){
+              props.onComplete = onComplete;
+            }
+
+            gsap.to(txt.position, props).delay(delay*delayIdx);
+          }
+          break;
+        case 'SLIDE_UP':
+          if(action == 'OUT'){
+            this.posVar.set(txt.position.x, bottom, txt.position.z);
+          }else{
+            this.posVar.copy(txt.position);
+            txt.position.set(txt.position.x, bottom, txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+
+            gsap.to(txt.position, props).delay(delay*delayIdx);
+          break;
+        case 'SLIDE_RIGHT':
+          if(action == 'OUT'){
+              this.posVar.set(right, txt.position.y, txt.position.z);
+          }else{
+            this.posVar.copy(txt.position);
+            txt.position.set(right, txt.position.y, txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
+
+            gsap.to(txt.position, props).delay(delay*delayIdx);
+          break;
+        case 'SLIDE_LEFT':
+          if(action == 'OUT'){
+            this.posVar.set(left, txt.position.y, txt.position.z);
+          }else{
+            this.posVar.copy(txt.position);
+            txt.position.set(left, txt.position.y, txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
           if(onComplete != undefined){
             props.onComplete = onComplete;
           }
 
           gsap.to(txt.position, props).delay(delay*delayIdx);
-        }
-        break;
-      case 'SLIDE_UP':
-        if(action == 'OUT'){
-          posVar.set(txt.position.x, bottom, txt.position.z);
-        }else{
-          posVar.copy(txt.position);
-          txt.position.set(txt.position.x, bottom, txt.position.z);
-          txt.material.opacity=1;
-        }
-        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-        if(onComplete != undefined){
-          props.onComplete = onComplete;
-        }
+          break;
+        case 'UNSCRAMBLE0':
+          if(action == 'OUT'){
+            this.posVar.set(txt.position.x+_randomNumber(-0.1, 0.1), txt.position.y+_randomNumber(-0.1, 0.1), txt.position.z);
+          }else{
+            this.posVar.copy(txt.position);
+            txt.position.set(txt.position.x+_randomNumber(-0.1, 0.1), txt.position.y+_randomNumber(-0.1, 0.1), txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
 
           gsap.to(txt.position, props).delay(delay*delayIdx);
-        break;
-      case 'SLIDE_RIGHT':
-        if(action == 'OUT'){
-            posVar.set(right, txt.position.y, txt.position.z);
-        }else{
-          posVar.copy(txt.position);
-          txt.position.set(right, txt.position.y, txt.position.z);
-          txt.material.opacity=1;
-        }
-        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-        if(onComplete != undefined){
-          props.onComplete = onComplete;
-        }
+          break;
+        case 'UNSCRAMBLE1':
+          if(action == 'OUT'){
+            this.posVar.set(txt.position.x+_randomNumber(-1, 1), txt.position.y+_randomNumber(-1, 1), txt.position.z);
+          }else{
+            this.posVar.copy(txt.position);
+            txt.position.set(txt.position.x+_randomNumber(-1, 1), txt.position.y+_randomNumber(-1, 1), txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
 
           gsap.to(txt.position, props).delay(delay*delayIdx);
-        break;
-      case 'SLIDE_LEFT':
-        if(action == 'OUT'){
-          posVar.set(left, txt.position.y, txt.position.z);
-        }else{
-          posVar.copy(txt.position);
-          txt.position.set(left, txt.position.y, txt.position.z);
-          txt.material.opacity=1;
-        }
-        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-        if(onComplete != undefined){
-          props.onComplete = onComplete;
-        }
+          break;
+        case 'UNSCRAMBLE2':
+          if(action == 'OUT'){
+            this.posVar.set(txt.position.x+_randomNumber(-2, 2), txt.position.y+_randomNumber(-2, 2), txt.position.z);
+          }else{
+            this.posVar.copy(txt.position);
+            txt.position.set(txt.position.x+_randomNumber(-2, 2), txt.position.y+_randomNumber(-2, 2), txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
 
-        gsap.to(txt.position, props).delay(delay*delayIdx);
-        break;
-      case 'UNSCRAMBLE0':
-        if(action == 'OUT'){
-          posVar.set(txt.position.x+_randomNumber(-0.1, 0.1), txt.position.y+_randomNumber(-0.1, 0.1), txt.position.z);
-        }else{
-          posVar.copy(txt.position);
-          txt.position.set(txt.position.x+_randomNumber(-0.1, 0.1), txt.position.y+_randomNumber(-0.1, 0.1), txt.position.z);
-          txt.material.opacity=1;
-        }
-        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-        if(onComplete != undefined){
-          props.onComplete = onComplete;
-        }
+          gsap.to(txt.position, props).delay(delay*delayIdx);
+          break;
+        case 'SPIRAL':
+          if(action == 'OUT'){
+              this.posVar.set(right, top, txt.position.z);
+          }else{
+            this.posVar.copy(txt.position);
+            txt.position.set(right, top, txt.position.z);
+            txt.material.opacity=1;
+          }
+          props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: 'cubic-bezier(0.55,0.055,0.675,0.19)' };
+          if(onComplete != undefined){
+            props.onComplete = onComplete;
+          }
 
-        gsap.to(txt.position, props).delay(delay*delayIdx);
-        break;
-      case 'UNSCRAMBLE1':
-        if(action == 'OUT'){
-          posVar.set(txt.position.x+_randomNumber(-1, 1), txt.position.y+_randomNumber(-1, 1), txt.position.z);
-        }else{
-          posVar.copy(txt.position);
-          txt.position.set(txt.position.x+_randomNumber(-1, 1), txt.position.y+_randomNumber(-1, 1), txt.position.z);
-          txt.material.opacity=1;
-        }
-        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-        if(onComplete != undefined){
-          props.onComplete = onComplete;
-        }
-
-        gsap.to(txt.position, props).delay(delay*delayIdx);
-        break;
-      case 'UNSCRAMBLE2':
-        if(action == 'OUT'){
-          posVar.set(txt.position.x+_randomNumber(-2, 2), txt.position.y+_randomNumber(-2, 2), txt.position.z);
-        }else{
-          posVar.copy(txt.position);
-          txt.position.set(txt.position.x+_randomNumber(-2, 2), txt.position.y+_randomNumber(-2, 2), txt.position.z);
-          txt.material.opacity=1;
-        }
-        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
-        if(onComplete != undefined){
-          props.onComplete = onComplete;
-        }
-
-        gsap.to(txt.position, props).delay(delay*delayIdx);
-        break;
-      case 'SPIRAL':
-        if(action == 'OUT'){
-            posVar.set(right, top, txt.position.z);
-        }else{
-          posVar.copy(txt.position);
-          txt.position.set(right, top, txt.position.z);
-          txt.material.opacity=1;
-        }
-        props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: 'cubic-bezier(0.55,0.055,0.675,0.19)' };
-        if(onComplete != undefined){
-          props.onComplete = onComplete;
-        }
-
-        gsap.to(txt.position, props).delay(delay*delayIdx);
-        break;
-      default:
-        console.log("");
-    }
-}
-
-/**
- * This function animates multi text elements.
- * @param {object} elem the Object3D to be animated.
- * @param {string} [anim='FADE'] this is a localized constant to the function.
- * @param {string} [easeIn='power1.in'] easing in constant for animation.
- * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
- * 
- * @returns {null} No return.
- * 
- */
-function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
-  let delayIdx=0;
-  const top = box.userData.height/2+5;
-  const bottom = top-box.userData.height-5;
-
-  txtArr.forEach((txt, i) => {
-    if(txt.position.y>bottom){
-      txtAnimation(box, txt, anim, action, duration, ease, delay, delayIdx, onComplete);
-      delayIdx+=1;
-    }
-  });
-
-};
-
-/**
- * This function animates an element for mouseover.
- * @param {object} elem the Object3D to be animated.
- * @param {string} [anim='SCALE'] this is a localized constant to the function.
- * @param {string} [easeIn='power1.in'] easing in constant for animation.
- * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
- * 
- * @returns {null} No return.
- * 
- */
-export function mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power1.inOut", delay=0){
-
-  let doAnim = false;
-
-  if(elem==undefined)
-    return;
-
-  if(elem.userData.hoverAnim != undefined && elem.userData.hoverAnim.isActive())
-    return;
-
-  if(elem.userData.mouseOver && (elem.scale.x == elem.userData.defaultScale.x && elem.scale.y == elem.userData.defaultScale.z)){
-    scaleVar.set(elem.userData.defaultScale.x*1.1,elem.userData.defaultScale.y*1.1,elem.userData.defaultScale.z);
-    elem.userData.mouseOverActive = true;
-    doAnim=true;
-  }else if (!elem.userData.mouseOver && elem.userData.mouseOverActive && (elem.scale.x != elem.userData.defaultScale.x || elem.scale.y != elem.userData.defaultScale.z)){
-    elem.userData.mouseOverActive = false;
-    scaleVar.copy(elem.userData.defaultScale);
-    doAnim=true;
-  }
-
-  if(doAnim){
-    let props = { duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: ease };
-    elem.userData.hoverAnim = gsap.to(elem.scale, props);
-  }
-
-};
-
-/**
- * This function animates selector elements.
- * @param {object} elem the Object3D to be animated.
- * @param {string} [anim='OPEN'] this is a localized constant to the function.
- * @param {string} [duration=0.1] the duration of the animation.
- * @param {string} [easeIn='power1.in'] easing in constant for animation.
- * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
- * 
- * @returns {null} No return.
- * 
- */
-export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
-
-    let yPositions = [];
-    let zPositions = [];
-    let scales = [];
-    let selected = undefined;
-
-    elem.userData.selectors.forEach((c, idx) => {
-      let size = getGeometrySize(c.geometry);
-      let parentSize = getGeometrySize(c.parent.geometry);
-      let yPos = size.height*idx;
-      let zPos = c.userData.unselectedPos.z;
-      let sel = c.children[0].userData.selected;
-      c.material.renderOrder = 1;
-      if(sel){
-        selected = idx;
-        scales.push(c.userData.selectedScale);
-      }else{
-        scales.push(c.userData.unselectedScale);
+          gsap.to(txt.position, props).delay(delay*delayIdx);
+          break;
+        default:
+          console.log("");
       }
-      
-      if(anim=='CLOSE'){
-        yPos=0;
-        if(sel){
-          zPos = c.userData.selectedPos.z;
-          c.material.renderOrder = 2;
-        }
-      }
-      yPositions.push(-yPos);
-      zPositions.push(zPos);
-      if(idx>0){
-        yPositions.push(yPos);
+  }
+  /**
+   * This function animates multi text elements.
+   * @param {object} elem the Object3D to be animated.
+   * @param {string} [anim='FADE'] this is a localized constant to the function.
+   * @param {string} [easeIn='power1.in'] easing in constant for animation.
+   * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+   * 
+   * @returns {null} No return.
+   * 
+   */
+  multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
+    let delayIdx=0;
+    const top = box.userData.height/2+5;
+    const bottom = top-box.userData.height-5;
+
+    txtArr.forEach((txt, i) => {
+      if(txt.position.y>bottom){
+        this.txtAnimation(box, txt, anim, action, duration, ease, delay, delayIdx, onComplete);
+        delayIdx+=1;
       }
     });
 
-    elem.userData.open = true;
-    let portalScale = 1*(elem.userData.selectors.length+1);
-    if(anim=='CLOSE'){
-      elem.userData.open = false;
-      portalScale = 1;
-    }
-
-    if(anim=='OPEN' || anim=='CLOSE'){
-      for (let i = 0; i < elem.userData.selectors.length; i++) {
-        let current = elem.userData.selectors[i];
-        let props = { duration: duration, x: current.position.x, y: yPositions[i], z: zPositions[i], ease: easeIn };
-        gsap.to(current.position, props);
-        props = { duration: duration, x: scales[i], y: scales[i], z: scales[i], ease: easeIn};
-        gsap.to(current.scale, props);
-      }
-
-      if(elem.userData.hoverZPos!=undefined){
-        let props = {duration: duration, x: elem.position.x, y: elem.position.y, z: elem.userData.defaultZPos}
-        if(elem.userData.open){
-          props = {duration: duration, x: elem.position.x, y: elem.position.y, z:elem.userData.hoverZPos};
-        }
-        gsap.to(elem.position, props);
-      }
-
-      if(elem.userData.properties.isPortal){
-        let props = { duration: duration, 0: 0, ease: easeIn };
-        if(elem.userData.open){
-          props = { duration: duration, 0: 1, ease: easeIn };
-        }
-        gsap.to(elem.morphTargetInfluences, props);
-      }
-    }
-
-    if(anim=='SELECT'){
-      
-      let current = elem.userData.selectors[selected];
-      let currentY = current.position.y;
-      let last = current.parent.userData.lastSelected;
-      let props = { duration: duration, x: current.position.x, y: current.userData.selectedPos.y, z: current.userData.selectedPos.z, ease: easeIn };
-      gsap.to(current.position, props);
-      props = { duration: duration, x: current.userData.selectedScale, y: current.userData.selectedScale, z: current.userData.selectedScale, ease: easeIn };
-      gsap.to(current.scale, props);
-
-      if(last != undefined){
-        props = { duration: duration, x: last.position.x, y: currentY, z: zPositions[selected], ease: easeIn };
-        gsap.to(last.position, props);
-        props = { duration: duration, x: last.userData.unselectedScale, y: last.userData.unselectedScale, z: last.userData.unselectedScale, ease: easeIn };
-        gsap.to(last.scale, props);
-      }
-    }
-
-};
-
-/**
- * This function animates a toggle element.
- * @param {object} elem the Object3D to be animated.
- * @param {string} [duration=0.15] the duration of the animation.
- * @param {string} [easeIn='power1.in'] easing in constant for animation.
- * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
- * 
- * @returns {null} No return.
- * 
- */
-export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
-
-  if(elem.handle.userData.anim != false && gsap.isTweening( elem.handle.userData.anim ))
-  return;
-
-  let pos = elem.handle.userData.onPos;
-
-  if(elem.handle.userData.on){
-    pos=elem.handle.userData.offPos;
   }
+  /**
+   * This function animates an element for mouseover.
+   * @param {object} elem the Object3D to be animated.
+   * @param {string} [anim='SCALE'] this is a localized constant to the function.
+   * @param {string} [easeIn='power1.in'] easing in constant for animation.
+   * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+   * 
+   * @returns {null} No return.
+   * 
+   */
+  mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power1.inOut", delay=0){
 
-  let props = { duration: duration, x: pos.x, y: elem.handle.position.y, z: elem.handle.position.z, ease: easeIn, onComplete: ToggleWidget.DoToggle, onCompleteParams:[elem] };
+    let doAnim = false;
 
-  if(!elem.handle.userData.horizontal){
-    props = { duration: duration, x: elem.handle.position.x, y: pos.y, z: elem.handle.position.z, ease: easeIn, onComplete: ToggleWidget.DoToggle, onCompleteParams:[elem] };
-  }
-
-  elem.handle.userData.anim = gsap.to(elem.handle.position, props);
-
-};
-
-
-/**
- * This function animates panel elements.
- * @param {object} elem the Object3D to be animated.
- * @param {string} [anim='OPEN'] this is a localized constant to the function.
- * @param {string} [duration=0.1] the duration of the animation.
- * @param {string} [easeIn='power1.in'] easing in constant for animation.
- * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
- * 
- * @returns {null} No return.
- * 
- */
-export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.in", easeOut="elastic.Out"){
-
-  function panelAnimComplete(elem, props){
-    gsap.to(elem.scale, props);
-  }
-
-  function panelExpandComplete(elem){
-    if(elem.userData.properties.expanded)
+    if(elem==undefined)
       return;
-    elem.dispatchEvent({type:'hideWidgets'});
-  }
 
-  function handleRotate(handle, props){
-    gsap.to(handle.rotation, props);
-  }
+    if(elem.userData.hoverAnim != undefined && elem.userData.hoverAnim.isActive())
+      return;
 
-  if(anim == 'OPEN'){
-    let onScale = elem.userData.onScale;
-    let offScale = elem.userData.offScale;
-
-    if(!elem.userData.properties.open){
-
-      let rot = elem.userData.handleOpen.userData.onRotation;
-      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
-      handleRotate(elem.userData.handleOpen, props);
-
-      let yprops = { duration: duration, x: onScale.x, y: onScale.y, z: onScale.z, ease: easeOut };
-      let xprops = { duration: duration, x: onScale.x, y: offScale.y, z: onScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, yprops] };
-      
-      gsap.to(elem.scale, xprops);
-
-    }else if(elem.userData.properties.open){
-
-      let rot = elem.userData.handleOpen.userData.offRotation;
-      let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
-      handleRotate(elem.userData.handleOpen, props);
-
-      let xprops = { duration: duration, x: offScale.x, y: offScale.y, z: offScale.z, ease: easeOut};
-      let yprops = { duration: duration, x: onScale.x, y: offScale.y, z: onScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, xprops] };
-      
-      gsap.to(elem.scale, yprops);
-
+    if(elem.userData.mouseOver && (elem.scale.x == elem.userData.defaultScale.x && elem.scale.y == elem.userData.defaultScale.z)){
+      this.scaleVar.set(elem.userData.defaultScale.x*1.1,elem.userData.defaultScale.y*1.1,elem.userData.defaultScale.z);
+      elem.userData.mouseOverActive = true;
+      doAnim=true;
+    }else if (!elem.userData.mouseOver && elem.userData.mouseOverActive && (elem.scale.x != elem.userData.defaultScale.x || elem.scale.y != elem.userData.defaultScale.z)){
+      elem.userData.mouseOverActive = false;
+      scaleVar.copy(elem.userData.defaultScale);
+      doAnim=true;
     }
 
-    elem.userData.properties.open = !elem.userData.properties.open;
+    if(doAnim){
+      let props = { duration: duration, x: this.scaleVar.x, y: this.scaleVar.y, z: this.scaleVar.z, ease: ease };
+      elem.userData.hoverAnim = gsap.to(elem.scale, props);
+    }
+
   }
+  /**
+   * This function animates selector elements.
+   * @param {object} elem the Object3D to be animated.
+   * @param {string} [anim='OPEN'] this is a localized constant to the function.
+   * @param {string} [duration=0.1] the duration of the animation.
+   * @param {string} [easeIn='power1.in'] easing in constant for animation.
+   * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+   * 
+   * @returns {null} No return.
+   * 
+   */
+  selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
+      let yPositions = [];
+      let zPositions = [];
+      let scales = [];
+      let selected = undefined;
 
-  if(anim == 'EXPAND'){
-    
-    let expanded = elem.userData.properties.expanded;
-    let bottom = elem.userData.bottom;
-    let topHeight = elem.userData.size.height;
-    let bottomHeight = bottom.userData.size.height;
-    let elemHeight = topHeight+bottomHeight;
-    let yPos = -bottomHeight/2;
-    let sectionsLength = elem.userData.sectionElements.length;
-    let bottomYPos = -((bottomHeight/2+elemHeight * sectionsLength) + bottomHeight);
-    let thisIndex = elem.userData.index;
-    let parentBottom = elem.parent.userData.bottom;
-    let props = {};
-
-    if(elem.userData.sectionsValueTypes == 'container'){
-      //Move sub elements to correct positions
-      for (const obj of elem.userData.sectionElements) {
-        if(expanded){
-          let pos = obj.userData.expandedPos;
-          props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
-          gsap.to(obj.position, props);
-          //expand handle
-          props = { duration: duration, x: 1, y: 1, z: 1, ease: easeOut };
-          gsap.to(obj.userData.handleExpand.scale, props);
-        }else if(!expanded){
-          let pos = obj.userData.closedPos;
-          props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
-          gsap.to(obj.position, props);
-          //contract handle
-          props = { duration: duration, x: 0, y: 0, z: 0, ease: easeOut };
-          gsap.to(obj.userData.handleExpand.scale, props);
-        }
-      }
-    } else if(elem.userData.sectionsValueTypes == 'controls'){
-      sectionsLength = elem.userData.widgetElements.length;
-      let widgetHeight = elem.userData.widgetHeight;
-      bottomYPos = -((bottomHeight/2+widgetHeight * sectionsLength) + bottomHeight);
-
-      for (const obj of elem.userData.widgetElements) {
-        if(expanded){
-          let pos = obj.userData.expandedPos;
-          props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
-          gsap.to(obj.position, props);
-        }else if(!expanded){
-          let pos = obj.userData.closedPos;
-          props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
-          gsap.to(obj.position, props);
-        }
-      }
-    }
-
-    //Do animation for expand handle and move down bottom element of main container
-    if(expanded){
-      let rot = elem.userData.handleExpand.userData.onRotation;
-      props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
-      handleRotate(elem.userData.handleExpand, props);
-      let pos = bottom.userData.expandedPos;
-      props = { duration: duration, x: pos.x, y: bottomYPos, z: pos.z, ease: easeOut };
-      gsap.to(bottom.position, props);
-    }else if(!expanded){
-      let rot = elem.userData.handleExpand.userData.offRotation;
-      props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
-      handleRotate(elem.userData.handleExpand, props);
-      let pos = bottom.userData.closedPos;
-      bottomYPos = pos.y;
-      props = { duration: duration, x: pos.x, y: bottomYPos, z: pos.z, ease: easeOut };
-      gsap.to(bottom.position, props); 
-    }
-
-    //if a sub panel is opened, we need to manage positions of other sub panels and base panel elements
-    if(elem.userData.properties.isSubPanel){
-      let subPanelBottom = undefined;
-      let startIdx = elem.userData.index+1;
-      let parentSectionsLength = elem.parent.userData.sectionElements.length;
-      let YPos = elem.position.y;
-      
-      if(expanded){
-        if(elem.userData.index==parentSectionsLength){
-          //YPos -= elem.userData.expandedHeight-parentBottom.userData.height-parentBottom.userData.height;
+      elem.userData.selectors.forEach((c, idx) => {
+        let size = getGeometrySize(c.geometry);
+        let parentSize = getGeometrySize(c.parent.geometry);
+        let yPos = size.height*idx;
+        let zPos = c.userData.unselectedPos.z;
+        let sel = c.children[0].userData.selected;
+        c.material.renderOrder = 1;
+        if(sel){
+          selected = idx;
+          scales.push(c.userData.selectedScale);
         }else{
-          for (const i of _range(startIdx, parentSectionsLength)) {
-            let idx = i-1;
-            let el = elem.parent.userData.sectionElements[idx];
-            let prev = elem.parent.userData.sectionElements[idx-1];
-            let pos = el.position;
-            let Y = prev.userData.expandedHeight;
-            
-            if(idx>startIdx-1){
-              if(!prev.userData.properties.expanded){
-                Y = prev.userData.closedHeight;
-              }
-            }
-            YPos -= Y;
-            props = { duration: duration, x: pos.x, y: YPos, z: pos.z, ease: easeOut };
-            gsap.to(el.position, props);
-            if(i==parentSectionsLength){
-              subPanelBottom = el.userData.bottom;
-            }
-          }
+          scales.push(c.userData.unselectedScale);
         }
         
-      }else if(!expanded){
-        if(elem.userData.index==parentSectionsLength){;
-          //YPos -= elem.userData.closedHeight-parentBottom.userData.height-parentBottom.userData.height;
-        }else{
-          for (const i of _range(startIdx, parentSectionsLength)) {
-            let idx = i-1;
-            let el = elem.parent.userData.sectionElements[idx];
-            let prev = elem.parent.userData.sectionElements[idx-1];
-            let pos = el.position;
-            let Y = prev.userData.closedHeight;
-            
-            if(idx>startIdx-1){
-              if(prev.userData.properties.expanded){
-                Y = prev.userData.expandedHeight;
-              }
-            }
-            YPos -= Y;
-            props = { duration: duration, x: pos.x, y: YPos, z: pos.z, ease: easeOut };
-            gsap.to(el.position, props);
-            if(i==parentSectionsLength){
-              subPanelBottom = el.userData.bottom;
-            }
-          }      
+        if(anim=='CLOSE'){
+          yPos=0;
+          if(sel){
+            zPos = c.userData.selectedPos.z;
+            c.material.renderOrder = 2;
+          }
+        }
+        yPositions.push(-yPos);
+        zPositions.push(zPos);
+        if(idx>0){
+          yPositions.push(yPos);
+        }
+      });
+
+      elem.userData.open = true;
+      let portalScale = 1*(elem.userData.selectors.length+1);
+      if(anim=='CLOSE'){
+        elem.userData.open = false;
+        portalScale = 1;
+      }
+
+      if(anim=='OPEN' || anim=='CLOSE'){
+        for (let i = 0; i < elem.userData.selectors.length; i++) {
+          let current = elem.userData.selectors[i];
+          let props = { duration: duration, x: current.position.x, y: yPositions[i], z: zPositions[i], ease: easeIn };
+          gsap.to(current.position, props);
+          props = { duration: duration, x: scales[i], y: scales[i], z: scales[i], ease: easeIn};
+          gsap.to(current.scale, props);
         }
 
+        if(elem.userData.hoverZPos!=undefined){
+          let props = {duration: duration, x: elem.position.x, y: elem.position.y, z: elem.userData.defaultZPos}
+          if(elem.userData.open){
+            props = {duration: duration, x: elem.position.x, y: elem.position.y, z:elem.userData.hoverZPos};
+          }
+          gsap.to(elem.position, props);
+        }
+
+        if(elem.userData.properties.isPortal){
+          let props = { duration: duration, 0: 0, ease: easeIn };
+          if(elem.userData.open){
+            props = { duration: duration, 0: 1, ease: easeIn };
+          }
+          gsap.to(elem.morphTargetInfluences, props);
+        }
       }
 
-      //calculate bottom based on child bottom position
-      let lastElem = elem.parent.userData.sectionElements[parentSectionsLength-1];
+      if(anim=='SELECT'){
+        
+        let current = elem.userData.selectors[selected];
+        let currentY = current.position.y;
+        let last = current.parent.userData.lastSelected;
+        let props = { duration: duration, x: current.position.x, y: current.userData.selectedPos.y, z: current.userData.selectedPos.z, ease: easeIn };
+        gsap.to(current.position, props);
+        props = { duration: duration, x: current.userData.selectedScale, y: current.userData.selectedScale, z: current.userData.selectedScale, ease: easeIn };
+        gsap.to(current.scale, props);
 
-      if(!lastElem.userData.properties.expanded){
-        YPos -= lastElem.userData.closedHeight-parentBottom.userData.height/2;
-      }else{
-        YPos -= lastElem.userData.expandedHeight-parentBottom.userData.height/2;
+        if(last != undefined){
+          props = { duration: duration, x: last.position.x, y: currentY, z: zPositions[selected], ease: easeIn };
+          gsap.to(last.position, props);
+          props = { duration: duration, x: last.userData.unselectedScale, y: last.userData.unselectedScale, z: last.userData.unselectedScale, ease: easeIn };
+          gsap.to(last.scale, props);
+        }
       }
 
-      //Adjust the bottom for parent container again
-      props = { duration: duration, x: parentBottom.position.x, y: YPos, z: parentBottom.position.z, ease: easeOut, onComplete: panelExpandComplete, onCompleteParams:[elem]};
-      gsap.to(parentBottom.position, props);
+  }
+  /**
+   * This function animates a toggle element.
+   * @param {object} elem the Object3D to be animated.
+   * @param {string} [duration=0.15] the duration of the animation.
+   * @param {string} [easeIn='power1.in'] easing in constant for animation.
+   * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+   * 
+   * @returns {null} No return.
+   * 
+   */
+  toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
+
+    if(elem.handle.userData.anim != false && gsap.isTweening( elem.handle.userData.anim ))
+    return;
+
+    let pos = elem.handle.userData.onPos;
+
+    if(elem.handle.userData.on){
+      pos=elem.handle.userData.offPos;
+    }
+
+    let props = { duration: duration, x: pos.x, y: elem.handle.position.y, z: elem.handle.position.z, ease: easeIn, onComplete: ToggleWidget.DoToggle, onCompleteParams:[elem] };
+
+    if(!elem.handle.userData.horizontal){
+      props = { duration: duration, x: elem.handle.position.x, y: pos.y, z: elem.handle.position.z, ease: easeIn, onComplete: ToggleWidget.DoToggle, onCompleteParams:[elem] };
+    }
+
+    elem.handle.userData.anim = gsap.to(elem.handle.position, props);
+
+  }
+  /**
+   * This function animates panel elements.
+   * @param {object} elem the Object3D to be animated.
+   * @param {string} [anim='OPEN'] this is a localized constant to the function.
+   * @param {string} [duration=0.1] the duration of the animation.
+   * @param {string} [easeIn='power1.in'] easing in constant for animation.
+   * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+   * 
+   * @returns {null} No return.
+   * 
+   */
+  panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.in", easeOut="elastic.Out"){
+    function panelAnimComplete(elem, props){
+      gsap.to(elem.scale, props);
+    }
+
+    function panelExpandComplete(elem){
+      if(elem.userData.properties.expanded)
+        return;
+      elem.dispatchEvent({type:'hideWidgets'});
+    }
+
+    function handleRotate(handle, props){
+      gsap.to(handle.rotation, props);
+    }
+
+    if(anim == 'OPEN'){
+      let onScale = elem.userData.onScale;
+      let offScale = elem.userData.offScale;
+
+      if(!elem.userData.properties.open){
+
+        let rot = elem.userData.handleOpen.userData.onRotation;
+        let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+        handleRotate(elem.userData.handleOpen, props);
+
+        let yprops = { duration: duration, x: onScale.x, y: onScale.y, z: onScale.z, ease: easeOut };
+        let xprops = { duration: duration, x: onScale.x, y: offScale.y, z: onScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, yprops] };
+        
+        gsap.to(elem.scale, xprops);
+
+      }else if(elem.userData.properties.open){
+
+        let rot = elem.userData.handleOpen.userData.offRotation;
+        let props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+        handleRotate(elem.userData.handleOpen, props);
+
+        let xprops = { duration: duration, x: offScale.x, y: offScale.y, z: offScale.z, ease: easeOut};
+        let yprops = { duration: duration, x: onScale.x, y: offScale.y, z: onScale.z, ease: easeOut, onComplete: panelAnimComplete, onCompleteParams:[elem, xprops] };
+        
+        gsap.to(elem.scale, yprops);
+
+      }
+
+      elem.userData.properties.open = !elem.userData.properties.open;
+    }
+
+    if(anim == 'EXPAND'){
+      
+      let expanded = elem.userData.properties.expanded;
+      let bottom = elem.userData.bottom;
+      let topHeight = elem.userData.size.height;
+      let bottomHeight = bottom.userData.size.height;
+      let elemHeight = topHeight+bottomHeight;
+      let yPos = -bottomHeight/2;
+      let sectionsLength = elem.userData.sectionElements.length;
+      let bottomYPos = -((bottomHeight/2+elemHeight * sectionsLength) + bottomHeight);
+      let thisIndex = elem.userData.index;
+      let parentBottom = elem.parent.userData.bottom;
+      let props = {};
+
+      if(elem.userData.sectionsValueTypes == 'container'){
+        //Move sub elements to correct positions
+        for (const obj of elem.userData.sectionElements) {
+          if(expanded){
+            let pos = obj.userData.expandedPos;
+            props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+            gsap.to(obj.position, props);
+            //expand handle
+            props = { duration: duration, x: 1, y: 1, z: 1, ease: easeOut };
+            gsap.to(obj.userData.handleExpand.scale, props);
+          }else if(!expanded){
+            let pos = obj.userData.closedPos;
+            props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+            gsap.to(obj.position, props);
+            //contract handle
+            props = { duration: duration, x: 0, y: 0, z: 0, ease: easeOut };
+            gsap.to(obj.userData.handleExpand.scale, props);
+          }
+        }
+      } else if(elem.userData.sectionsValueTypes == 'controls'){
+        sectionsLength = elem.userData.widgetElements.length;
+        let widgetHeight = elem.userData.widgetHeight;
+        bottomYPos = -((bottomHeight/2+widgetHeight * sectionsLength) + bottomHeight);
+
+        for (const obj of elem.userData.widgetElements) {
+          if(expanded){
+            let pos = obj.userData.expandedPos;
+            props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+            gsap.to(obj.position, props);
+          }else if(!expanded){
+            let pos = obj.userData.closedPos;
+            props = { duration: duration, x: pos.x, y: pos.y, z: pos.z, ease: easeOut };
+            gsap.to(obj.position, props);
+          }
+        }
+      }
+
+      //Do animation for expand handle and move down bottom element of main container
+      if(expanded){
+        let rot = elem.userData.handleExpand.userData.onRotation;
+        props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+        handleRotate(elem.userData.handleExpand, props);
+        let pos = bottom.userData.expandedPos;
+        props = { duration: duration, x: pos.x, y: bottomYPos, z: pos.z, ease: easeOut };
+        gsap.to(bottom.position, props);
+      }else if(!expanded){
+        let rot = elem.userData.handleExpand.userData.offRotation;
+        props = { duration: duration, x: rot.x, y: rot.y, z: rot.z, ease: easeOut };
+        handleRotate(elem.userData.handleExpand, props);
+        let pos = bottom.userData.closedPos;
+        bottomYPos = pos.y;
+        props = { duration: duration, x: pos.x, y: bottomYPos, z: pos.z, ease: easeOut };
+        gsap.to(bottom.position, props); 
+      }
+
+      //if a sub panel is opened, we need to manage positions of other sub panels and base panel elements
+      if(elem.userData.properties.isSubPanel){
+        let subPanelBottom = undefined;
+        let startIdx = elem.userData.index+1;
+        let parentSectionsLength = elem.parent.userData.sectionElements.length;
+        let YPos = elem.position.y;
+        
+        if(expanded){
+          if(elem.userData.index==parentSectionsLength){
+            //YPos -= elem.userData.expandedHeight-parentBottom.userData.height-parentBottom.userData.height;
+          }else{
+            for (const i of _range(startIdx, parentSectionsLength)) {
+              let idx = i-1;
+              let el = elem.parent.userData.sectionElements[idx];
+              let prev = elem.parent.userData.sectionElements[idx-1];
+              let pos = el.position;
+              let Y = prev.userData.expandedHeight;
+              
+              if(idx>startIdx-1){
+                if(!prev.userData.properties.expanded){
+                  Y = prev.userData.closedHeight;
+                }
+              }
+              YPos -= Y;
+              props = { duration: duration, x: pos.x, y: YPos, z: pos.z, ease: easeOut };
+              gsap.to(el.position, props);
+              if(i==parentSectionsLength){
+                subPanelBottom = el.userData.bottom;
+              }
+            }
+          }
+          
+        }else if(!expanded){
+          if(elem.userData.index==parentSectionsLength){;
+            //YPos -= elem.userData.closedHeight-parentBottom.userData.height-parentBottom.userData.height;
+          }else{
+            for (const i of _range(startIdx, parentSectionsLength)) {
+              let idx = i-1;
+              let el = elem.parent.userData.sectionElements[idx];
+              let prev = elem.parent.userData.sectionElements[idx-1];
+              let pos = el.position;
+              let Y = prev.userData.closedHeight;
+              
+              if(idx>startIdx-1){
+                if(prev.userData.properties.expanded){
+                  Y = prev.userData.expandedHeight;
+                }
+              }
+              YPos -= Y;
+              props = { duration: duration, x: pos.x, y: YPos, z: pos.z, ease: easeOut };
+              gsap.to(el.position, props);
+              if(i==parentSectionsLength){
+                subPanelBottom = el.userData.bottom;
+              }
+            }      
+          }
+
+        }
+
+        //calculate bottom based on child bottom position
+        let lastElem = elem.parent.userData.sectionElements[parentSectionsLength-1];
+
+        if(!lastElem.userData.properties.expanded){
+          YPos -= lastElem.userData.closedHeight-parentBottom.userData.height/2;
+        }else{
+          YPos -= lastElem.userData.expandedHeight-parentBottom.userData.height/2;
+        }
+
+        //Adjust the bottom for parent container again
+        props = { duration: duration, x: parentBottom.position.x, y: YPos, z: parentBottom.position.z, ease: easeOut, onComplete: panelExpandComplete, onCompleteParams:[elem]};
+        gsap.to(parentBottom.position, props);
+
+      }
+
+      //textMesh.widget.base.userData.valueBox.dispatchEvent({type:'update'});
 
     }
 
-    //textMesh.widget.base.userData.valueBox.dispatchEvent({type:'update'});
-
   }
-
-}
-
-/**
- * This function creates a click animation on passed element.
- * @param {object} elem the Object3D to be animated.
- * @param {string} [anim='SCALE'] this is a localized constant to the function.
- * @param {string} [duration=0.15] the duration of the animation.
- * @param {string} [easeIn='power1.in'] easing in constant for animation.
- * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
- * 
- * @returns {null} No return.
- * 
- */
-export function clickAnimation(elem, anim='SCALE', duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
-    scaleVar.set(elem.userData.defaultScale.x*0.9,elem.userData.defaultScale.y*0.9,elem.userData.defaultScale.z);
-    let props = { duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: easeIn, transformOrigin: '50% 50%' };
+  /**
+   * This function creates a click animation on passed element.
+   * @param {object} elem the Object3D to be animated.
+   * @param {string} [anim='SCALE'] this is a localized constant to the function.
+   * @param {string} [duration=0.15] the duration of the animation.
+   * @param {string} [easeIn='power1.in'] easing in constant for animation.
+   * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+   * 
+   * @returns {null} No return.
+   * 
+   */
+  clickAnimation(elem, anim='SCALE', duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
+    const self = this;
+    this.scaleVar.set(elem.userData.defaultScale.x*0.9,elem.userData.defaultScale.y*0.9,elem.userData.defaultScale.z);
+    let props = { duration: duration, x: this.scaleVar.x, y: this.scaleVar.y, z: this.scaleVar.z, ease: easeIn, transformOrigin: '50% 50%' };
     props.onComplete = function(e){
-      scaleVar.copy(elem.userData.defaultScale);
-      let props = { duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: easeOut, transformOrigin: '50% 50%' };
+      self.scaleVar.copy(elem.userData.defaultScale);
+      let props = { duration: duration, x: self.scaleVar.x, y: self.scaleVar.y, z: self.scaleVar.z, ease: easeOut, transformOrigin: '50% 50%' };
       gsap.to(elem.scale, props);
     }
     gsap.to(elem.scale, props);
-};
+  }
+}
 
 /**
  * This function an object with width, height, and depth based on passed geometry.
@@ -3741,9 +3718,11 @@ export class BasePanel extends BaseTextBox {
       }
     }
 
+    const self = this;
+
     this.handleExpand.addEventListener('close', function(event) {
       this.userData.targetElem.userData.properties.expanded = false;
-      panelAnimation(this.userData.targetElem, 'EXPAND');
+      self.scene.anims.panelAnimation(this.userData.targetElem, 'EXPAND');
       this.userData.targetElem.userData.widgetElements.forEach((widget, index) =>{
         widget.userData.boxCtrl.ToggleVisible(false);
       });
@@ -3757,7 +3736,7 @@ export class BasePanel extends BaseTextBox {
             panel.handleExpand.dispatchEvent({type:'close'});
         });
       }
-      panelAnimation(this.userData.targetElem, 'EXPAND');
+      self.scene.anims.panelAnimation(this.userData.targetElem, 'EXPAND');
 
       if(!this.userData.targetElem.userData.properties.expanded)
       return;
@@ -3801,9 +3780,10 @@ export class BasePanel extends BaseTextBox {
 
     this.box.userData.handleOpen = handle;
     handle.userData.targetElem = this.box;
+    const self = this;
 
     handle.addEventListener('action', function(event) {
-      panelAnimation(this.userData.targetElem);
+      self.scene.animspanelAnimation(this.userData.targetElem);
     });
   }
   CreateHandle() {
@@ -5330,13 +5310,13 @@ export class ToggleWidget extends BaseWidget {
     if(this.box.userData.valueBox != undefined){
       this.box.userData.valueBox.dispatchEvent({type:'update'});
     }
-
+    const self = this;
     this.handle.addEventListener('action', function(event) {
-      toggleAnimation(this.userData.targetElem);
+      self.scene.anims.toggleAnimation(this.userData.targetElem);
     });
 
     if(this.on){
-      toggleAnimation(this);
+      this.scene.anims.toggleAnimation(this);
     }
 
   }
@@ -5593,7 +5573,7 @@ export class TextBoxWidget extends BaseWidget {
     }
     if(textBoxProps.animProps!=undefined){
       //anim, action, duration, ease, delay, onComplete
-      multiAnimation(this.box, this.textMesh.children, textBoxProps.animProps.anim, textBoxProps.animProps.action, textBoxProps.animProps.duration, textBoxProps.animProps.ease, textBoxProps.animProps.delay, textBoxProps.animProps.callback);
+      this.scene.anims.multiAnimation(this.box, this.textMesh.children, textBoxProps.animProps.anim, textBoxProps.animProps.action, textBoxProps.animProps.duration, textBoxProps.animProps.ease, textBoxProps.animProps.delay, textBoxProps.animProps.callback);
     }
     if(textBoxProps.onCreated!=undefined){
       textBoxProps.onCreated(this.box);
@@ -6261,6 +6241,8 @@ export class SelectorWidget extends BaseWidget {
 
   }
   static TextSelected(selection){
+    console.log(selection)
+    const scene = selection.userData.controller.parentCtrl.scene;
     let base = selection.parent.parent;
     base.userData.selection = selection;
 
@@ -6274,7 +6256,7 @@ export class SelectorWidget extends BaseWidget {
     selection.userData.selected = true;
     let first = selection.parent;
     base.userData.selectors.sort(function(x,y){ return x == first ? -1 : y == first ? 1 : 0; });
-    selectorAnimation(selection.parent.parent, 'SELECT');
+    scene.anims.selectorAnimation(selection.parent.parent, 'SELECT');
     SelectorWidget.HandleHVYMSelection(selection.userData.value);
 
   }
