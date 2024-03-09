@@ -93,7 +93,7 @@ export function CamControlProperties(autoRotate=true, minPolarAngle=0, maxPolarA
   }
 };
 
-export function MainSceneProperties(scene=undefined, mouse=undefined, camera=undefined, renderer=undefined, raycaster=undefined, raycastLayer=0, camControlProps=undefined){
+export function MainSceneProperties(scene=undefined, mouse=undefined, camera=undefined, renderer=undefined, raycaster=undefined, raycastLayer=0, camControlProps=CamControlProperties()){
   return {
     'type': 'MAIN_SCENE_PROPS',
     'scene': scene,
@@ -106,12 +106,41 @@ export function MainSceneProperties(scene=undefined, mouse=undefined, camera=und
   }
 };
 
+/**
+ * This function creates a new scene, sets up lighting.
+ * @param {object} gltf loaded gltf object.
+ * 
+ * @returns {object} Heavymeta scene class object.
+ */
+export class HVYM_Scene {
+  constructor(sceneProps) {
+    this.ambientLight = new THREE.AmbientLight(0x404040);
+    this.ambientLight.name = 'MAIN_AMBIENT_LIGHT'
+    sceneProps.scene.add(ambientLight);
+
+    this.directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    this.directionalLight.name = 'MAIN_DIRECTIONAL_LIGHT'
+    this.directionalLight.position.set(1, 1, 1);
+    sceneProps.scene.add(directionalLight);
+  }
+  createMainSceneControls(mainSceneProps){
+    this.camCtrls = new OrbitControls(mainSceneProps.camera, mainSceneProps.renderer.domElement);
+    this.camCtrls.update(); // This is important to initialize the controls
+  }
+  toggleSceneCtrls(state){
+    if(!this.camCtrls)
+      return;
+
+    this.camCtrls.enabled = state;
+  }
+}
+
 export function createMainSceneControls(mainSceneProps){
   SCENE_CTRLS = new OrbitControls(mainSceneProps.camera, mainSceneProps.renderer.domElement);
   SCENE_CTRLS.update(); // This is important to initialize the controls
 }
 
-function toggleSceneCtrls(state){
+export function toggleSceneCtrls(state){
   if(!SCENE_CTRLS)
     return;
 
@@ -129,50 +158,11 @@ export function createMainSceneLighting(scene){
   scene.add(directionalLight);
 };
 
-function getMainCam(scene){
-  const cameras = scene.getObjectsByProperty( 'isCamera', true );
-  let result = undefined;
-
-  cameras.forEach((cam) => {
-    if(cam.name=='MAIN_CAM'){
-      result = cam;
-    }
-  });
-
-  return result
-}
-
-function getMainAmbientLight(scene){
-  const lights = scene.getObjectsByProperty( 'isLight', true );
-  let result = undefined;
-
-  lights.forEach((light) => {
-    if(light.name == 'MAIN_AMBIENT_LIGHT'){
-      result = light;
-    }
-  });
-
-  return result
-}
-
-function getMainDirectionalLight(scene){
-  const lights = scene.getObjectsByProperty( 'isLight', true );
-  let result = undefined;
-
-  lights.forEach((light) => {
-    if(light.name == 'MAIN_DIRECTIONAL_LIGHT'){
-      result = light;
-    }
-  });
-
-  return result
-}
-
-function randomNumber(min, max) {
+function _randomNumber(min, max) {
   return Math.random() * (max - min) + min;
 }
 
-function* range(from, to, step = 1) {
+function* _range(from, to, step = 1) {
   let value = from;
   while (value <= to) {
     yield value;
@@ -180,12 +170,18 @@ function* range(from, to, step = 1) {
   }
 }
 
-function SetListConfigFont(listConfig, font){
-  if(listConfig!=undefined){
-    listConfig.textProps.font = font;
-  }
-}
-
+/**
+ * This function creates a new property set for animation.
+ * @param {string} [anim='FADE'] this is a localized constant to the function.
+ * @param {string} [anim='IN'] this is a localized constant for fading animation in or out.
+ * @param {number} [duration=0.07] the duration of the animation.
+ * @param {string} [easeIn='power1.inOut'] easing in constant for animation.
+ * @param {number} [delay=0.007] the delay before animation plays.
+ * @param {number} [delayIdx=0] this is a delay multiplier, which acts to stagger animations played consecutively.
+ * 
+ * @returns {null} No return.
+ * 
+ */
 export function animationProperties(anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
   return {
     'type': 'ANIMATION_PROPS',
@@ -198,6 +194,14 @@ export function animationProperties(anim='FADE', action='IN', duration=0.07, eas
   }
 };
 
+/**
+ * This function creates a new property set for information.
+ * @param {string} title this is a title for a given element.
+ * @param {string} author this is an author for a given element.
+ * 
+ * @returns {null} No return.
+ * 
+ */
 export function infoProperties(title, author){
   return {
     'type': 'INFO_PROPS',
@@ -206,6 +210,19 @@ export function infoProperties(title, author){
   }
 };
 
+/**
+ * This function animates text elements.
+ * @param {object} elem the Object3D to be animated.
+ * @param {string} [anim='FADE'] this is a localized constant to the function.
+ * @param {string} [anim='IN'] this is a localized constant for fading animation in or out.
+ * @param {number} [duration=0.07] the duration of the animation.
+ * @param {string} [easeIn='power1.inOut'] easing in constant for animation.
+ * @param {number} [delay=0.007] the delay before animation plays.
+ * @param {number} [delayIdx=0] this is a delay multiplier, which acts to stagger animations played consecutively.
+ * 
+ * @returns {null} No return.
+ * 
+ */
 function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, delayIdx=0, onComplete=undefined){
   const top = box.userData.height/2+10;
   const bottom = top-box.userData.height-10;
@@ -306,10 +323,10 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
         break;
       case 'UNSCRAMBLE0':
         if(action == 'OUT'){
-          posVar.set(txt.position.x+randomNumber(-0.1, 0.1), txt.position.y+randomNumber(-0.1, 0.1), txt.position.z);
+          posVar.set(txt.position.x+_randomNumber(-0.1, 0.1), txt.position.y+_randomNumber(-0.1, 0.1), txt.position.z);
         }else{
           posVar.copy(txt.position);
-          txt.position.set(txt.position.x+randomNumber(-0.1, 0.1), txt.position.y+randomNumber(-0.1, 0.1), txt.position.z);
+          txt.position.set(txt.position.x+_randomNumber(-0.1, 0.1), txt.position.y+_randomNumber(-0.1, 0.1), txt.position.z);
           txt.material.opacity=1;
         }
         props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
@@ -321,10 +338,10 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
         break;
       case 'UNSCRAMBLE1':
         if(action == 'OUT'){
-          posVar.set(txt.position.x+randomNumber(-1, 1), txt.position.y+randomNumber(-1, 1), txt.position.z);
+          posVar.set(txt.position.x+_randomNumber(-1, 1), txt.position.y+_randomNumber(-1, 1), txt.position.z);
         }else{
           posVar.copy(txt.position);
-          txt.position.set(txt.position.x+randomNumber(-1, 1), txt.position.y+randomNumber(-1, 1), txt.position.z);
+          txt.position.set(txt.position.x+_randomNumber(-1, 1), txt.position.y+_randomNumber(-1, 1), txt.position.z);
           txt.material.opacity=1;
         }
         props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
@@ -336,10 +353,10 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
         break;
       case 'UNSCRAMBLE2':
         if(action == 'OUT'){
-          posVar.set(txt.position.x+randomNumber(-2, 2), txt.position.y+randomNumber(-2, 2), txt.position.z);
+          posVar.set(txt.position.x+_randomNumber(-2, 2), txt.position.y+_randomNumber(-2, 2), txt.position.z);
         }else{
           posVar.copy(txt.position);
-          txt.position.set(txt.position.x+randomNumber(-2, 2), txt.position.y+randomNumber(-2, 2), txt.position.z);
+          txt.position.set(txt.position.x+_randomNumber(-2, 2), txt.position.y+_randomNumber(-2, 2), txt.position.z);
           txt.material.opacity=1;
         }
         props = {duration: duration, x: posVar.x, y: posVar.y, z: posVar.z, ease: ease };
@@ -369,6 +386,16 @@ function txtAnimation(box, txt, anim='FADE', action='IN', duration=0.07, ease="p
     }
 }
 
+/**
+ * This function animates multi text elements.
+ * @param {object} elem the Object3D to be animated.
+ * @param {string} [anim='FADE'] this is a localized constant to the function.
+ * @param {string} [easeIn='power1.in'] easing in constant for animation.
+ * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+ * 
+ * @returns {null} No return.
+ * 
+ */
 function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ease="power1.inOut", delay=0.007, onComplete=undefined){
   let delayIdx=0;
   const top = box.userData.height/2+5;
@@ -383,7 +410,17 @@ function multiAnimation(box, txtArr, anim='FADE', action='IN', duration=0.07, ea
 
 };
 
-export function mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power1.inOut", delay=0, onComplete=undefined){
+/**
+ * This function animates an element for mouseover.
+ * @param {object} elem the Object3D to be animated.
+ * @param {string} [anim='SCALE'] this is a localized constant to the function.
+ * @param {string} [easeIn='power1.in'] easing in constant for animation.
+ * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+ * 
+ * @returns {null} No return.
+ * 
+ */
+export function mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power1.inOut", delay=0){
 
   let doAnim = false;
 
@@ -410,7 +447,18 @@ export function mouseOverAnimation(elem, anim='SCALE', duration=0.5, ease="power
 
 };
 
-export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="power1.in", easeOut="elastic.Out", onComplete=undefined){
+/**
+ * This function animates selector elements.
+ * @param {object} elem the Object3D to be animated.
+ * @param {string} [anim='OPEN'] this is a localized constant to the function.
+ * @param {string} [duration=0.1] the duration of the animation.
+ * @param {string} [easeIn='power1.in'] easing in constant for animation.
+ * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+ * 
+ * @returns {null} No return.
+ * 
+ */
+export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
 
     let yPositions = [];
     let zPositions = [];
@@ -498,6 +546,16 @@ export function selectorAnimation(elem, anim='OPEN', duration=0.15, easeIn="powe
 
 };
 
+/**
+ * This function animates a toggle element.
+ * @param {object} elem the Object3D to be animated.
+ * @param {string} [duration=0.15] the duration of the animation.
+ * @param {string} [easeIn='power1.in'] easing in constant for animation.
+ * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+ * 
+ * @returns {null} No return.
+ * 
+ */
 export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
 
   if(elem.handle.userData.anim != false && gsap.isTweening( elem.handle.userData.anim ))
@@ -519,6 +577,18 @@ export function toggleAnimation(elem, duration=0.15, easeIn="power1.in", easeOut
 
 };
 
+
+/**
+ * This function animates panel elements.
+ * @param {object} elem the Object3D to be animated.
+ * @param {string} [anim='OPEN'] this is a localized constant to the function.
+ * @param {string} [duration=0.1] the duration of the animation.
+ * @param {string} [easeIn='power1.in'] easing in constant for animation.
+ * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+ * 
+ * @returns {null} No return.
+ * 
+ */
 export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.in", easeOut="elastic.Out"){
 
   function panelAnimComplete(elem, props){
@@ -646,7 +716,7 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
         if(elem.userData.index==parentSectionsLength){
           //YPos -= elem.userData.expandedHeight-parentBottom.userData.height-parentBottom.userData.height;
         }else{
-          for (const i of range(startIdx, parentSectionsLength)) {
+          for (const i of _range(startIdx, parentSectionsLength)) {
             let idx = i-1;
             let el = elem.parent.userData.sectionElements[idx];
             let prev = elem.parent.userData.sectionElements[idx-1];
@@ -671,7 +741,7 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
         if(elem.userData.index==parentSectionsLength){;
           //YPos -= elem.userData.closedHeight-parentBottom.userData.height-parentBottom.userData.height;
         }else{
-          for (const i of range(startIdx, parentSectionsLength)) {
+          for (const i of _range(startIdx, parentSectionsLength)) {
             let idx = i-1;
             let el = elem.parent.userData.sectionElements[idx];
             let prev = elem.parent.userData.sectionElements[idx-1];
@@ -715,7 +785,18 @@ export function panelAnimation(elem, anim='OPEN', duration=0.1, easeIn="power1.i
 
 }
 
-export function clickAnimation(elem, anim='SCALE', duration=0.15, easeIn="power1.in", easeOut="elastic.Out", onComplete=undefined){
+/**
+ * This function creates a click animation on passed element.
+ * @param {object} elem the Object3D to be animated.
+ * @param {string} [anim='SCALE'] this is a localized constant to the function.
+ * @param {string} [duration=0.15] the duration of the animation.
+ * @param {string} [easeIn='power1.in'] easing in constant for animation.
+ * @param {string} [easeIn='elastic.Out'] easing out constant for animation.
+ * 
+ * @returns {null} No return.
+ * 
+ */
+export function clickAnimation(elem, anim='SCALE', duration=0.15, easeIn="power1.in", easeOut="elastic.Out"){
     scaleVar.set(elem.userData.defaultScale.x*0.9,elem.userData.defaultScale.y*0.9,elem.userData.defaultScale.z);
     let props = { duration: duration, x: scaleVar.x, y: scaleVar.y, z: scaleVar.z, ease: easeIn, transformOrigin: '50% 50%' };
     props.onComplete = function(e){
@@ -726,6 +807,13 @@ export function clickAnimation(elem, anim='SCALE', duration=0.15, easeIn="power1
     gsap.to(elem.scale, props);
 };
 
+/**
+ * This function an object with width, height, and depth based on passed geometry.
+ * @param {object} geometry the geometry of an Object3D.
+ * 
+ * @returns {object} an object with geometry size dimensions.
+ * 
+ */
 export function getGeometrySize(geometry) {
   const bbox = new THREE.Box3().setFromObject(new THREE.Mesh(geometry));
   const width = bbox.max.x - bbox.min.x;
@@ -734,6 +822,19 @@ export function getGeometrySize(geometry) {
   return { width, height, depth };
 };
 
+/**
+ * This function creates a new text mesh property set, property of text geometry.
+ * useCase='SIMPLE','STENCIL','STENCIL_CHILD'
+ * @param {number} [curveSegments=12] the mesh curve segments.
+ * @param {bool} [bevelEnabled=false] if true, text has an edge bevel.
+ * @param {number} [bevelThickness=0.1] thickness of bevel.
+ * @param {number} [bevelSize=0.1] size of bevel.
+ * @param {number} [bevelOffset=0] offset of bevel.
+ * @param {number} [bevelSegments=3] number of segments in bevel.
+ * 
+ * @returns {object} Data (materialRefProperties).
+ * 
+ */
 export function textMeshProperties(curveSegments=12, bevelEnabled=false, bevelThickness=0.1, bevelSize=0.1, bevelOffset=0, bevelSegments=3){
   return {
     'type': 'TEXT_MESH_PROPS',
@@ -754,6 +855,9 @@ const W_BEVEL_SIZE = 0.1;
 const W_BEVEL_OFFSET = 0;
 const W_BEVEL_SEGMENTS = 3;
 
+/**
+ * This function returns default (textMeshProperties) for widgets.
+ */
 export function defaultWidgetTextMeshProperties(){
   return textMeshProperties(W_CURVE_SEGMENTS, W_BEVEL_ENABLED, W_BEVEL_THICKNESS, W_BEVEL_SIZE, W_BEVEL_OFFSET, W_BEVEL_SEGMENTS)
 }
@@ -766,24 +870,23 @@ const VT_BEVEL_SIZE = 0.1;
 const VT_BEVEL_OFFSET = 0;
 const VT_BEVEL_SEGMENTS = 3;
 
+/**
+ * This function returns default (textMeshProperties).
+ */
 export function defaultValueTextMeshProperties(){
   return textMeshProperties(VT_CURVE_SEGMENTS, VT_BEVEL_ENABLED, VT_BEVEL_THICKNESS, VT_BEVEL_SIZE, VT_BEVEL_OFFSET, VT_BEVEL_SEGMENTS)
 }
 
-export function createTextGeometry(character, font, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments) {
-  return new TextGeometry(character, {
-    font: font,
-    size: size,
-    height: height,
-    curveSegments: curveSegments,
-    bevelEnabled: bevelEnabled,
-    bevelThickness: bevelThickness,
-    bevelSize: bevelSize,
-    bevelOffset: bevelOffset,
-    bevelSegments: bevelSegments,
-  });
-};
 
+//MATERIAL CREATION
+
+/**
+ * This function returns material string constant based on passed material.
+ * @param {object} material the three js material to clone.
+ * 
+ * @returns {string} string constant for material type.
+ * 
+ */
 export function materialTypeConstant(material){
   let result = undefined;
 
@@ -813,8 +916,22 @@ export function materialTypeConstant(material){
   return result
 };
 
-//MATERIAL CREATION
-//useCase='SIMPLE','STENCIL','STENCIL_CHILD'
+/**
+ * This function creates a new material reference prperty set based on passed material and target property.
+ * useCase='SIMPLE','STENCIL','STENCIL_CHILD'
+ * @param {string} [type='BASIC'] the type of material.
+ * @param {string} [color='white'] the color of the material.
+ * @param {bool} [transparent=false] if true, material has transparent property enabled.
+ * @param {number} [opacity=1] the opacity value for the material.
+ * @param {object} [side=THREE.FrontSide] the side of the mesh that gets rendered.
+ * @param {string} [useCase='SIMPLE'] used to set stencil rendering.
+ * @param {bool} [emissive=false] if true, material made emissive.
+ * @param {bool} [reflective=false] if true, material made reflective.
+ * @param {bool} [iridescent=false] if true, material made iridescent.
+ * 
+ * @returns {object} Data (materialRefProperties).
+ * 
+ */
 export function materialProperties(type='BASIC', color='white', transparent=false, opacity=1, side=THREE.FrontSide, useCase='SIMPLE', emissive=false, reflective=false, iridescent=false){
   return {
     'type': type,
@@ -829,6 +946,18 @@ export function materialProperties(type='BASIC', color='white', transparent=fals
   }
 };
 
+/**
+ * This function creates a new material reference prperty set based on passed material and target property.
+ * @param {string} [matType='PHONG'] the type of material.
+ * @param {object} [ref=undefined] the reference to the material.
+ * @param {string} [targetProp='animation'] target propert of mesh.
+ * @param {bool} [useMaterialView=false] if true view for material preview is created.
+ * @param {bool} [isHVYM=false] identifier for mesh that has heavymeta data.
+ * @param {object} [hvymCtrl=undefined] (HVYM_Data) class object.
+ * 
+ * @returns {object} Data (materialRefProperties).
+ * 
+ */
 export function materialRefProperties(matType='PHONG', ref=undefined, targetProp='color', valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false, isHVYM=false, hvymCtrl=undefined){
   return {
     'type': 'MAT_REF',
@@ -842,6 +971,16 @@ export function materialRefProperties(matType='PHONG', ref=undefined, targetProp
   }
 };
 
+/**
+ * This function creates a new material reference prperty set based on passed material and target property.
+ * used to set up control over a specific material property.
+ * @param {object} material the three js material to base propert set on.
+ * @param {string} prop the target property on the material.
+ * @param {bool} [useMaterialView=false] if true, widget will use an indicator for the material.
+ * 
+ * @returns {object} (materialRefProperties).
+ * 
+ */
 export function materialRefPropertiesFromMaterial(material, prop, useMaterialView=false){
   let matType = materialTypeConstant(material);
   let valProp = materialNumberValueProperties(material, prop);
@@ -849,17 +988,13 @@ export function materialRefPropertiesFromMaterial(material, prop, useMaterialVie
   return materialRefProperties(matType, material, prop, valProp, useMaterialView);
 }
 
-export function setRefProperties(setType='MATERIAL', meshRefs=[], materialIndex=0, valueProps=numberValueProperties( 0, 0, 1, 3, 0.001, false), useMaterialView=false){
-  return {
-    'type': 'SET_REF',
-    'setType': setType,
-    'meshRefs': meshRefs,
-    'materialIndex': materialIndex,
-    'valueProps': valueProps,
-    'useMaterialView': useMaterialView
-  }
-};
-
+/**
+ * This function creates a new material based on another copying all the first level properties.
+ * @param {object} material the three js material to clone.
+ * 
+ * @returns {object} new three js material.
+ * 
+ */
 export function shallowCloneMaterial(material){
   const matType = materialTypeConstant(material);
   let clonedMat = getBaseMaterial('#'+material.color.getHexString(), matType);
@@ -872,78 +1007,214 @@ export function shallowCloneMaterial(material){
   return clonedMat
 }
 
+/**
+ * This function creates a new material porperty set for phong material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function basicMatProperties(color='white'){
   return materialProperties('BASIC', color, false, 1, THREE.FrontSide, 'SIMPLE');
 };
 
+/**
+ * This function creates a new material porperty set for phong stencil material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function basicStencilMatProperties(color='white'){
   return materialProperties('BASIC', color, false, 1, THREE.FrontSide, 'STENCIL');
 };
 
+/**
+ * This function creates a new material porperty set for basic stencil child material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function basicStencilChildMatProperties(color='white'){
   return materialProperties('BASIC', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
 };
 
+/**
+ * This function creates a new material porperty set for phong material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function phongMatProperties(color='white'){
   return materialProperties('PHONG', color, false, 1, THREE.FrontSide, 'SIMPLE');
 };
 
+/**
+ * This function creates a new material porperty set for phong stencil material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function phongStencilMatProperties(color='white'){
   return materialProperties('PHONG', color, false, 1, THREE.FrontSide, 'STENCIL');
 };
 
+/**
+ * This function creates a new material porperty set for phong stencil child material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function phongStencilChildMatProperties(color='white'){
   return materialProperties('PHONG', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
 };
 
+/**
+ * This function creates a new material porperty set for lambert material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function lambertMatProperties(color='white'){
   return materialProperties('LAMBERT', color, false, 1, THREE.FrontSide, 'SIMPLE');
 };
 
+/**
+ * This function creates a new material porperty set for lambert stencil material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function lambertStencilMatProperties(color='white'){
   return materialProperties('LAMBERT', color, false, 1, THREE.FrontSide, 'STENCIL');
 };
 
+/**
+ * This function creates a new material porperty set for lambert stencil child material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function lambertStencilChildMatProperties(color='white'){
   return materialProperties('LAMBERT', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
 };
 
+/**
+ * This function creates a new material porperty set for standard material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function standardMatProperties(color='white'){
   return materialProperties('STANDARD', color, false, 1, THREE.FrontSide, 'SIMPLE');
 };
 
+/**
+ * This function creates a new material porperty set for standard stencil material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function standardMatStencilProperties(color='white'){
   return materialProperties('STANDARD', color, false, 1, THREE.FrontSide, 'STENCIL');
 };
 
+/**
+ * This function creates a new material porperty set for standard stencil child material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function standardMatStencilChildProperties(color='white'){
   return materialProperties('STANDARD', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
 };
 
+/**
+ * This function creates a new material porperty set for pbr material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function pbrMatProperties(color='white'){
   return materialProperties('PBR', color, false, 1, THREE.FrontSide, 'SIMPLE');
 };
 
+/**
+ * This function creates a new material porperty set for pbr stencil material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function pbrMatStencilProperties(color='white'){
   return materialProperties('PBR', color, false, 1, THREE.FrontSide, 'STENCIL');
 };
 
+/**
+ * This function creates a new material porperty set for pbr stencil child material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function pbrMatStencilChildProperties(color='white'){
   return materialProperties('PBR', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
 };
 
+/**
+ * This function creates a new material porperty set for toon material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function toonMatProperties(color='white'){
   return materialProperties('TOON', color, false, 1, THREE.FrontSide, 'SIMPLE');
 };
 
+/**
+ * This function creates a new material porperty set for toon stencil material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function toonMatStencilProperties(color='white'){
   return materialProperties('TOON', color, false, 1, THREE.FrontSide, 'STENCIL');
 };
 
+/**
+ * This function creates a new material porperty set for toon stencil child material.
+ * @param {string} [color='white'] the color of the material.
+ * 
+ * @returns {object} (materialProperties).
+ * 
+ */
 export function toonMatStencilChildProperties(color='white'){
   return materialProperties('TOON', color, false, 1, THREE.FrontSide, 'STENCIL_CHILD');
 };
 
+/**
+ * This function creates a new material based on passed properties.
+ * material type constants: 'BASIC', 'PHONG', 'LAMBERT', 'STANDARD', 'PBR', 'TOON'
+ * @param {string} [color='white'] (materialProperties) properties of material used on box.
+ * @param {string} [type='BASIC'] the material constant type.
+ * @param {object} [side=THREE.FrontSide] the side of the mesh that gets rendered.
+ * 
+ * @returns {object} new three js material.
+ * 
+ */
 export function getBaseMaterial(color='white', type='BASIC', side=THREE.FrontSide){
   let mat = undefined;
   switch (type) {
@@ -978,6 +1249,12 @@ export function getBaseMaterial(color='white', type='BASIC', side=THREE.FrontSid
   return mat
 };
 
+/**
+ * This function creates and stores a new stencil reference.
+ * 
+ * @returns {int} new stencil integer.
+ * 
+ */
 export function getStencilRef(){
   let ref = stencilRefs.length+1;
   stencilRefs.push(ref);
@@ -985,20 +1262,34 @@ export function getStencilRef(){
   return stencilRefs[stencilRefs.length-1]
 }
 
-export function getMaterial(props, stencilRef=0){
-  const mat = getBaseMaterial(props.color, props.type, props.side);
-  mat.transparent = props.transparent;
-  mat.opacity = props.opacity;
+/**
+ * This function creates a new transparent material.
+ * @param {object} matProps (materialProperties) properties of material used on box.
+ * @param {number} [stencilRef=0] the stencil ref to be used.
+ * 
+ * @returns {object} new three js material.
+ * 
+ */
+export function getMaterial(matProps, stencilRef=0){
+  const mat = getBaseMaterial(matProps.color, matProps.type, matProps.side);
+  mat.transparent = matProps.transparent;
+  mat.opacity = matProps.opacity;
 
-  if(props.useCase == 'STENCIL'){
+  if(matProps.useCase == 'STENCIL'){
     setupStencilMaterial(mat, getStencilRef());
-  }else if(props.useCase == 'STENCIL_CHILD'){
+  }else if(matProps.useCase == 'STENCIL_CHILD'){
     setupStencilChildMaterial(mat, stencilRef);
   }
 
   return mat
 };
 
+/**
+ * This function creates a new transparent material.
+ * 
+ * @returns {object} new three js material.
+ * 
+ */
 export function transparentMaterial(){
   const mat = new THREE.MeshBasicMaterial();
   mat.transparent = true;
@@ -1007,13 +1298,14 @@ export function transparentMaterial(){
   return mat
 };
 
-export function setupClipMaterial(mat, clippingPlanes){
-  mat.clippingPlanes = clippingPlanes;
-  mat.stencilFail = THREE.DecrementWrapStencilOp;
-  mat.stencilZFail = THREE.DecrementWrapStencilOp;
-  mat.stencilZPass = THREE.DecrementWrapStencilOp;
-};
-
+/**
+ * This function sets up material to render another inside of it.
+ * @param {object} material the material to be darkened.
+ * @param {number} stencilRef the stencil reference to be set on the material.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function setupStencilMaterial(mat, stencilRef){
   mat.depthWrite = false;
   mat.stencilWrite = true;
@@ -1022,6 +1314,14 @@ export function setupStencilMaterial(mat, stencilRef){
   mat.stencilZPass = THREE.ReplaceStencilOp;
 };
 
+/**
+ * This function sets up material to be rendered inside another, no depth sorting.
+ * @param {object} material the material to be darkened.
+ * @param {number} stencilRef the stencil reference to be set on the material.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function setupStencilChildMaterial(mat, stencilRef){
   mat.depthWrite = false;
   mat.stencilWrite = true;
@@ -1030,6 +1330,14 @@ export function setupStencilChildMaterial(mat, stencilRef){
   mat.stencilFunc = THREE.EqualStencilFunc;
 };
 
+/**
+ * This function sets up material to be rendered inside another with depth sorting.
+ * @param {object} material the material to be darkened.
+ * @param {number} stencilRef the stencil reference to be set on the material.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function setupStencilChildDepthMaterial(mat, stencilRef){
   mat.depthWrite = true;
   mat.stencilWrite = true;
@@ -1038,145 +1346,356 @@ export function setupStencilChildDepthMaterial(mat, stencilRef){
   mat.stencilFunc = THREE.EqualStencilFunc;
 };
 
+/**
+ * This function creates a new material based on passed property set, assigns a new stencil ref.
+ * @param {object} matProps (materialProperties) property set.
+ * 
+ * @returns {object} new three js material.
+ * 
+ */
 export function stencilMaterial(matProps){
   let stencilRef = getStencilRef();
   return getMaterial(matProps, stencilRef);
 };
 
+/**
+ * This function darkens passed material color by passed value.
+ * @param {object} material the material to be darkened.
+ * @param {number} value the amount the material color value should be lightened.
+ * @param {number} [alpha=100] the alpha value of the material.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function darkenMaterial(material, value, alpha=100){
   let c = colorsea('#'+material.color.getHexString(), alpha).darken(value);
   material.color.set(c.hex());
 }
 
+/**
+ * This function lightens passed material color by passed value.
+ * @param {object} material the material to be lightened.
+ * @param {number} value the amount the material color value should be lightened.
+ * @param {number} [alpha=100] the alpha value of the material.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function lightenMaterial(material, value, alpha=100){
   let c = colorsea('#'+material.color.getHexString(), alpha).lighten(value);
   material.color.set(c.hex());
 }
 
+/**
+ * This function get constant draggable array.
+ * @returns {array} draggable.
+ * 
+ */
 export function getDraggable(obj){
   return draggable;
 };
 
+/**
+ * This function adds draggable to array constant.
+ * @param {object} add created draggable element to array.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function addToDraggable(obj){
   draggable.push(obj);
 };
 
+/**
+ * This function get constant mouseoverable array.
+ * @returns {array} mouseoverable.
+ * 
+ */
 export function getMouseOverable(){
   return mouseOverable;
 };
 
+/**
+ * This function adds mouseoverable to array constant.
+ * @param {object} add created mouseoverable element to array.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function addToMouseOverable(obj){
   mouseOverable.push(obj);
 };
 
+/**
+ * This function get constant clickable array.
+ * @returns {array} clickable.
+ * 
+ */
 export function getClickable(){
   return clickable;
 };
 
+/**
+ * This function adds clickable to array constant.
+ * @param {object} add created clickable element to array.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function addClickable(obj){
   clickable.push(obj);
 };
 
+/**
+ * This function get constant input prompt array.
+ * @returns {array} inputPrompts.
+ * 
+ */
 export function getInputPrompts(){
   return inputPrompts;
 };
 
+/**
+ * This function adds input prompt element to array constant.
+ * @param {object} add created input prompt to array.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function addToInputPrompts(obj){
   inputPrompts.push(obj);
 };
 
+/**
+ * This function get constant input text array.
+ * @returns {array} inputText.
+ * 
+ */
 export function getInputText(){
   return inputText;
 };
 
+/**
+ * This function adds input text element to array constant.
+ * @param {object} add created input text to array.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function addToInputText(obj){
   inputText.push(obj);
 };
 
+/**
+ * This function get constant selector array.
+ * @returns {array} selectorElems.
+ * 
+ */
 export function getSelectorElems(){
   return selectorElems;
 };
 
+/**
+ * This function adds selector element to array constant.
+ * @param {object} add created selector to array.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function addToSelectorElems(obj){
   selectorElems.push(obj);
 };
 
+/**
+ * This function get constant toggle array.
+ * @returns {array} toggles.
+ * 
+ */
 export function getToggles(){
   return toggles;
 };
 
+/**
+ * This function adds toggle element to array constant.
+ * @param {object} add created toggle to array.
+ * 
+ * @returns {null} no return.
+ * 
+ */
 export function addToToggles(obj){
   toggles.push(obj);
 };
 
-export function getClippedMeshes(){
-  return clippedMeshes;
-};
-
-export function addToClippedMeshes(obj){
-  clippedMeshes.push(obj);
-};
-
-export function getMeshViews(){
-  return meshViews;
-};
-
-export function addToMeshViews(obj){
-  meshViews.push(obj);
-};
-
-export function getPortals(){
-  return portals;
-};
-
-export function addToPortals(obj){
-  portals.push(obj);
-};
-
+/**
+ * This function creates vector 3 position for the center of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function centerPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, parentSize.height-parentSize.height, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the left top center of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function topCenterPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, (parentSize.height/2)-childSize.height/2-padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the top center outside of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function topCenterOutsidePos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, (parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the bottom center of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function bottomCenterPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, -(parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the bottom center outside of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function bottomCenterOutsidePos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(parentSize.width-parentSize.width, -(parentSize.height/2)-childSize.height/2-padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the right center of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function rightCenterPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3((parentSize.width/2)-childSize.width/2-padding, parentSize.height-parentSize.height, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the right top corner of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function rightTopCornerPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3((parentSize.width/2)-childSize.width/2-padding, (parentSize.height/2)-childSize.height/2-padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the left bottom corner of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function rightBottomCornerPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3((parentSize.width/2)-childSize.width/2-padding, -(parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the left center of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function leftCenterPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(-(parentSize.width/2)+childSize.width/2+padding, parentSize.height-parentSize.height, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the left top corner of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function leftTopCornerPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(-(parentSize.width/2)+childSize.width/2+padding, (parentSize.height/2)-childSize.height/2-padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates vector 3 position for the left bottom corner of the parent.
+ * @param {number} parentSize size of parent object.
+ * @param {number} childSize size of child object.
+ * @param {number} [zPosDir=1] if 1, object aligned in front of parent, else behind parent.
+ * @param {object} [padding=0.025] extra padding on size of object.
+ * 
+ * @returns {object} Data THREE.Vector3.
+ * 
+ */
 export function leftBottomCornerPos(parentSize, childSize, zPosDir=1, padding=0.025){
   return new THREE.Vector3(-(parentSize.width/2)+childSize.width/2+padding, -(parentSize.height/2)+childSize.height/2+padding, (parentSize.depth/2+childSize.depth/2)*zPosDir);
 }
 
+/**
+ * This function creates a property set for animation reference.
+ * loop constants: 'loopOnce', 'loopRepeat', 'pingPong', 'clamp'
+ * @param {number} start animation start time.
+ * @param {number} end animation end time.
+ * @param {string} [loop='loopRepeat'] how the animations loop.
+ * @param {object} [ref=undefined] reference for the animation object in imported model.
+ * @param {object} [valueProps=stringValueProperties] property set for value type of widget.
+ * @param {string} [targetProp='animation'] target propert of mesh.
+ * @param {bool} [useMaterialView=false] if true view for material preview is created.
+ * @param {bool} [isHVYM=false] identifier for mesh that has heavymeta data.
+ * @param {object} [hvymCtrl=undefined] (HVYM_Data) class object.
+ * 
+ * @returns {object} Data animRefProperties.
+ * 
+ */
 export function animRefProperties( start, end, loop='loopRepeat', ref=undefined, valueProps=stringValueProperties(), targetProp='animation', useMaterialView=false, isHVYM=false, hvymCtrl=undefined){
   return {
     'type': 'ANIM_REF',
@@ -1184,37 +1703,35 @@ export function animRefProperties( start, end, loop='loopRepeat', ref=undefined,
     'end': end,
     'loop': loop,
     'ref': ref,
-    'targetProp': targetProp,
     'valueProps': valueProps,
+    'targetProp': targetProp,
     'useMaterialView': useMaterialView,
     'isHVYM': isHVYM,
     'hvymCtrl': hvymCtrl
   }
 };
 
-export function animSeekRefProperties( start, end, loop='loopRepeat', ref=undefined, mixer, valueProps=stringValueProperties(), targetProp='animation', useMaterialView=false, isHVYM=false, hvymCtrl=undefined){
-  return {
-    'type': 'ANIM_SEEK_REF',
-    'start': start,
-    'end': end,
-    'loop': loop,
-    'ref': ref,
-    'mixer': mixer,
-    'targetProp': targetProp,
-    'valueProps': valueProps,
-    'useMaterialView': useMaterialView,
-    'isHVYM': isHVYM,
-    'hvymCtrl': hvymCtrl
-  }
-};
-
+/**
+ * This function creates a property set for mesh reference.
+ * @param {bool} [isGroup=false] if three js mesh consists of multiple meshes.
+ * @param {object} [ref=undefined] Object3D mesh reference.
+ * @param {object} [valueProps=stringValueProperties] property set for value type of widget.
+ * @param {string} [targetProp='visibility'] target propert of mesh.
+ * @param {bool} [useMaterialView=false] if true view for material preview is created.
+ * @param {object} [targetMorph=undefined] if defined morph.
+ * @param {bool} [isHVYM=false] identifier for mesh that has heavymeta data.
+ * @param {object} [hvymCtrl=undefined] (HVYM_Data) class object.
+ * 
+ * @returns {object} Data meshRefProperties.
+ * 
+ */
 export function meshRefProperties(isGroup=false, ref=undefined, valueProps=stringValueProperties(), targetProp='visbility', useMaterialView=false, targetMorph=undefined, isHVYM=false, hvymCtrl=undefined){
   return {
     'type': 'MESH_REF',
     'isGroup': isGroup,
     'ref': ref,
-    'targetProp': targetProp,
     'valueProps': valueProps,
+    'targetProp': targetProp,
     'useMaterialView': useMaterialView,
     'targetMorph': targetMorph,
     'isHVYM': isHVYM,
@@ -1222,6 +1739,25 @@ export function meshRefProperties(isGroup=false, ref=undefined, valueProps=strin
   }
 };
 
+/**
+ * This function creates a property set for text mesh creation.
+ * @param {string} font path to the font json file.
+ * @param {number} letterSpacing space between letters.
+ * @param {number} lineSpacing space between text lines.
+ * @param {number} wordSpacing space between words.
+ * @param {number} text padding.
+ * @param {number} size text size.
+ * @param {number} height text height.
+ * @param {number} zOffset position of text in z.
+ * @param {object} [matProps=materialProperties] (materialProperties) properties of material used on box.
+ * @param {number} [meshProps=textMeshProperties] text mesh properties.
+ * @param {string} [align='CENTER'] text alignment.
+ * @param {bool} [editText=false] if true, text is editable.
+ * @param {bool} [wrap=true] if true, text wraps in box.
+ * 
+ * @returns {object} Data textProperties.
+ * 
+ */
 export function textProperties(font, letterSpacing, lineSpacing, wordSpacing, padding, size, height, zOffset=-1, matProps=materialProperties(), meshProps=textMeshProperties(), align='CENTER', editText=false, wrap=true) {
   return {
     'font': font,
@@ -1251,10 +1787,22 @@ const W_TEXT_Z_OFFSET = 1;
 const W_TEXT_MAT_PROPS = basicMatProperties(SECONDARY_COLOR_A);
 const W_TEXT_MESH_PROPS = defaultWidgetTextMeshProperties();
 
+/**
+ * This function creates a default material properties for text elements.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data materialProperties.
+ */
 export function defaultWidgetTextProperties(font){
   return textProperties( font, W_LETTER_SPACING, W_LINE_SPACING, W_WORD_SPACING , W_TEXT_PADDING, W_TEXT_SIZE, W_TEXT_HEIGHT, W_TEXT_Z_OFFSET, W_TEXT_MAT_PROPS, W_TEXT_MESH_PROPS);
 };
 
+/**
+ * This function creates a default material properties for text portal elements.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data materialProperties.
+ */
 export function defaultWidgetStencilTextProperties(font){
   let textProps = defaultWidgetTextProperties(font);
   textProps.matProps = phongStencilMatProperties(SECONDARY_COLOR_A);
@@ -1273,10 +1821,22 @@ const VT_TEXT_Z_OFFSET = 1;
 const VT_TEXT_MAT_PROPS = basicMatProperties(SECONDARY_COLOR_A);
 const VT_TEXT_MESH_PROPS = defaultValueTextMeshProperties();
 
+/**
+ * This function creates a default material properties for value text elements.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data materialProperties.
+ */
 export function defaultValueTextProperties(font){
   return textProperties( font, VT_LETTER_SPACING, VT_LINE_SPACING, VT_WORD_SPACING , VT_TEXT_PADDING, VT_TEXT_SIZE, VT_TEXT_HEIGHT, VT_TEXT_Z_OFFSET, VT_TEXT_MAT_PROPS, VT_TEXT_MESH_PROPS);
 };
 
+/**
+ * This function creates a default material properties for value text portal elements.
+ * @param {string} font path to the font json file.
+ * 
+ * @returns {object} Data materialProperties.
+ */
 export function defaultStencilValueTextProperties(font){
   let textProps = defaultValueTextProperties(font);
   textProps.matProps = phongStencilMatProperties(SECONDARY_COLOR_A);
@@ -1284,6 +1844,12 @@ export function defaultStencilValueTextProperties(font){
   return textProps
 };
 
+/**
+ * This function creates base class for all elements with text.
+ * @param {object} textProps (textProperties) property set.
+ * 
+ * @returns {object} Basetext class object.
+ */
 export class BaseText {
   constructor(textProps){
     this.textProps = textProps;
@@ -1599,8 +2165,39 @@ export class BaseText {
     this.meshes[key].userData.minScroll = this.meshes[key].userData.initialPositionY+this.meshes[key].userData.maxScroll+(this.padding-extraSpace);
     this.meshes[key].userData.padding = this.padding;
   }
+  static CreateTextGeometry(character, font, size, height, curveSegments, bevelEnabled, bevelThickness, bevelSize, bevelOffset, bevelSegments) {
+    return new TextGeometry(character, {
+      'font': font,
+      'size': size,
+      'height': height,
+      'curveSegments': curveSegments,
+      'bevelEnabled': bevelEnabled,
+      'bevelThickness': bevelThickness,
+      'bevelSize': bevelSize,
+      'bevelOffset': bevelOffset,
+      'bevelSegments': bevelSegments,
+    });
+  }
 }
 
+/**
+ * This function creates a property set toggle widgets.
+ * @param {string} name element name.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * @param {number} width  the width of the box.
+ * @param {number} height  the height of the box.
+ * @param {number} depth  the depth of the box.
+ * @param {number} smoothness amount of geometry smoothness.
+ * @param {number} radius  the curvature of the box edges.
+ * @param {number} [zOffset=1]  offset of box in z relative to the parent.
+ * @param {bool} [complexMesh=true] if true box created has curved edges, else simple box is used.
+ * @param {object} [matProps=materialProperties] (materialProperties) properties of material used on box.
+ * @param {string} [pivot='CENTER'] pivot point of the box.
+ * @param {number} [padding=0.01] box padding.
+ * @param {bool} [isPortal=false] if true, element is curved flat plane with stencil shader, children box are rendered inside of it.
+ * 
+ * @returns {object} Data object for toggle elements.
+ */
 export function boxProperties(name, parent, width, height, depth, smoothness, radius, zOffset = 1, complexMesh=true, matProps=materialProperties(), pivot='CENTER', padding=0.01, isPortal=false){
   return {
     'type': 'BOX_PROPS',
@@ -1635,10 +2232,24 @@ const W_WIDTH = 1.5;
 const W_HEIGHT = 0.25;
 const W_DEPTH = 0.1;
 
+/**
+ * This function creates default box property set for widgets on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultWidgetBoxProps(name, parent){
   return boxProperties(name, parent, W_WIDTH, W_HEIGHT, W_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for widget portals on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultWidgetPortalProps(name, parent){
   let boxProps = defaultWidgetBoxProps(parent);
   boxProps.isPortal = true;
@@ -1651,10 +2262,24 @@ const PW_WIDTH = 1.7;
 const PW_HEIGHT = 0.25;
 const PW_DEPTH = 0.05;
 
+/**
+ * This function creates default box property set for panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelWidgetBoxProps(name, parent){
   return boxProperties(name, parent, PW_WIDTH, PW_HEIGHT, PW_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for panel portals.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelWidgetPortalProps(name, parent){
   let boxProps = defaultPanelWidgetBoxProps(parent);
   boxProps.isPortal = true;
@@ -1670,10 +2295,24 @@ const PCTRL_DEPTH = 0.01;
 //default panel widget box constants
 const PIT_WIDTH = 1.5;
 
+/**
+ * This function creates default box property set for edit texts on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelEditTextBoxProps(name, parent){
   return boxProperties(name, parent, PIT_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for edit text portals on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelEditTextPortalProps(name, parent){
   let boxProps = defaultPanelEditTextBoxProps(parent);
   boxProps.isPortal = true;
@@ -1684,10 +2323,24 @@ export function defaultPanelEditTextPortalProps(name, parent){
 //default panel widget box constants
 const EDTBTN_WIDTH = 1;
 
+/**
+ * This function creates default box property set for edit text buttons on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultEditTextButtonBoxProps(name, parent){
   return boxProperties(name, parent, EDTBTN_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for edit text button portals on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultEditTextButtonPortalProps(name, parent){
   let boxProps = defaultEditTextButtonBoxProps(parent);
   boxProps.isPortal = true;
@@ -1698,10 +2351,24 @@ export function defaultEditTextButtonPortalProps(name, parent){
 //default panel toggle box constants
 const PTGL_WIDTH = 1;
 
+/**
+ * This function creates default box property set for toggles on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelToggleBoxProps(name, parent){
   return boxProperties(name, parent, PTGL_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for toggle portals on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelTogglePortalProps(name, parent){
   let boxProps = defaultPanelToggleBoxProps(parent);
   boxProps.isPortal = true;
@@ -1712,10 +2379,24 @@ export function defaultPanelTogglePortalProps(name, parent){
 //default panel toggle box constants
 const PSL_WIDTH = 1.2;
 
+/**
+ * This function creates default box property set for sliders on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelSliderBoxProps(name, parent){
   return boxProperties(name, parent, PSL_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for slider portals on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelSliderPortalProps(name, parent){
   let boxProps = defaultPanelSliderBoxProps(parent);
   boxProps.isPortal = true;
@@ -1725,10 +2406,24 @@ export function defaultPanelSliderPortalProps(name, parent){
 
 const CW_HEIGHT = 0.18;
 
+/**
+ * This function creates default box property set for color widgets on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelColorWidgetBoxProps(name, parent){
   return boxProperties(name, parent, W_WIDTH, CW_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for color widget portals on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelColorWidgetPortalProps(name, parent){
   let boxProps = defaultPanelColorWidgetBoxProps(parent);
   boxProps.isPortal = true;
@@ -1740,10 +2435,24 @@ export function defaultPanelColorWidgetPortalProps(name, parent){
 const PLS_HEIGHT = 0.13;
 const PLS_WIDTH = 0.75;
 
+/**
+ * This function creates default box property set for selector on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelListSelectorBoxProps(name, parent){
   return boxProperties(name, parent, PLS_WIDTH, PLS_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for selector portals on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelListSelectorPortalProps(name, parent){
   let boxProps = defaultPanelListSelectorBoxProps(parent);
   boxProps.isPortal = true;
@@ -1754,10 +2463,24 @@ export function defaultPanelListSelectorPortalProps(name, parent){
 //default selector box broperties
 const PBTN_WIDTH = 0.75;
 
+/**
+ * This function creates default box property set for button on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelButtonBoxProps(name, parent){
   return boxProperties(name, parent, PLS_WIDTH, PCTRL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for button portals on panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelButtonPortalProps(name, parent){
   let boxProps = defaultPanelButtonBoxProps(parent);
   boxProps.isPortal = true;
@@ -1769,10 +2492,24 @@ export function defaultPanelButtonPortalProps(name, parent){
 const PGL_WIDTH = 0.15;
 const PGL_HEIGHT = 0.15;
 
+/**
+ * This function creates default box property set for gltf model panels.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelGltfModelBoxProps(name, parent){
   return boxProperties(name, parent, PGL_WIDTH, PGL_HEIGHT, PCTRL_DEPTH, SMOOTHNESS, RADIUS, Z_OFFSET, COMPLEX_MESH, PCTRL_MAT_PROPS, PIVOT, PADDING, IS_PORTAL)
 };
 
+/**
+ * This function creates default box property set for gltf model panel portals.
+ * @param {string} name for the element.
+ * @param {object} parent Object3D that the model widget should be parented to.
+ * 
+ * @returns {object} Data (boxProperties).
+ */
 export function defaultPanelGltfModelPortalProps(name, parent){
   let boxProps = defaultPanelGltfModelBoxProps(parent);
   boxProps.isPortal = true;
@@ -1780,6 +2517,14 @@ export function defaultPanelGltfModelPortalProps(name, parent){
   return boxProps
 };
 
+/**
+ * This function sets the mesh pivot based on passed constant type.
+ * Pivot Constants: 'LEFT', 'RIGHT', 'TOP', 'TOP_LEFT', 'TOP_RIGHT','BOTTOM_LEFT', 'BOTTOM_RIGHT'
+ * @param {object} mesh Object3D mesh.
+ * @param {object} boxProps (boxProperties) property set.
+ * 
+ * @returns {null} No return.
+ */
 function setGeometryPivot(mesh, boxProps){
   let geomSize = getGeometrySize(mesh.geometry);
   switch (boxProps.pivot) {
@@ -4796,11 +5541,11 @@ export function createStaticTextBox(textBoxProps) {
     // Load the font
     loader.load(textBoxProps.textProps.font, (font) => {
       textBoxProps.textProps.font = font;
-      SetListConfigFont(textBoxProps.listConfig, font);
+      ListItemBox.SetListConfigFont(textBoxProps.listConfig, font);
       new TextBoxWidget(textBoxProps);
     });
   }else if(textBoxProps.textProps.font.isFont){
-    SetListConfigFont(textBoxProps.listConfig, font);
+    ListItemBox.SetListConfigFont(textBoxProps.listConfig, font);
     new TextBoxWidget(textBoxProps);
   }  
 };
@@ -4851,11 +5596,11 @@ export function createMultiTextBox(textBoxProps) {
     // Load the font
     loader.load(textBoxProps.textProps.font, (font) => {
       textBoxProps.textProps.font = font;
-      SetListConfigFont(textBoxProps.listConfig, font);
+      ListItemBox.SetListConfigFont(textBoxProps.listConfig, font);
       new TextBoxWidget(textBoxProps);
     });
   }else if(textBoxProps.textProps.font.isFont){
-    SetListConfigFont(textBoxProps.listConfig, font);
+    ListItemBox.SetListConfigFont(textBoxProps.listConfig, font);
     new TextBoxWidget(textBoxProps);
   }
 };
@@ -5692,11 +6437,11 @@ export function createImageBox(imageProps){
     // Load the font
     loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
       DEFAULT_TEXT_PROPS.font = font;
-      SetListConfigFont(imageProps.listConfig, font);
+      ListItemBox.SetListConfigFont(imageProps.listConfig, font);
       new ImageWidget(imageProps);
     });
   }else if(DEFAULT_TEXT_PROPS.font.isFont){
-    SetListConfigFont(imageProps.listConfig, DEFAULT_TEXT_PROPS.font);
+    ListItemBox.SetListConfigFont(imageProps.listConfig, DEFAULT_TEXT_PROPS.font);
     new ImageWidget(imageProps);
   }
 };
@@ -6436,12 +7181,12 @@ function GLTFModelWidgetLoader(gltfProps){
     // Load the font
     loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
       DEFAULT_TEXT_PROPS.font = font;
-      SetListConfigFont(gltfProps.listConfig, font);
+      ListItemBox.SetListConfigFont(gltfProps.listConfig, font);
       let model = new GLTFModelWidget(gltfProps);
       gltfModels.push(model);
     });
   }else if(DEFAULT_TEXT_PROPS.font.isFont){
-    SetListConfigFont(gltfProps.listConfig, DEFAULT_TEXT_PROPS.font);
+    ListItemBox.SetListConfigFont(gltfProps.listConfig, DEFAULT_TEXT_PROPS.font);
     let model = new GLTFModelWidget(gltfProps);
     gltfModels.push(model);
   }
@@ -6697,7 +7442,7 @@ export class ListItemBox extends BaseBox {
     }
   }
   CreateListTextGeometry(text, sizeMult=1){
-    return createTextGeometry(text, this.textProps.font, this.textProps.size*sizeMult, this.textProps.height, this.textProps.meshProps.curveSegments, this.textProps.meshProps.bevelEnabled, this.textProps.meshProps.bevelThickness, this.textProps.meshProps.bevelSize, this.textProps.meshProps.bevelOffset, this.textProps.meshProps.bevelSegments);
+    return BaseText.CreateTextGeometry(text, this.textProps.font, this.textProps.size*sizeMult, this.textProps.height, this.textProps.meshProps.curveSegments, this.textProps.meshProps.bevelEnabled, this.textProps.meshProps.bevelThickness, this.textProps.meshProps.bevelSize, this.textProps.meshProps.bevelOffset, this.textProps.meshProps.bevelSegments);
   }
   NewTextMeshStencilMaterial(stencilRef){
     this.listTextMaterial = getMaterial(this.box.userData.properties.textProps.matProps, stencilRef);
@@ -6724,6 +7469,11 @@ export class ListItemBox extends BaseBox {
   NewDate(){
     let timestamp = Number(new Date());
     return new Date(timestamp).toString();
+  }
+  static SetListConfigFont(listConfig, font){
+    if(listConfig!=undefined){
+      listConfig.textProps.font = font;
+    }
   }
 
 };
