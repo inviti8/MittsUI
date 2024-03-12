@@ -2647,6 +2647,7 @@ export class BaseBox {
     this.isPortal = boxProps.isPortal;
     this.material = getMaterial(boxProps.matProps);
     this.geometry = this.CreateBoxGeometry(boxProps);
+    this.boxProps = boxProps;
     this.box = new THREE.Mesh(this.geometry, this.material);
     setGeometryPivot(this.box, boxProps);
     this.box.userData.width = this.width;
@@ -3089,6 +3090,31 @@ class BaseTextBox extends BaseBox {
     this.textMesh.geometry.dispose();
     this.box.remove(this.textMesh);
   }
+  UpdateBoxPropsColors(boxProps){
+    let bProps = {...boxProps};
+    let boxMatProps = {...bProps.matProps};
+    boxMatProps.color = this.boxProps.matProps.color;
+    bProps.matProps = boxMatProps;
+    bProps = boxProps;
+
+    return bProps
+  }
+  UpdateWidgetPropColors(props){
+    let boxProps = {...props.boxProps};
+    let textProps = {...props.textProps};
+    let boxMatProps = {...boxProps.matProps};
+    let textMatProps = {...textProps.matProps};
+    boxMatProps.color = this.boxProps.matProps.color;
+    textMatProps.color = this.textProps.matProps.color;
+
+    boxProps.matProps = boxMatProps;
+    textProps.matProps = textMatProps;
+
+    props.boxProps = boxProps;
+    props.textProps = textProps;
+
+    return props
+  }
 }
 
 /**
@@ -3146,6 +3172,10 @@ export class PanelGltfModel extends BaseTextBox {
     }
 
     let gltfProps = defaultPanelGltfModelProps(this.scene, this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.path);
+    if(panelProps.unique){
+      gltfProps = this.UpdateWidgetPropColors(gltfProps);
+    }
+    
     gltfProps.ctrl = this;
 
     gltfLoader.load( gltfProps.gltf,function ( gltf ) {
@@ -3187,6 +3217,10 @@ export class PanelGltfModelMeter extends PanelGltfModel{
     this.scene = panelProps.scene;
     this.SetParentPanel();
     this.meterProps = defaultPanelMeterProps(this.scene, this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
+    if(panelProps.unique){
+      this.meterProps = this.UpdateWidgetPropColors(this.meterProps);
+    }
+
     this.DeleteText();
     this.loadedCallback = this.SetupMeter;
   }
@@ -3213,6 +3247,9 @@ export class PanelGltfModelValueMeter extends PanelGltfModelMeter{
     this.scene = panelProps.scene;
     this.SetParentPanel();
     this.meterProps = defaultPanelValueMeterProps(this.scene, this.panelProps.name, this.box, this.panelProps.textProps.font, this.valProps.widgetValueProp);
+    if(panelProps.unique){
+      this.meterProps = this.UpdateWidgetPropColors(this.meterProps);
+    }
     this.loadedCallback = this.SetupValueMeter;
   }
   SetupValueMeter(){
@@ -3238,7 +3275,13 @@ export class PanelEditText extends PanelBox {
     this.is = 'PANEL_EDIT_TEXT';
     this.scene = panelProps.scene;
     const section = panelProps.sections.data[panelProps.name];
-    const editTextProps = defaultPanelEditTextProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    let editTextProps = defaultPanelEditTextProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    if(panelProps.unique){
+      editTextProps = this.UpdateWidgetPropColors(editTextProps);
+    }
+    if(panelProps.unique){
+      gltfProps = this.UpdateWidgetPropColors(props);
+    }
     editTextProps.name = section.name;
     editTextProps.textProps.wrap = false;
     this.ctrlWidget = new InputTextWidget(editTextProps);
@@ -3259,7 +3302,10 @@ export class PanelInputText extends PanelBox {
     this.scene = panelProps.scene;
     const section = panelProps.sections.data[panelProps.name];
     this.SetParentPanel();
-    const inputTextProps = defaultPanelInputTextProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    let inputTextProps = defaultPanelInputTextProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    if(panelProps.unique){
+      inputTextProps = this.UpdateWidgetPropColors(inputTextProps);
+    }
     inputTextProps.name = section.name;
     inputTextProps.textProps.wrap = false;
     this.ctrlWidget = new InputTextWidget(inputTextProps);
@@ -3280,7 +3326,10 @@ export class PanelBooleanToggle extends PanelBox {
     this.scene = panelProps.scene;
     this.SetParentPanel();
     this.DeleteText();
-    const toggleProps = defaultPanelBooleanToggleProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    let toggleProps = defaultPanelBooleanToggleProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    if(panelProps.unique){
+      toggleProps = this.UpdateWidgetPropColors(toggleProps);
+    }
     this.ctrlWidget = new ToggleWidget(toggleProps);
 
   }
@@ -3310,7 +3359,10 @@ export class PanelSlider extends PanelBox {
         valProps = section.data.val_props.valueProps
       }
     }
-    const sliderProps = defaultPanelSliderProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, valProps);
+    let sliderProps = defaultPanelSliderProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, valProps);
+    if(panelProps.unique){
+      sliderProps = this.UpdateWidgetPropColors(sliderProps);
+    }
     if(objectControlProps!=undefined){
       sliderProps.objectControlProps = objectControlProps;
     }
@@ -3334,7 +3386,10 @@ export class PanelMaterialSlider extends PanelBox {
     const section = panelProps.sections.data[panelProps.name];
     const matRefProps = section.data;
     matRefProps.valueProps.editable = true;
-    const sliderProps = defaultPanelSliderProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, matRefProps.valueProps);
+    let sliderProps = defaultPanelSliderProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, matRefProps.valueProps);
+    if(panelProps.unique){
+      sliderProps = this.UpdateWidgetPropColors(sliderProps);
+    }
     sliderProps.objectControlProps = matRefProps;
     this.ctrlWidget = new SliderWidget(sliderProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
@@ -3358,7 +3413,10 @@ export class PanelMeter extends PanelBox {
     if(valProps.type == 'HVYM_VAL_PROP_REF'){
       valProps = valProps.val_props;
     }
-    const meterProps = defaultPanelMeterProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, valProps);
+    let meterProps = defaultPanelMeterProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, valProps);
+    if(panelProps.unique){
+      meterProps = this.UpdateWidgetPropColors(meterProps);
+    }
     this.ctrlWidget = new MeterWidget(meterProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   } 
@@ -3381,7 +3439,10 @@ export class PanelValueMeter extends PanelBox {
     if(valProps.type == 'HVYM_VAL_PROP_REF'){
       valProps = valProps.val_props;
     }
-    const meterProps = defaultPanelValueMeterProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, valProps);
+    let meterProps = defaultPanelValueMeterProps(this.scene, panelProps.name, this.box, panelProps.textProps.font, valProps);
+    if(panelProps.unique){
+      meterProps = this.UpdateWidgetPropColors(meterProps);
+    }
     this.ctrlWidget = new MeterWidget(meterProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -3399,7 +3460,10 @@ export class PanelColorWidget extends PanelBox {
     this.is = 'PANEL_COLOR_WIDGET';
     this.scene = panelProps.scene;
     this.SetParentPanel();
-    const colorWidgetProps = defaultPanelColorWidgetProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    let colorWidgetProps = defaultPanelColorWidgetProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    if(panelProps.unique){
+      colorWidgetProps = this.UpdateWidgetPropColors(colorWidgetProps);
+    }
     this.ctrlWidget = new ColorWidget(colorWidgetProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -3420,6 +3484,9 @@ export class PanelMaterialColorWidget extends PanelBox {
     const section = panelProps.sections.data[panelProps.name];
     const matRefProps = section.data;
     this.colorWidgetProps = defaultPanelColorWidgetProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    if(panelProps.unique){
+      this.colorWidgetProps = this.UpdateWidgetPropColors(this.colorWidgetProps);
+    }
     if(matRefProps.targetProp=='color'){
       matRefProps.useMaterialView = true;
       this.colorWidgetProps.useAlpha = true;
@@ -3452,7 +3519,10 @@ export class PanelListSelector extends PanelBox {
     if(!dataIsHVYMWidget(this.selectors))
       return;
 
-    const listSelectorProps = defaultPanelListSelectorProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    let listSelectorProps = defaultPanelListSelectorProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    if(panelProps.unique){
+      listSelectorProps = this.UpdateWidgetPropColors(listSelectorProps);
+    }
     this.ctrlWidget = new SelectorWidget(listSelectorProps);
     this.ctrlWidget.box.userData.hoverZPos = this.size.depth*2;
     this.ctrlWidget.AssignSelectionSet(this.selectors);
@@ -3476,6 +3546,9 @@ export class PanelToggle extends PanelBox {
     const sectionProps = section.data;
     let on = false;
     let toggleProps = defaultPanelBooleanToggleProps(this.scene, sectionProps.name, this.box, panelProps.textProps.font, false);
+    if(panelProps.unique){
+      toggleProps = this.UpdateWidgetPropColors(toggleProps);
+    }
     if(sectionProps.type == 'HVYM_MESH_PROP_REF'){
       toggleProps.on = sectionProps.val_props.ref.visible;
       toggleProps.objectControlProps = sectionProps.val_props;
@@ -3500,7 +3573,10 @@ export class PanelButton extends PanelBox {
     this.is = 'PANEL_BUTTON';
     this.scene = panelProps.scene;
     this.SetParentPanel();
-    const buttonProps = defaultPanelButtonProps(this.scene, panelProps.name, this.box, panelProps.textProps.font)
+    let buttonProps = defaultPanelButtonProps(this.scene, panelProps.name, this.box, panelProps.textProps.font);
+    if(panelProps.unique){
+      buttonProps = this.UpdateWidgetPropColors(buttonProps);
+    }
     this.ctrlWidget = ButtonElement(buttonProps);
     this.box.userData.ctrlWidget = this.ctrlWidget;
   }
@@ -3636,7 +3712,7 @@ export function panelMaterialSetSectionPropertySet(materialSet){
  * 
  * @returns {object} Data object for panel elements.
  */
-export function panelProperties( scene, boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined){
+export function panelProperties( scene, boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined, unique=false){
   return {
     'type': 'PANEL',
     'scene': scene,
@@ -3650,7 +3726,8 @@ export function panelProperties( scene, boxProps, name='Panel', textProps, attac
     'isSubPanel': isSubPanel,
     'topPanel': topPanel,
     'topCtrl': topCtrl,
-    'index': 0
+    'index': 0,
+    'unique': unique
   }
 };
 
@@ -3915,6 +3992,11 @@ export class BasePanel extends BaseTextBox {
       sectionProps.name = name;
       sectionProps.isSubPanel = true;
       sectionProps.boxProps = defaultPanelWidgetBoxProps('panel-box-'+index.toString(), this.box);
+      if(panelProps.unique){
+        sectionProps = this.UpdateWidgetPropColors(sectionProps);
+        let c = colorsea(sectionProps.boxProps.matProps.color, 100).lighten(10);
+        sectionProps.boxProps.matProps.color = c.hex();
+      }
       sectionProps.index = index;
       let ctrlBox = undefined;
 
@@ -6955,6 +7037,7 @@ export class HVYM_Data {
         tProps.matProps = textMatProps;
         let topSectionData = this.createHVYMCollectionWidgetData(collection);
         let colPanel = panelProperties( scene, panelBoxProps, collection.collectionName, tProps, collection.menuData.alignment, topSectionData);
+        colPanel.unique = true;
         colPanels[collection.menuTransform.name] = colPanel;
       }
     }
