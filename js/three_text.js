@@ -3712,7 +3712,7 @@ export function panelMaterialSetSectionPropertySet(materialSet){
  * 
  * @returns {object} Data object for panel elements.
  */
-export function panelProperties( scene, boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=true, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined, unique=false){
+export function panelProperties( scene, boxProps, name='Panel', textProps, attach='LEFT', sections={}, open=false, expanded=false, isSubPanel=false, topPanel=undefined, topCtrl=undefined, unique=false){
   return {
     'type': 'PANEL',
     'scene': scene,
@@ -3813,7 +3813,6 @@ export class BasePanel extends BaseTextBox {
       this.handleExpand.rotation.z = this.handleExpand.rotation.z+0.8;
     }
 
-    this.handleOpen = undefined;
     this.SetUserData();
 
     if(panelProps.sections != undefined){
@@ -3869,6 +3868,11 @@ export class BasePanel extends BaseTextBox {
       this.box.dispatchEvent({type:'hideWidgets'});
     }
 
+    if(this.handleOpen!=undefined && !this.open){
+      this.box.userData.properties.open = !(this.open);
+      this.scene.anims.panelAnimation(this.box, 'OPEN', 0.0001);
+    }
+
   }
   CreateTopHandle() {
     const handle = this.CreateHandle();
@@ -3893,19 +3897,22 @@ export class BasePanel extends BaseTextBox {
       }
     }
 
+    this.box.userData.handleOpen = handle;
+    handle.userData.targetElem = this.box;
+    this.box.userData.properties.open = this.open;
+    const self = this;
+
+    handle.addEventListener('action', function(event) {
+      self.scene.anims.panelAnimation(this.userData.targetElem);
+    });
+
     if(!this.open){
       handle.rotation.z = handle.rotation.z;
     }else if(this.open){
       handle.rotation.z = handle.rotation.z+0.8;
     }
 
-    this.box.userData.handleOpen = handle;
-    handle.userData.targetElem = this.box;
-    const self = this;
-
-    handle.addEventListener('action', function(event) {
-      self.scene.anims.panelAnimation(this.userData.targetElem);
-    });
+    return handle
   }
   CreateHandle() {
     let result = undefined;
@@ -3955,10 +3962,6 @@ export class BasePanel extends BaseTextBox {
       this.box.position.set(this.parentSize.width/2+this.width/2, this.parentSize.height/2-this.height/2, this.parentSize.depth);
     }
 
-    if(!this.open){
-      this.box.scale.set(0,0,0);
-    }
-
     if(this.isSubPanel){
       this.box.position.copy(this.parent.position);
       this.DarkenBoxMaterial();
@@ -3998,6 +4001,7 @@ export class BasePanel extends BaseTextBox {
   CreateControlSections(panelProps){
     let index = 1;
     let widgetHeight = undefined;
+    const propCount = Object.entries(panelProps.sections.data).length;
     for (const [name, sect] of Object.entries(panelProps.sections.data)) {
       let sectionProps = {...panelProps};
       sectionProps.name = name;
@@ -4080,6 +4084,7 @@ export class BasePanel extends BaseTextBox {
     }
     this.box.userData.widgetHeight = widgetHeight;
     this.box.userData.expandedHeight = this.height+(widgetHeight*Object.keys(this.sections.data).length)+this.bottom.height;
+
   }
   CreateContainerSections(panelProps){
     let index = 1;
