@@ -34,20 +34,18 @@ THREE.Object3D.prototype.updateMatrix = function () {
 };
 
 //colors
-const PRIMARY_COLOR_A = '#4ed8a7';
+const PRIMARY_COLOR_A = '#37b89e';
 let c = colorsea(PRIMARY_COLOR_A, 100).darken(15);
 const PRIMARY_COLOR_B = c.hex();
 c = colorsea(PRIMARY_COLOR_A, 100).darken(5);
 const PRIMARY_COLOR_C = c.hex();
-const SECONDARY_COLOR_A = '#cf5270';
+const SECONDARY_COLOR_A = '#ce166f';
 
 const loader = new FontLoader();
 const gltfLoader = new GLTFLoader();
-let posVar = new THREE.Vector3();
-let scaleVar = new THREE.Vector3();
-let stencilRefs = [];//For assigning a unique stencil ref to each clipped material
+export const stencilRefs = [];//For assigning a unique stencil ref to each clipped material
 
-const DEFAULT_FONT = 'fonts/Generic_Techno_Regular.json';
+export const DEFAULT_FONT = 'fonts/Generic_Techno_Regular.json';
 let DEFAULT_TEXT_PROPS = textProperties( DEFAULT_FONT, 0.02, 0.1, 0.1, 0.1, 0.05, 0.05, 1);
 loader.load(DEFAULT_TEXT_PROPS.font, (font) => {
   DEFAULT_TEXT_PROPS.font = font;
@@ -89,8 +87,10 @@ export function MainSceneProperties(scene=undefined, mouse=undefined, camera=und
  */
 export class HVYM_Scene {
   constructor(sceneProps) {
+    this.is = 'HVYM_SCENE';
     this.scene = sceneProps.scene;
-    this.anims = new HVYM_Animation();
+    this.utils = new HVYM_Utils();
+    this.anims = new HVYM_Animation(this);
     this.raycaster = sceneProps.raycaster;
     this.draggable = [];
     this.mouseOverable = [];
@@ -227,12 +227,12 @@ export class HVYM_Scene {
       const dragPosition = this.lastDragged.position.clone();
       this.toggleSceneCtrls(false);
       if(!this.lastDragged.userData.horizontal){
-        dragDistY = deltaY;
+        this.dragDistY = deltaY;
 
         if(deltaY<0){
-          moveDir=1
+          this.moveDir=1
         }else{
-          moveDir=-1;
+          this.moveDir=-1;
         }
         // Limit scrolling
         dragPosition.y = Math.max(this.lastDragged.userData.minScroll, Math.min(this.lastDragged.userData.maxScroll, dragPosition.y - deltaY * 0.01));
@@ -240,12 +240,12 @@ export class HVYM_Scene {
         this.previousMouseY = event.clientY;
         this.lastDragged.dispatchEvent({type:'action'});
       }else{
-        dragDistX = deltaX;
+        this.dragDistX = deltaX;
 
         if(deltaX<0){
-          moveDir=1
+          this.moveDir=1
         }else{
-          moveDir=-1;
+          this.moveDir=-1;
         }
 
         // Limit scrolling
@@ -347,18 +347,39 @@ export class HVYM_Scene {
   }
 }
 
+export class HVYM_Utils {
+  constructor() {
 
-function _randomNumber(min, max) {
-  return Math.random() * (max - min) + min;
-}
-
-function* _range(from, to, step = 1) {
-  let value = from;
-  while (value <= to) {
-    yield value;
-    value += step;
+  }
+  /**
+   * This function creates a random number between a minumum and maximum value.
+   * @param {number} min minumum number in range.
+   * @param {number} max maximum number in range.
+   * 
+   * @returns {number} random number.
+   * 
+   */
+  randomNumber(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+  /**
+   * This function returns a range number between 2 numbers.
+   * @param {number} from the starting number for the range.
+   * @param {number} to ending number in range.
+   * @param {number} step the increment number in range.
+   * 
+   * @returns {number} random number.
+   * 
+   */
+  * range(from, to, step = 1) {
+    let value = from;
+    while (value <= to) {
+      yield value;
+      value += step;
+    }
   }
 }
+
 
 /**
  * This function creates a new property set for animation.
@@ -401,7 +422,9 @@ export function infoProperties(title, author){
 };
 
 export class HVYM_Animation {
-  constructor() {
+  constructor(hvymScene) {
+    this.is = 'HVYM_SCENE';
+    this.scene = hvymScene;
     this.posVar = new THREE.Vector3();
     this.scaleVar = new THREE.Vector3();
   }
@@ -518,10 +541,10 @@ export class HVYM_Animation {
           break;
         case 'UNSCRAMBLE0':
           if(action == 'OUT'){
-            this.posVar.set(txt.position.x+_randomNumber(-0.1, 0.1), txt.position.y+_randomNumber(-0.1, 0.1), txt.position.z);
+            this.posVar.set(txt.position.x+this.scene.utils.randomNumber(-0.1, 0.1), txt.position.y+this.scene.utils.randomNumber(-0.1, 0.1), txt.position.z);
           }else{
             this.posVar.copy(txt.position);
-            txt.position.set(txt.position.x+_randomNumber(-0.1, 0.1), txt.position.y+_randomNumber(-0.1, 0.1), txt.position.z);
+            txt.position.set(txt.position.x+this.scene.utils.randomNumber(-0.1, 0.1), txt.position.y+this.scene.utils.randomNumber(-0.1, 0.1), txt.position.z);
             txt.material.opacity=1;
           }
           props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
@@ -533,10 +556,10 @@ export class HVYM_Animation {
           break;
         case 'UNSCRAMBLE1':
           if(action == 'OUT'){
-            this.posVar.set(txt.position.x+_randomNumber(-1, 1), txt.position.y+_randomNumber(-1, 1), txt.position.z);
+            this.posVar.set(txt.position.x+this.scene.utils.randomNumber(-1, 1), txt.position.y+this.scene.utils.randomNumber(-1, 1), txt.position.z);
           }else{
             this.posVar.copy(txt.position);
-            txt.position.set(txt.position.x+_randomNumber(-1, 1), txt.position.y+_randomNumber(-1, 1), txt.position.z);
+            txt.position.set(txt.position.x+this.scene.utils.randomNumber(-1, 1), txt.position.y+this.scene.utils.randomNumber(-1, 1), txt.position.z);
             txt.material.opacity=1;
           }
           props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
@@ -548,10 +571,10 @@ export class HVYM_Animation {
           break;
         case 'UNSCRAMBLE2':
           if(action == 'OUT'){
-            this.posVar.set(txt.position.x+_randomNumber(-2, 2), txt.position.y+_randomNumber(-2, 2), txt.position.z);
+            this.posVar.set(txt.position.x+this.scene.utils.randomNumber(-2, 2), txt.position.y+this.scene.utils.randomNumber(-2, 2), txt.position.z);
           }else{
             this.posVar.copy(txt.position);
-            txt.position.set(txt.position.x+_randomNumber(-2, 2), txt.position.y+_randomNumber(-2, 2), txt.position.z);
+            txt.position.set(txt.position.x+this.scene.utils.randomNumber(-2, 2), txt.position.y+this.scene.utils.randomNumber(-2, 2), txt.position.z);
             txt.material.opacity=1;
           }
           props = {duration: duration, x: this.posVar.x, y: this.posVar.y, z: this.posVar.z, ease: ease };
@@ -629,7 +652,7 @@ export class HVYM_Animation {
       doAnim=true;
     }else if (!elem.userData.mouseOver && elem.userData.mouseOverActive && (elem.scale.x != elem.userData.defaultScale.x || elem.scale.y != elem.userData.defaultScale.z)){
       elem.userData.mouseOverActive = false;
-      scaleVar.copy(elem.userData.defaultScale);
+      this.scaleVar.copy(elem.userData.defaultScale);
       doAnim=true;
     }
 
@@ -903,7 +926,7 @@ export class HVYM_Animation {
           if(elem.userData.index==parentSectionsLength){
             //YPos -= elem.userData.expandedHeight-parentBottom.userData.height-parentBottom.userData.height;
           }else{
-            for (const i of _range(startIdx, parentSectionsLength)) {
+            for (const i of this.scene.utils.range(startIdx, parentSectionsLength)) {
               let idx = i-1;
               let el = elem.parent.userData.sectionElements[idx];
               let prev = elem.parent.userData.sectionElements[idx-1];
@@ -928,7 +951,7 @@ export class HVYM_Animation {
           if(elem.userData.index==parentSectionsLength){;
             //YPos -= elem.userData.closedHeight-parentBottom.userData.height-parentBottom.userData.height;
           }else{
-            for (const i of _range(startIdx, parentSectionsLength)) {
+            for (const i of this.scene.utils.range(startIdx, parentSectionsLength)) {
               let idx = i-1;
               let el = elem.parent.userData.sectionElements[idx];
               let prev = elem.parent.userData.sectionElements[idx-1];
@@ -2811,11 +2834,17 @@ export class BaseBox {
   AlignLeft(){
     this.box.position.copy(this.LeftCenterBoxPos(this.zPosDir));
   }
+  AlignLeftOfTransform(){
+    this.box.position.set(-this.size.width/2, 0, 0);
+  }
   AlignOutsideLeft(zPosDir=1){
     this.box.position.copy(this.LeftCenterOutsideBoxPos(zPosDir));
   }
   AlignRight(){
     this.box.position.copy(this.RightCenterBoxPos(this.zPosDir));
+  }
+  AlignRightOfTransform(){
+    this.box.position.set(this.size.width/2, 0, 0);
   }
   AlignOutsideRight(zPosDir=1){
     this.box.position.copy(this.RightCenterOutsideBoxPos(zPosDir));
@@ -3664,7 +3693,6 @@ export class BasePanel extends BaseTextBox {
     this.box.userData.panelProps = this.panelProps;
     this.box.userData.panelCtrl = this;
     this.panelMaterials = [];
-
     this.SetParentPanel();
 
 
@@ -3728,6 +3756,7 @@ export class BasePanel extends BaseTextBox {
       });
     });
 
+
     this.handleExpand.addEventListener('action', function(event) {
       this.userData.targetElem.userData.properties.expanded = !this.userData.targetElem.userData.properties.expanded;
       if(!this.userData.targetElem.userData.properties.expanded){
@@ -3758,6 +3787,10 @@ export class BasePanel extends BaseTextBox {
       });
     });
 
+    if(this.isSubPanel){
+      this.box.dispatchEvent({type:'hideWidgets'});
+    }
+
   }
   CreateTopHandle() {
     const handle = this.CreateHandle();
@@ -3783,7 +3816,7 @@ export class BasePanel extends BaseTextBox {
     const self = this;
 
     handle.addEventListener('action', function(event) {
-      self.scene.animspanelAnimation(this.userData.targetElem);
+      self.scene.anims.panelAnimation(this.userData.targetElem);
     });
   }
   CreateHandle() {
@@ -6575,6 +6608,8 @@ export class HVYM_Data {
         }else{
           this.collections[key] = this.hvymCollection(key, obj.collectionName);
           this.collections[key].models = this.getCollectionModelRefs(gltf.scene, obj.nodes);
+          this.collections[key].menuData = {...extensions.HVYM_nft_data[key].menuData};
+          this.collections[key].menuTransform = this.getCollectionMenuTransform(this.collections[key]);
           this.collections[key].materials = this.getGltfSceneMaterials(gltf.scene);
           this.collections[key].hasAnimation = false;
 
@@ -6889,14 +6924,34 @@ export class HVYM_Data {
 
     return panelSectionProperties('sections', 'container', mainData);
   }
-  panelHVYMCollectionPropertyList(scene, parent, textProps){
+  basicPanelHVYMCollectionPropertyList(scene, parent, textProps){
     let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', parent);
     let colPanels = [];
 
     for (const [colId, collection] of Object.entries(this.collections)) {
-      let topSectionData = this.createHVYMCollectionWidgetData(collection);
-      let colPanel = panelProperties( scene, panelBoxProps, collection.collectionName, textProps, 'LEFT', topSectionData);
-      colPanels.push(colPanel);
+
+      if(collection.menuTransform==undefined){
+        let topSectionData = this.createHVYMCollectionWidgetData(collection);
+        let colPanel = panelProperties( scene, panelBoxProps, collection.collectionName, textProps, 'LEFT', topSectionData);
+        colPanels.push(colPanel);
+      }
+    }
+
+    return colPanels
+  }
+  uniquePanelHVYMCollectionPropertyList(scene, parent, textProps){
+    let colPanels = {};
+
+    for (const [colId, collection] of Object.entries(this.collections)) {
+
+      if(collection.menuTransform!=undefined){
+        let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', collection.menuTransform);
+        panelBoxProps.matProps.color = collection.menuData.primary_color;
+        textProps.matProps.color = collection.menuData.text_color;
+        let topSectionData = this.createHVYMCollectionWidgetData(collection);
+        let colPanel = panelProperties( scene, panelBoxProps, collection.collectionName, textProps, collection.menuData.alignment, topSectionData);
+        colPanels[collection.menuTransform.name] = colPanel;
+      }
     }
 
     return colPanels
@@ -6914,7 +6969,9 @@ export class HVYM_Data {
       'meshProps': {},
       'materialSets': {},
       'models': {},
-      'materials': {}
+      'materials': {},
+      'menuTransform': undefined,
+      'menuData': undefined
     }
   }
   hvymMeshSet(collection_id, set, widget_type, widget){
@@ -7091,6 +7148,19 @@ export class HVYM_Data {
 
     return result
   }
+  getCollectionMenuTransform(collection){
+    let result = undefined;
+    const menuName = 'menu_'+collection.id;
+    if(collection.models.hasOwnProperty(menuName)){
+      result = collection.models[menuName];
+      result.userData.alignment = collection.menuData.alignment
+      result.userData.primary_color = collection.menuData.primary_color;
+      result.userData.secondary_color = collection.menuData.secondary_color;
+      result.userData.text_color = collection.menuData.text_color;
+    }
+    
+    return result
+  }
 };
 
 /**
@@ -7211,8 +7281,10 @@ export class GLTFModelWidget extends BaseWidget {
         // Load the font
         loader.load(panelTextProps.font, (font) => {
           panelTextProps.font = font;
-          const panelPropList = this.hvymData.panelHVYMCollectionPropertyList(this.scene, this.box, panelTextProps, this.isPortal);
-          this.CreateHVYMPanel(panelPropList);
+          const basicPanelPropList = this.hvymData.basicPanelHVYMCollectionPropertyList(this.scene, this.box, panelTextProps, this.isPortal);
+          this.CreateBasicHVYMPanel(basicPanelPropList);
+          const uniquePanelPropList = this.hvymData.uniquePanelHVYMCollectionPropertyList(this.scene, this.box, panelTextProps, this.isPortal);
+          this.CreateUniqueHVYMPanel(uniquePanelPropList);
           this.isHVYM = true;
         });
       }
@@ -7223,7 +7295,7 @@ export class GLTFModelWidget extends BaseWidget {
       this.hvymData.mixer.update(delta);
     }
   }
-  CreateHVYMPanel(panelPropList){
+  CreateBasicHVYMPanel(panelPropList){
     panelPropList.forEach((panelProps, index) =>{
       let panel = undefined;
       if(index == 0){
@@ -7244,6 +7316,25 @@ export class GLTFModelWidget extends BaseWidget {
       this.hvymPanels[0].MakePortalChild(this.stencilRef);
     }
     
+  }
+  CreateUniqueHVYMPanel(panelPropList){
+    for (const [menuTransform, panelProps] of Object.entries(panelPropList)) {
+      let panel = new BasePanel(panelProps);
+      if(panelProps.attach == 'LEFT'){
+        panel.AlignLeftOfTransform();
+      }else if(panelProps.attach == 'RIGHT'){
+        panel.AlignRightOfTransform();
+      }else{
+        panel.box.set(0,0,0);
+      }
+      
+      if(panel != undefined){
+        this.hvymPanels.push(panel);
+      }
+      if(this.isPortal && this.hvymPanels.length>0){
+        panel.MakePortalChild(this.stencilRef);
+      }
+    }
   }
   MakeModelPortalChild(stencilRef){
     this.stencilRef = stencilRef;
