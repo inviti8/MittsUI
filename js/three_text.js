@@ -3754,6 +3754,7 @@ export class BasePanel extends BaseTextBox {
     super(buttonProperties(panelProps.scene, panelProps.boxProps, panelProps.name, panelProps.value, panelProps.textProps, panelProps.mouseOver));
     this.is = 'BASE_PANEL';
     this.scene = panelProps.scene;
+    this.unique = panelProps.unique;
     this.boxProps = panelProps.boxProps;
     this.name = panelProps.name;
     this.textProps = panelProps.textProps;
@@ -3874,12 +3875,22 @@ export class BasePanel extends BaseTextBox {
 
     this.parent.add(handle);
 
-    if(this.attach == 'CENTER'){
-      handle.position.set(this.width/2, this.height/2, this.parentSize.depth+this.depth/2);
-    }else if(this.attach == 'LEFT'){
-      handle.position.set(-(this.parentSize.width/2), this.parentSize.height/2, this.parentSize.depth+this.depth/2);
-    }else if(this.attach == 'RIGHT'){
-      handle.position.set(this.parentSize.width/2, this.parentSize.height/2, -(this.parentSize.depth+this.depth/2));
+    if(!this.unique){
+      if(this.attach == 'CENTER'){
+        handle.position.set(this.width/2, this.height/2, this.parentSize.depth+this.depth/2);
+      }else if(this.attach == 'LEFT'){
+        handle.position.set(-(this.parentSize.width/2), this.parentSize.height/2, this.parentSize.depth+this.depth/2);
+      }else if(this.attach == 'RIGHT'){
+        handle.position.set(-(this.parentSize.width/2), this.parentSize.height/2, this.parentSize.depth+this.depth/2);
+      }
+    }else{
+      if(this.attach == 'CENTER'){
+        handle.position.set(0, 0, this.parentSize.depth+this.depth/2);
+      }else if(this.attach == 'LEFT'){
+        handle.position.set(0, this.height/2, this.depth/2);
+      }else if(this.attach == 'RIGHT'){
+        handle.position.set(this.width, this.height/2, this.depth/2);
+      }
     }
 
     if(!this.open){
@@ -7027,7 +7038,7 @@ export class HVYM_Data {
     for (const [colId, collection] of Object.entries(this.collections)) {
 
       if(collection.menuTransform!=undefined){
-        let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', collection.menuTransform);
+        let panelBoxProps = defaultPanelWidgetBoxProps('panel-box-'+collection.collectionName, collection.menuTransform);
         let boxMatProps = {...panelBoxProps.matProps}
         let textMatProps = {...textProps.matProps}
         let tProps = {...textProps};
@@ -7037,6 +7048,8 @@ export class HVYM_Data {
         tProps.matProps = textMatProps;
         let topSectionData = this.createHVYMCollectionWidgetData(collection);
         let colPanel = panelProperties( scene, panelBoxProps, collection.collectionName, tProps, collection.menuData.alignment, topSectionData);
+        colPanel.topPanel = undefined;
+        colPanel.topCtrl = undefined;
         colPanel.unique = true;
         colPanels[collection.menuTransform.name] = colPanel;
       }
