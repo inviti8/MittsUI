@@ -3477,7 +3477,7 @@ export class PanelToggle extends PanelBox {
     let on = false;
     let toggleProps = defaultPanelBooleanToggleProps(this.scene, sectionProps.name, this.box, panelProps.textProps.font, false);
     if(sectionProps.type == 'HVYM_MESH_PROP_REF'){
-      toggleProps.on = sectionProps.visible;
+      toggleProps.on = sectionProps.val_props.ref.visible;
       toggleProps.objectControlProps = sectionProps.val_props;
     }else if(sectionProps.type == 'HVYM_ANIM_PROP'){
       toggleProps.objectControlProps = sectionProps.val_props;
