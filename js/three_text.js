@@ -6946,10 +6946,15 @@ export class HVYM_Data {
 
       if(collection.menuTransform!=undefined){
         let panelBoxProps = defaultPanelWidgetBoxProps('panel-box', collection.menuTransform);
-        panelBoxProps.matProps.color = collection.menuData.primary_color;
-        textProps.matProps.color = collection.menuData.text_color;
+        let boxMatProps = {...panelBoxProps.matProps}
+        let textMatProps = {...textProps.matProps}
+        let tProps = {...textProps};
+        boxMatProps.color = collection.menuData.primary_color;
+        textMatProps.color = collection.menuData.text_color;
+        panelBoxProps.matProps = boxMatProps;
+        tProps.matProps = textMatProps;
         let topSectionData = this.createHVYMCollectionWidgetData(collection);
-        let colPanel = panelProperties( scene, panelBoxProps, collection.collectionName, textProps, collection.menuData.alignment, topSectionData);
+        let colPanel = panelProperties( scene, panelBoxProps, collection.collectionName, tProps, collection.menuData.alignment, topSectionData);
         colPanels[collection.menuTransform.name] = colPanel;
       }
     }
