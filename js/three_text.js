@@ -3888,13 +3888,7 @@ export class BasePanel extends BaseTextBox {
         handle.position.set(-(this.parentSize.width/2), this.parentSize.height/2, this.parentSize.depth+this.depth/2);
       }
     }else{
-      if(this.attach == 'CENTER'){
-        handle.position.set(0, 0, this.parentSize.depth+this.depth/2);
-      }else if(this.attach == 'LEFT'){
-        handle.position.set(0, this.height/2, this.depth/2);
-      }else if(this.attach == 'RIGHT'){
-        handle.position.set(this.width, this.height/2, this.depth/2);
-      }
+      handle.position.set(0, this.height/2, this.depth/2);
     }
 
     this.box.userData.handleOpen = handle;
@@ -6677,8 +6671,10 @@ export function createImageBox(imageProps){
 export function dataIsHVYMWidget(data){
   let result = false;
 
-  if(data.hasOwnProperty('widget')){
-    result = data.widget
+  if(data.hasOwnProperty('widget_type') && data.hasOwnProperty('show')){
+    if(data.widget_type == 'none')
+      return
+    result = data.show
   }
 
   return result
@@ -6772,8 +6768,8 @@ export class HVYM_Data {
       let action_type = valProp.prop_action_type;
       let slider_type = valProp.prop_slider_type;
       let widget_type = valProp.widget_type;
-      let widget = valProp.widget;
-      this.collections[colID].valProps[valPropName] = this.hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget_type, widget);
+      let show = valProp.show;
+      this.collections[colID].valProps[valPropName] = this.hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget_type, show);
     }
   }
   HandleMaterialProps(colID, matProps){
@@ -6784,8 +6780,8 @@ export class HVYM_Data {
       let irridescent = matProp.irridescent;
       let sheen = matProp.sheen;
       let widget_type = matProp.widget_type;
-      let widget = matProp.widget;
-      this.collections[colID].matProps[matPropName] = this.hvymMatProps(colID, mat_name, emissive, irridescent, sheen, mat_ref, widget_type, widget);
+      let show = matProp.show;
+      this.collections[colID].matProps[matPropName] = this.hvymMatProps(colID, mat_name, emissive, irridescent, sheen, mat_ref, widget_type, show);
     }
   }
   HandleMorphSetProps(colID, morphSets){
@@ -6797,13 +6793,13 @@ export class HVYM_Data {
         morph_set[m_prop.name] = this.hvymMorphSetRef(m_prop.name, morphSetName, colID, mesh_ref, m_prop.default, m_prop.min, m_prop.max);
       });
 
-      this.collections[colID].morphSets[morphSetName] = this.hvymMorphSet(colID, morph_set, mesh_ref, morphSet.widget_type, morphSet.widget);
+      this.collections[colID].morphSets[morphSetName] = this.hvymMorphSet(colID, morph_set, mesh_ref, morphSet.widget_type, morphSet.show);
     }
   }
   HandleMeshProps(colID, meshProps){
     for (const [meshPropName, meshProp] of Object.entries(meshProps)) {
       let mesh = this.collections[colID].models[meshProp.name];
-      this.collections[colID].meshProps[meshPropName] = this.hvymMeshPropRef(meshProp.name, meshProp.visible, mesh, meshProp.widget_type, meshProp.widget);
+      this.collections[colID].meshProps[meshPropName] = this.hvymMeshPropRef(meshProp.name, meshProp.visible, mesh, meshProp.widget_type, meshProp.show);
     }
   }
   HandleAnimProps(colID, animProps){
@@ -6813,7 +6809,7 @@ export class HVYM_Data {
 
       let anim = this.collections[colID].animations[animProp.name];
       anim.weight = animProp.weight;
-      this.collections[colID].animProps[animPropName] = this.hvymAnimProp(colID, animProp.name, animProp.start, animProp.end, animProp.loop, animProp.blending, anim, animProp.widget_type, animProp.widget);
+      this.collections[colID].animProps[animPropName] = this.hvymAnimProp(colID, animProp.name, animProp.start, animProp.end, animProp.loop, animProp.blending, anim, animProp.widget_type, animProp.show);
       if(animProp.widget_type == 'slider'){
         let val_props = numberValueProperties(animProp.weight, 0, 1, 3, 0.001, true);
         this.collections[colID].animProps[animPropName].val_props = animRefProperties(animProp.start, animProp.end, animProp.loop, anim, val_props, 'animation', false, true, this);;
@@ -6827,7 +6823,7 @@ export class HVYM_Data {
         let mesh_set = this.collections[colID].meshSets[v.mesh_set];
         let mat_id = v.material_id;
         let widget_type = v.widget_type;
-        let widget = v.widget;
+        let show = v.show;
         if(mesh_set == undefined)
           return;
 
@@ -6839,7 +6835,7 @@ export class HVYM_Data {
           mat_set[m_name] = this.hvymMaterialSetRef(k, colID, mat);
         });
 
-        this.collections[colID].materialSets[k] = this.hvymMaterialSet(colID, mat_id, mat_set, mesh_set, widget_type, widget);
+        this.collections[colID].materialSets[k] = this.hvymMaterialSet(colID, mat_id, mat_set, mesh_set, widget_type, show);
 
         //assign material ref to material userData
         for (const [matName, mat_set_ref] of Object.entries(mat_set)) {
@@ -6857,7 +6853,7 @@ export class HVYM_Data {
         set[m_ref.name] = ref
       });
 
-      this.collections[colID].meshSets[k] = this.hvymMeshSet(colID, set, v.widget_type, v.widget);
+      this.collections[colID].meshSets[k] = this.hvymMeshSet(colID, set, v.widget_type, v.show);
     }
   }
   CollectionHasProperty(key, prop){
@@ -7080,13 +7076,13 @@ export class HVYM_Data {
       'menuData': undefined
     }
   }
-  hvymMeshSet(collection_id, set, widget_type, widget){
+  hvymMeshSet(collection_id, set, widget_type, show){
     return {
       'type': 'HVYM_MESH_SET',
       'collection_id': collection_id,
       'set': set,
       'widget_type': widget_type,
-      'widget': widget
+      'show': show
     }
   }
   hvymMeshSetRef(set_name, collection_id, mesh_ref, visible){
@@ -7099,7 +7095,7 @@ export class HVYM_Data {
       'ctrl': this
     }
   }
-  hvymMaterialSet(collection_id, material_id, set, mesh_set, widget_type, widget){
+  hvymMaterialSet(collection_id, material_id, set, mesh_set, widget_type, show){
     return {
       'type': 'HVYM_MAT_SET',
       'collection_id': collection_id,
@@ -7107,7 +7103,7 @@ export class HVYM_Data {
       'set': set,
       'mesh_set': mesh_set,
       'widget_type': widget_type,
-      'widget': widget
+      'show': show
     }
   }
   hvymMaterialSetRef(set_name, collection_id, mat_ref){
@@ -7154,7 +7150,7 @@ export class HVYM_Data {
       'ctrl': this
     }
   }
-  hvymAnimProp(collection_id, name, start, end, loop, blend, anim_ref, widget_type, widget){
+  hvymAnimProp(collection_id, name, start, end, loop, blend, anim_ref, widget_type, show){
     return {
       'type': 'HVYM_ANIM_PROP',
       'collection_id': collection_id,
@@ -7162,12 +7158,12 @@ export class HVYM_Data {
       'val_props': animRefProperties(start, end, loop, anim_ref, stringValueProperties(), 'animation', false, true, this),
       'blend': blend,
       'widget_type': widget_type,
-      'widget': widget,
+      'show': show,
       'mixer': undefined,
       'ctrl': this
     }
   }
-  hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget_type, widget){
+  hvymValPropRef(name, default_val, min, max, action_type, slider_type, widget_type, show){
     let editable = true;
     if(action_type == 'Immutable'){
       editable = false;
@@ -7178,7 +7174,7 @@ export class HVYM_Data {
       'val_props': numberValueProperties(default_val, min, max, 0, 0.001, editable),
       'action_type': action_type,
       'slider_type': slider_type,
-      'widget': widget,
+      'show': show,
       'widget_type': widget_type,
       'ctrl': this
     }
@@ -7554,7 +7550,7 @@ export function createGLTFModelPortal(gltfProps){
  *
  * @param {object} parent Object3D.
  */
-export function GLTFDragAndDrop(parent) {
+export function GLTFDragAndDrop(hvymScene, parent) {
   document.addEventListener('dragover', (e) => {
       e.preventDefault()
   });
@@ -7587,7 +7583,7 @@ export function GLTFDragAndDrop(parent) {
           loader.parse( contents, '', function ( gltf ) {
             const size = getGeometrySize(parent.geometry);
             const boxProps = boxProperties(gltf.scene.name, parent, size.width, size.height, size.depth, 3, 0.02);
-            const gltfProps = gltfProperties(boxProps, gltf.scene.name, gltf);
+            const gltfProps = gltfProperties(hvymScene, boxProps, gltf.scene.name, gltf);
             gltfProps.hvymData = new HVYM_Data(gltf);
             GLTFModelWidgetLoader(gltfProps);
           } );
