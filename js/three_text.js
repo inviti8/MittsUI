@@ -7115,14 +7115,14 @@ export class HVYM_Data {
       'ctrl': this
     }
   }
-  hvymMorphSet(collection_id, set, mesh_ref, widget_type, widget){
+  hvymMorphSet(collection_id, set, mesh_ref, widget_type, show){
     return {
       'type': 'HVYM_MORPH_SET',
       'collection_id': collection_id,
       'set': set,
       'mesh_ref': mesh_ref,
       'widget_type': widget_type,
-      'widget': widget
+      'show': show
     }
   }
   hvymMorphSetRef(morph_name, set_name, collection_id, mesh_ref, default_val, min, max){
@@ -7495,7 +7495,6 @@ export function createGLTFModel(gltfProps){
         gltfProps.hvymData = new HVYM_Data(gltf);
         gltfProps.gltf = gltf;
         GLTFModelWidgetLoader(gltfProps);
-        console.log('hvymData&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&')
         console.log(gltfProps.hvymData)
       },
       // called while loading is progressing
