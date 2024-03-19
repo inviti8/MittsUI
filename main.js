@@ -64,13 +64,6 @@ let dragDistY = 0;
 let lastClick = 0;
 let mouseOver = [];
 
-const draggable = three_text.getDraggable();
-const mouseOverable = three_text.getMouseOverable();
-const inputPrompts = three_text.getInputPrompts();
-const inputText = three_text.getInputText();
-const selectorElems = three_text.getSelectorElems();
-const toggles = three_text.getToggles();
-
 let RESET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_START.x+GRID.offsetScale, CUBE_SCALE_START.y+GRID.offsetScale, CUBE_SCALE_START.z);
 let TARGET_CUBE_SCALE =  new THREE.Vector3(CUBE_SCALE_TARGET.x+GRID.offsetScale, CUBE_SCALE_TARGET.y+GRID.offsetScale, CUBE_SCALE_TARGET.z);
 
@@ -101,8 +94,6 @@ document.body.appendChild(renderer.domElement);
 camera.position.z = 100;
 camera.aspect = aspectRatio; // Update the camera's aspect ratio
 camera.updateProjectionMatrix(); // Update the camera's projection matrix
-
-three_text.setSceneCameraAndRenderer(scene, camera, renderer)//Set scene, camera, and renderer for Three_text
 
 // Function to smoothly interpolate camera position
 function resetCamera(idx=0) {
@@ -364,7 +355,6 @@ function onDoubleClick() {
       let currentText = '';
       let parent = inputProps.txtBox.box;
       let pos = new THREE.Vector3().copy(clicked.position);
-      const textGeometry = three_text.createTextGeometry(currentText, inputProps.font, inputProps.size, inputProps.height, inputProps.meshProps.curveSegments, inputProps.meshProps.bevelEnabled, inputProps.meshProps.bevelThickness, inputProps.meshProps.bevelSize, inputProps.meshProps.bevelOffset, inputProps.meshProps.bevelSegments);
       let mat = clicked.material;
 
       const typingTextMesh = new THREE.Mesh(textGeometry, mat);
@@ -405,7 +395,6 @@ function onDoubleClick() {
 
           // Update the text in the typingTextMesh
           typingTextMesh.geometry.dispose(); // Clear the previous text
-          typingTextMesh.geometry = three_text.createTextGeometry(currentText, inputProps.font, inputProps.size, inputProps.height, inputProps.meshProps.curveSegments, inputProps.meshProps.bevelEnabled, inputProps.meshProps.bevelThickness, inputProps.meshProps.bevelSize, inputProps.meshProps.bevelOffset, inputProps.meshProps.bevelSegments);
       });
     }
 }
@@ -698,10 +687,7 @@ function elementHandler( action, props ){
             const panel = viewGrps[activeView].panels[LAST_INDEX];
             const font = STYLE_PROPS.selected_font.font;
             let name = props.element_name.name;
-            let meshProps = three_text.meshProperties(12, false, 0.1, 0.1, 0, 3);
-            //anim, action, duration, ease, delay, onComplete
-            let aConfig = three_text.animationConfig('SCALE', 'IN', 1, 'elastic.out', 0.01)
-            three_text.createMultiTextBox(panel, 50, 10, name, 'text', font, true, 1, 5, 1, 4, 5, 0.5, meshProps, aConfig, onElemCreated);
+
         break;
         case 'remove':
 
@@ -732,10 +718,6 @@ function elemUpdateHandler(action, props){
             const panel = viewGrps[activeView].panels[LAST_INDEX];
             const font = STYLE_PROPS.selected_font.font;
             let name = props.element_name.name;
-            let meshProps = three_text.meshProperties(12, false, 0.1, 0.1, 0, 3);
-            //anim, action, duration, ease, delay, onComplete
-            let aConfig = three_text.animationConfig('SCALE', 'IN', 1, 'elastic.out', 0.01)
-            three_text.createMultiTextBox(panel, 50, 10, name, 'text', font, true, 1, 5, 1, 4, 5, 0.5, meshProps, aConfig, onElemCreated);
         break;
         case 'remove':
 
